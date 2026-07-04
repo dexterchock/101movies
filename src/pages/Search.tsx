@@ -43,7 +43,7 @@ export function Search() {
       {results.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 pb-24">
           {results.map((item) => (
-            <MediaCard key={item.id} item={item} className="aspect-[2/3]" />
+            <MediaCard key={item.id} item={item} className="" />
           ))}
         </div>
       ) : query.trim().length > 2 ? (

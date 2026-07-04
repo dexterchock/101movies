@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { api } from "../api";
 import { MediaDetails, MediaItem } from "../types";
 import { HlsPlayer } from "../components/HlsPlayer";
+import { Play } from "lucide-react";
 
 // Mock streaming sources representing different CDNs/Servers
 const MOCK_SOURCES = [
@@ -15,81 +16,108 @@ export function Player() {
   const { type, id } = useParams<{ type: 'movie' | 'tv'; id: string }>();
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const [activeSource, setActiveSource] = useState(MOCK_SOURCES[0].url);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (type && id) {
       api.getDetails(type, id).then((data) => {
         setDetails(data);
-        // Save to history
         try {
           const stored = localStorage.getItem("watch_history");
           let history: MediaItem[] = stored ? JSON.parse(stored) : [];
-          // Remove if it exists
           history = history.filter((item) => item.id.toString() !== id);
-          // Add to top
           history.unshift(data as MediaItem);
-          // Keep only last 20
           localStorage.setItem("watch_history", JSON.stringify(history.slice(0, 20)));
         } catch (e) {}
       });
     }
   }, [type, id]);
 
+  useEffect(() => {
+    if (details && !isPlaying) {
+      playButtonRef.current?.focus();
+    }
+  }, [details, isPlaying]);
+
   if (!details) {
-    return <div className="p-12 text-2xl text-gray-500">Loading...</div>;
+    return <div className="p-12 flex items-center justify-center min-h-screen"><div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div></div>;
   }
 
   const title = details.title || details.name;
+  const backdropUrl = details.backdrop_path 
+    ? `https://image.tmdb.org/t/p/original${details.backdrop_path}`
+    : `https://image.tmdb.org/t/p/original${details.poster_path}`;
 
   return (
-    <div className="flex flex-col min-h-full p-8 md:p-12 gap-8">
-      {/* Video Player Section */}
-      <div className="w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl relative group focus-within:ring-4 focus-within:ring-white/50">
-        <HlsPlayer src={activeSource} />
-      </div>
-
-      {/* Line Selection */}
-      <div className="flex flex-wrap items-center gap-4 bg-white/5 p-4 rounded-xl">
-        <span className="text-gray-400 font-medium px-4">Streaming Source:</span>
-        {MOCK_SOURCES.map((src, index) => (
-          <button
-            key={index}
-            onClick={() => setActiveSource(src.url)}
-            tabIndex={0}
-            className={`px-6 py-3 rounded-lg font-medium transition-all outline-none focus:ring-4 focus:ring-white focus:scale-105 ${activeSource === src.url ? 'bg-white text-black' : 'bg-white/10 text-white hover:bg-white/20'}`}
-          >
-            {src.name}
-          </button>
-        ))}
-      </div>
-
-      {/* Media Details */}
-      <div className="flex flex-col md:flex-row gap-8 mt-4">
-        {details.poster_path && (
-          <img
-            src={`https://image.tmdb.org/t/p/w500${details.poster_path}`}
-            alt={title}
-            className="w-48 md:w-64 rounded-xl shadow-lg shrink-0"
-          />
-        )}
-        <div className="flex flex-col gap-4">
-          <h1 className="text-4xl md:text-5xl font-bold text-white">{title}</h1>
-          <div className="flex flex-wrap gap-4 items-center text-gray-300">
-            <span>{(details.release_date || details.first_air_date)?.substring(0, 4)}</span>
-            {details.runtime && <span>{details.runtime} min</span>}
-            <div className="flex gap-2">
-              {details.genres?.map(g => (
-                <span key={g.id} className="bg-white/10 px-2 py-1 rounded text-sm">{g.name}</span>
-              ))}
-            </div>
-            {details.vote_average > 0 && (
-              <span className="text-yellow-500 font-bold bg-yellow-500/10 px-2 py-1 rounded">
-                ★ {details.vote_average.toFixed(1)}
-              </span>
+    <div className="flex flex-col min-h-full pb-24 relative">
+      {/* Hero / Player Section */}
+      <div className="w-full relative aspect-video bg-black overflow-hidden group">
+        {isPlaying ? (
+          <HlsPlayer src={activeSource} />
+        ) : (
+          <div className="absolute inset-0 w-full h-full">
+            {backdropUrl && (
+              <img 
+                src={backdropUrl} 
+                alt={title} 
+                className="w-full h-full object-cover opacity-50"
+              />
             )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/20 to-transparent" />
+            
+            {/* Play Overlay */}
+            <div className="absolute inset-0 flex flex-col justify-end p-8 md:p-16 z-10 pt-32">
+              <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 drop-shadow-2xl">{title}</h1>
+              <div className="flex flex-wrap gap-4 items-center text-gray-200 mb-8 font-medium">
+                <span className="bg-white/15 px-3 py-1 rounded-full border border-white/10">{(details.release_date || details.first_air_date)?.substring(0, 4)}</span>
+                {details.runtime && <span className="bg-white/15 px-3 py-1 rounded-full border border-white/10">{details.runtime} min</span>}
+                {details.vote_average > 0 && (
+                  <span className="text-black font-bold bg-white px-3 py-1 rounded-full shadow-lg">
+                    ★ {details.vote_average.toFixed(1)}
+                  </span>
+                )}
+                {details.genres?.slice(0, 3).map(g => (
+                  <span key={g.id} className="text-gray-300">{g.name}</span>
+                ))}
+              </div>
+              <p className="text-gray-300 text-lg md:text-xl leading-relaxed max-w-3xl mb-10 line-clamp-3 drop-shadow-md">
+                {details.overview}
+              </p>
+              <div>
+                <button
+                  ref={playButtonRef}
+                  onClick={() => setIsPlaying(true)}
+                  tabIndex={0}
+                  className="flex items-center gap-3 bg-white text-black px-10 py-4 rounded-full font-bold text-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none focus:ring-4 focus:ring-white/50 focus:scale-105 hover:scale-105 hover:bg-gray-200 shadow-2xl"
+                >
+                  <Play size={28} className="fill-black" />
+                  Play Now
+                </button>
+              </div>
+            </div>
           </div>
-          {details.tagline && <p className="text-xl text-gray-400 italic">"{details.tagline}"</p>}
-          <p className="text-gray-200 text-lg leading-relaxed max-w-4xl">{details.overview}</p>
+        )}
+      </div>
+
+      {/* Streaming Sources Section */}
+      <div className="px-8 md:px-16 mt-12 max-w-7xl mx-auto w-full">
+        <h2 className="text-2xl font-semibold mb-6 text-white/90">Streaming Servers</h2>
+        <div className="flex flex-wrap items-center gap-4">
+          {MOCK_SOURCES.map((src, index) => (
+            <button
+              key={index}
+              onClick={() => {
+                setActiveSource(src.url);
+                setIsPlaying(true);
+              }}
+              tabIndex={0}
+              className={`px-8 py-4 rounded-2xl font-medium transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none focus:ring-4 focus:ring-white focus:scale-105 border ${activeSource === src.url ? 'bg-white text-black border-white shadow-[0_4px_24px_rgba(255,255,255,0.2)]' : 'bg-[#111] text-white border-white/10 hover:bg-white/10 hover:scale-105'}`}
+            >
+              {src.name}
+            </button>
+          ))}
         </div>
       </div>
     </div>

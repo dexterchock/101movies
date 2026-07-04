@@ -22,32 +22,35 @@ export function MediaCard({ item, rank, className }: MediaCardProps) {
       to={`/player/${type}/${item.id}`}
       tabIndex={0}
       className={cn(
-        "group relative flex-shrink-0 rounded-lg overflow-hidden transition-all duration-300 outline-none",
-        "focus:ring-4 focus:ring-white focus:scale-105 focus:z-10",
+        "group flex flex-col gap-3 flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none",
+        "focus:scale-105 focus:z-10",
         "hover:scale-105 hover:z-10",
         className
       )}
     >
-      <div className="w-full h-full bg-white/5 relative">
+      <div className="w-full relative aspect-[2/3] rounded-xl overflow-hidden bg-[#111] border border-white/5 group-focus:ring-4 group-focus:ring-white group-focus:border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
         <img
           src={imageUrl}
           alt={title}
-          className="w-full h-full object-cover rounded-lg"
+          className="w-full h-full object-cover"
           loading="lazy"
         />
-        {/* Using a solid gradient overlay instead of blur for TV GPU performance */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-0 group-focus:opacity-100 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-50" />
         
         {rank && (
-          <div className="absolute top-2 left-2 bg-white text-black font-extrabold text-2xl px-3 py-1 rounded shadow-lg z-10">
+          <div className="absolute top-2 left-2 bg-white/90 text-black font-extrabold text-xl px-3 py-1 rounded shadow-lg z-10 backdrop-blur-sm border border-white/20">
             {rank}
           </div>
         )}
-
-        <div className="absolute bottom-0 left-0 right-0 p-4 translate-y-4 group-focus:translate-y-0 group-hover:translate-y-0 opacity-0 group-focus:opacity-100 group-hover:opacity-100 transition-all duration-300">
-          <h3 className="text-white font-medium text-lg leading-tight line-clamp-2">{title}</h3>
-          <p className="text-gray-300 text-sm mt-1">{item.release_date || item.first_air_date?.substring(0,4)}</p>
-        </div>
+      </div>
+      
+      <div className="flex flex-col px-1">
+        <h3 className="text-white font-medium text-base leading-tight truncate group-focus:text-white transition-colors">
+          {title}
+        </h3>
+        <p className="text-gray-400 text-sm mt-0.5 font-light">
+          {item.release_date?.substring(0,4) || item.first_air_date?.substring(0,4)}
+        </p>
       </div>
     </Link>
   );

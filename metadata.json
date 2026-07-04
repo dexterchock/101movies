@@ -1,0 +1,6 @@
+{
+  "name": "101Movies",
+  "description": "A sleek, dark-mode movie streaming web app optimized for Smart TVs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

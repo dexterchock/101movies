@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { Star } from "lucide-react";
 import { MediaItem } from "../types";
 import { cn } from "../utils";
 
@@ -22,26 +23,32 @@ export function MediaCard({ item, rank, className }: MediaCardProps) {
       to={`/player/${type}/${item.id}`}
       tabIndex={0}
       className={cn(
-        "group flex flex-col gap-3 flex-shrink-0 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none",
-        "focus:scale-105 focus:z-10",
-        "hover:scale-105 hover:z-10",
+        "group flex flex-col gap-3 flex-shrink-0 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none cursor-pointer",
+        "focus:z-30 hover:z-30",
         className
       )}
     >
-      <div className="w-full relative aspect-[2/3] rounded-xl overflow-hidden bg-[#111] border border-white/5 group-focus:ring-4 group-focus:ring-white group-focus:border-transparent transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-[0_8px_24px_rgba(0,0,0,0.5)]">
+      <div className="w-full relative aspect-[2/3] rounded-2xl overflow-hidden bg-[#111] border border-white/10 group-focus:ring-4 group-focus:ring-white/80 group-focus:border-transparent group-hover:border-white/30 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-lg group-hover:shadow-[0_16px_40px_rgba(0,0,0,0.8)]">
         <img
           src={imageUrl}
           alt={title}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transform group-hover:scale-105 group-focus:scale-105 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-50" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500" />
         
         {rank && (
-          <div className="absolute top-2 left-2 bg-white/90 text-black font-extrabold text-xl px-3 py-1 rounded shadow-lg z-10 backdrop-blur-sm border border-white/20">
+          <div className="absolute top-3 left-3 bg-white/90 text-black font-extrabold text-xl px-3 py-1 rounded-xl shadow-lg z-10 backdrop-blur-md border border-white/20">
             {rank}
           </div>
         )}
+
+        {item.vote_average ? (
+          <div className="absolute bottom-3 right-3 bg-white text-black font-bold text-xs px-2.5 py-1 rounded-full shadow-lg z-10 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex items-center gap-1">
+            <Star className="w-3 h-3 text-black fill-black" />
+            <span>{item.vote_average.toFixed(1)}</span>
+          </div>
+        ) : null}
       </div>
       
       <div className="flex flex-col px-1">

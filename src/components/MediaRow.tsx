@@ -72,18 +72,32 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
         </div>
       </div>
 
-      {/* Grid Container */}
-      <div 
-        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full"
-      >
-        {visibleItems.map((item) => (
-          <MediaCard 
-            key={item.id} 
-            item={item} 
-            className="w-full" 
-          />
-        ))}
-      </div>
+      {rows === 2 ? (
+        <div className="flex flex-col w-full">
+          {/* First Row */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full">
+            {visibleItems.slice(0, 6).map((item) => (
+              <MediaCard key={item.id} item={item} className="w-full" />
+            ))}
+          </div>
+          {/* Second Row - Height Bounded for Early Un-stick */}
+          {visibleItems.length > 6 && (
+            <div className="h-32 md:h-48 overflow-visible mt-6 md:mt-8 relative z-10">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full">
+                {visibleItems.slice(6, 12).map((item) => (
+                  <MediaCard key={item.id} item={item} className="w-full" />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full">
+          {visibleItems.map((item) => (
+            <MediaCard key={item.id} item={item} className="w-full" />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -33,7 +33,7 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
 
   return (
     <div className="flex flex-col w-full relative z-20">
-      <div className={`flex items-center justify-between w-full px-4 md:px-6 pt-2 md:pt-2 pb-1 mb-2 ${
+      <div className={`flex items-center justify-between w-full px-6 md:px-8 pt-6 md:pt-8 pb-1 mb-2 ${
         rows === 2 ? 'sticky top-0 z-50 pointer-events-none' : ''
       }`}>
         {rows === 2 && (
@@ -74,7 +74,7 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
 
       {/* Grid Container */}
       <div 
-        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-4 md:px-6 w-full"
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full"
       >
         {visibleItems.map((item) => (
           <MediaCard 

@@ -13,7 +13,7 @@ export function Layout() {
   return (
     <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden relative">
       {/* Floating Bottom Navigation - Apple Liquid Glass */}
-      <div className="fixed bottom-4 md:bottom-6 left-0 right-0 z-50 flex justify-center pointer-events-none">
+      <div className="fixed bottom-6 md:bottom-8 left-0 right-0 z-50 flex justify-center pointer-events-none">
         <nav className="flex items-center gap-2 p-1.5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.2)] pointer-events-auto">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;

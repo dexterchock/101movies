@@ -23,12 +23,10 @@ export function Home() {
   }, []);
 
   return (
-    <div className="flex flex-col pt-4 pb-24 min-h-full">
-      <div className="flex flex-col gap-8">
-        {history.length > 0 && <MediaRow title="Continue Watching" items={history} />}
-        <MediaRow title="Trending Movies" items={trendingMovies} rows={2} />
-        <MediaRow title="Trending TV Shows" items={trendingTV} rows={2} />
-      </div>
+    <div className="flex flex-col gap-12 py-8 min-h-screen bg-black">
+      {history.length > 0 && <MediaRow title="Continue Watching" items={history} />}
+      <MediaRow title="Trending Movies" items={trendingMovies} rows={2} />
+      <MediaRow title="Trending TV Shows" items={trendingTV} rows={2} />
     </div>
   );
 }

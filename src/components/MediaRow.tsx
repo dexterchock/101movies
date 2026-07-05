@@ -32,15 +32,15 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
   if (!items || items.length === 0) return null;
 
   return (
-    <div className="flex flex-col w-full relative z-20">
-      <div className={`flex items-center justify-between w-full px-6 md:px-8 pt-6 md:pt-8 pb-1 mb-2 ${
+    <div className={`flex flex-col w-full relative z-20 ${rows === 2 ? 'pb-36 md:pb-48' : ''}`}>
+      <div className={`relative flex items-center justify-between w-full px-6 md:px-8 pt-6 md:pt-8 pb-1 mb-2 ${
         rows === 2 ? 'sticky top-0 z-50 pointer-events-none' : ''
       }`}>
         {rows === 2 && (
-          <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black via-black/60 to-transparent -z-10" />
+          <div className="absolute inset-x-0 -top-4 h-32 md:h-40 bg-gradient-to-b from-black via-black/40 to-transparent -z-10 pointer-events-none" />
         )}
-        <h2 className="text-2xl font-bold text-white/95 tracking-wide pointer-events-auto">{title}</h2>
-        <div className="flex items-center gap-4 pointer-events-auto">
+        <h2 className="relative z-10 text-2xl font-bold text-white/95 tracking-wide pointer-events-auto">{title}</h2>
+        <div className="relative z-10 flex items-center gap-4 pointer-events-auto">
           <div className="flex gap-2 items-center">
             {onClear && (
               <button

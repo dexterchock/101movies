@@ -32,9 +32,9 @@ export function MediaRow({ title, items, rows = 1 }: MediaRowProps) {
 
   return (
     <div className="flex flex-col w-full py-8 relative z-20">
-      <div className="flex items-center justify-between px-12 md:px-16 w-full mb-4">
-        <h2 className="text-2xl font-bold text-white/95 tracking-wide">{title}</h2>
-        <div className="flex items-center gap-4">
+      <div className={`flex items-center justify-between px-12 md:px-16 w-full ${rows > 1 ? 'sticky top-0 z-50 pt-4 pb-8 mb-[-1rem] bg-gradient-to-b from-black via-black/90 to-transparent pointer-events-none' : 'mb-4'}`}>
+        <h2 className={`text-2xl font-bold text-white/95 tracking-wide ${rows > 1 ? 'pointer-events-auto' : ''}`}>{title}</h2>
+        <div className={`flex items-center gap-4 ${rows > 1 ? 'pointer-events-auto' : ''}`}>
           <div className="flex gap-2">
             <button
               onClick={prevPage}

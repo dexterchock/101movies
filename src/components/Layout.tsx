@@ -12,8 +12,8 @@ export function Layout() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden relative">
-      {/* Floating Top Navigation - Apple Liquid Glass */}
-      <div className="fixed top-8 left-0 right-0 z-50 flex justify-center pointer-events-none">
+      {/* Floating Bottom Navigation - Apple Liquid Glass */}
+      <div className="fixed bottom-8 left-0 right-0 z-50 flex justify-center pointer-events-none">
         <nav className="flex items-center gap-2 p-1.5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.2)] pointer-events-auto">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -40,7 +40,7 @@ export function Layout() {
       </div>
       
       {/* Main Content Area */}
-      <main className="flex-1 relative w-full h-full overflow-y-auto overflow-x-hidden no-scrollbar pt-32 pb-12 z-10">
+      <main className="flex-1 relative w-full h-full overflow-y-auto overflow-x-hidden no-scrollbar pt-0 pb-32">
         <Outlet />
       </main>
     </div>

@@ -40,7 +40,7 @@ export function Layout() {
       </div>
       
       {/* Main Content Area */}
-      <main className="flex-1 relative w-full h-full overflow-y-auto overflow-x-hidden no-scrollbar pt-0 pb-32">
+      <main className="flex-1 relative w-full h-full overflow-y-auto overflow-x-hidden no-scrollbar pt-0 pb-[120px]">
         <Outlet />
       </main>
     </div>

@@ -22,9 +22,14 @@ export function Home() {
     }
   }, []);
 
+  const handleClearHistory = () => {
+    localStorage.removeItem("watch_history");
+    setHistory([]);
+  };
+
   return (
-    <div className="flex flex-col gap-12 py-8 min-h-screen bg-black">
-      {history.length > 0 && <MediaRow title="Continue Watching" items={history} />}
+    <div className="flex flex-col gap-4 md:gap-6 pt-0 pb-0 min-h-screen bg-black">
+      {history.length > 0 && <MediaRow title="Continue Watching" items={history} onClear={handleClearHistory} />}
       <MediaRow title="Trending Movies" items={trendingMovies} rows={2} />
       <MediaRow title="Trending TV Shows" items={trendingTV} rows={2} />
     </div>

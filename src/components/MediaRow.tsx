@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { MediaItem } from "../types";
 import { MediaCard } from "./MediaCard";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 
 interface MediaRowProps {
   title: string;
   items: MediaItem[];
   rows?: 1 | 2;
+  onClear?: () => void;
 }
 
-export function MediaRow({ title, items, rows = 1 }: MediaRowProps) {
+export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
   const [page, setPage] = useState(0);
 
   const itemsPerPage = rows === 2 ? 12 : 6;
@@ -31,11 +32,24 @@ export function MediaRow({ title, items, rows = 1 }: MediaRowProps) {
   if (!items || items.length === 0) return null;
 
   return (
-    <div className="flex flex-col w-full py-8 relative z-20">
-      <div className={`flex items-center justify-between px-12 md:px-16 w-full ${rows > 1 ? 'sticky top-0 z-50 pt-4 pb-8 mb-[-1rem] bg-gradient-to-b from-black via-black/90 to-transparent pointer-events-none' : 'mb-4'}`}>
+    <div className="flex flex-col w-full relative z-20">
+      <div className={`flex items-center justify-between px-4 md:px-6 w-full mb-4 ${rows > 1 ? 'sticky top-0 z-50 pt-4 md:pt-6 pb-2 pointer-events-none' : 'pt-4 md:pt-6'}`}>
+        {rows > 1 && (
+          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black from-40% via-black/80 to-transparent -z-10" />
+        )}
         <h2 className={`text-2xl font-bold text-white/95 tracking-wide ${rows > 1 ? 'pointer-events-auto' : ''}`}>{title}</h2>
         <div className={`flex items-center gap-4 ${rows > 1 ? 'pointer-events-auto' : ''}`}>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {onClear && (
+              <button
+                onClick={onClear}
+                className="mr-2 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white/70 hover:text-white bg-transparent hover:bg-white/10 rounded-full border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                title="Clear History"
+              >
+                <Trash2 size={16} />
+                Clear
+              </button>
+            )}
             <button
               onClick={prevPage}
               disabled={!showLeft}
@@ -58,7 +72,7 @@ export function MediaRow({ title, items, rows = 1 }: MediaRowProps) {
 
       {/* Grid Container */}
       <div 
-        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-12 md:px-16 w-full"
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-4 md:px-6 w-full"
       >
         {visibleItems.map((item) => (
           <MediaCard 

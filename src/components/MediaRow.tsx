@@ -33,8 +33,8 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
 
   return (
     <div className="flex flex-col w-full relative z-20">
-      <div className="sticky top-0 z-50 flex items-center justify-between w-full px-4 md:px-6 pt-4 md:pt-6 pb-2 mb-4 pointer-events-none">
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black from-40% via-black/80 to-transparent -z-10" />
+      <div className="sticky top-0 z-50 flex items-center justify-between w-full px-4 md:px-6 pt-2 md:pt-2 pb-1 mb-2 pointer-events-none">
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black via-black/60 to-transparent -z-10" />
         <h2 className="text-2xl font-bold text-white/95 tracking-wide pointer-events-auto">{title}</h2>
         <div className="flex items-center gap-4 pointer-events-auto">
           <div className="flex gap-2 items-center">

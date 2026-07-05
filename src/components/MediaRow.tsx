@@ -29,73 +29,90 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
     if (page < totalPages - 1) setPage(page + 1);
   };
 
+  const renderHeader = (isSticky: boolean, isPlaceholder: boolean = false) => (
+    <div 
+      className={`relative flex items-center justify-between w-full px-6 md:px-8 pt-6 md:pt-8 pb-1 mb-2 ${
+        isSticky ? 'sticky top-0 z-50 pointer-events-none' : ''
+      } ${isPlaceholder ? 'opacity-0 pointer-events-none invisible' : ''}`}
+      aria-hidden={isPlaceholder}
+    >
+      {isSticky && !isPlaceholder && (
+        <div className="absolute inset-x-0 -top-4 h-32 md:h-40 bg-gradient-to-b from-black via-black/40 to-transparent -z-10 pointer-events-none" />
+      )}
+      <h2 className="relative z-10 text-2xl font-bold text-white/95 tracking-wide pointer-events-auto">{title}</h2>
+      <div className="relative z-10 flex items-center gap-4 pointer-events-auto">
+        <div className="flex gap-2 items-center">
+          {onClear && (
+            <button
+              onClick={onClear}
+              className="mr-2 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white/70 hover:text-white bg-transparent hover:bg-white/10 rounded-full border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+              title="Clear History"
+              tabIndex={isPlaceholder ? -1 : 0}
+            >
+              <Trash2 size={16} />
+              Clear
+            </button>
+          )}
+          <button
+            onClick={prevPage}
+            disabled={!showLeft}
+            className={`p-2 rounded-full border border-white/20 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${showLeft ? 'bg-white/10 hover:bg-white/20 hover:scale-110 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
+            aria-label="Previous page"
+            tabIndex={isPlaceholder ? -1 : 0}
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <button
+            onClick={nextPage}
+            disabled={!showRight}
+            className={`p-2 rounded-full border border-white/20 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${showRight ? 'bg-white/10 hover:bg-white/20 hover:scale-110 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
+            aria-label="Next page"
+            tabIndex={isPlaceholder ? -1 : 0}
+          >
+            <ChevronRight size={24} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (!items || items.length === 0) return null;
 
   return (
-    <div className={`flex flex-col w-full relative z-20 ${rows === 2 ? 'pb-36 md:pb-48' : ''}`}>
-      <div className={`relative flex items-center justify-between w-full px-6 md:px-8 pt-6 md:pt-8 pb-1 mb-2 ${
-        rows === 2 ? 'sticky top-0 z-50 pointer-events-none' : ''
-      }`}>
-        {rows === 2 && (
-          <div className="absolute inset-x-0 -top-4 h-32 md:h-40 bg-gradient-to-b from-black via-black/40 to-transparent -z-10 pointer-events-none" />
-        )}
-        <h2 className="relative z-10 text-2xl font-bold text-white/95 tracking-wide pointer-events-auto">{title}</h2>
-        <div className="relative z-10 flex items-center gap-4 pointer-events-auto">
-          <div className="flex gap-2 items-center">
-            {onClear && (
-              <button
-                onClick={onClear}
-                className="mr-2 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white/70 hover:text-white bg-transparent hover:bg-white/10 rounded-full border border-white/10 hover:border-white/20 transition-all cursor-pointer"
-                title="Clear History"
-              >
-                <Trash2 size={16} />
-                Clear
-              </button>
-            )}
-            <button
-              onClick={prevPage}
-              disabled={!showLeft}
-              className={`p-2 rounded-full border border-white/20 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${showLeft ? 'bg-white/10 hover:bg-white/20 hover:scale-110 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
-              aria-label="Previous page"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <button
-              onClick={nextPage}
-              disabled={!showRight}
-              className={`p-2 rounded-full border border-white/20 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${showRight ? 'bg-white/10 hover:bg-white/20 hover:scale-110 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
-              aria-label="Next page"
-            >
-              <ChevronRight size={24} />
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col w-full relative z-20">
       {rows === 2 ? (
-        <div className="flex flex-col w-full">
-          {/* First Row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full">
-            {visibleItems.slice(0, 6).map((item) => (
-              <MediaCard key={item.id} item={item} className="w-full" />
-            ))}
+        <>
+          {/* Absolute container that ends precisely halfway through the second row */}
+          <div className="absolute top-0 left-0 right-0 h-[calc(100%-8rem)] md:h-[calc(100%-12rem)] pointer-events-none z-30">
+            {renderHeader(true)}
           </div>
-          {/* Second Row - Height Bounded for Early Un-stick */}
-          {visibleItems.length > 6 && (
-            <div className="h-32 md:h-48 overflow-visible mt-6 md:mt-8 relative z-10">
+          <div className="flex flex-col w-full gap-6 md:gap-8">
+            <div className="flex flex-col w-full relative z-20">
+              {/* Invisible placeholder to reserve the exact layout height */}
+              {renderHeader(false, true)}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full">
+                {visibleItems.slice(0, 6).map((item) => (
+                  <MediaCard key={item.id} item={item} className="w-full" />
+                ))}
+              </div>
+            </div>
+            {visibleItems.length > 6 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full">
                 {visibleItems.slice(6, 12).map((item) => (
                   <MediaCard key={item.id} item={item} className="w-full" />
                 ))}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full">
-          {visibleItems.map((item) => (
-            <MediaCard key={item.id} item={item} className="w-full" />
-          ))}
+        <div className="flex flex-col w-full relative z-20">
+          {renderHeader(false)}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full">
+            {visibleItems.map((item) => (
+              <MediaCard key={item.id} item={item} className="w-full" />
+            ))}
+          </div>
         </div>
       )}
     </div>

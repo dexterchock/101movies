@@ -28,7 +28,7 @@ export function Home() {
   };
 
   return (
-    <div className="flex flex-col gap-6 md:gap-8 pt-0 pb-0 min-h-screen bg-black">
+    <div className="flex flex-col gap-6 md:gap-8 pt-0 pb-[108px] md:pb-[124px] min-h-screen bg-black">
       {history.length > 0 && <MediaRow title="Continue Watching" items={history} onClear={handleClearHistory} />}
       <MediaRow title="Trending Movies" items={trendingMovies} rows={2} />
       <MediaRow title="Trending TV Shows" items={trendingTV} rows={2} />

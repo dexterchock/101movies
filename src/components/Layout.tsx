@@ -12,6 +12,9 @@ export function Layout() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden relative">
+      {/* Global Top Edge Cinematic Dissolve Mask */}
+      <div className="fixed top-0 left-0 right-0 z-[60] h-20 md:h-28 bg-gradient-to-b from-black from-20% via-black/70 to-transparent pointer-events-none" />
+
       {/* Floating Bottom Navigation - Apple Liquid Glass */}
       <div className="fixed bottom-6 md:bottom-8 left-0 right-0 z-50 flex justify-center pointer-events-none">
         <nav className="flex items-center gap-2 p-1.5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.2)] pointer-events-auto">

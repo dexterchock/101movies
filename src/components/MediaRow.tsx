@@ -76,7 +76,18 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
 
   return (
     <div className="flex flex-col w-full relative z-20">
-      {renderHeader(rows === 2)}
+      {rows === 2 ? (
+        <>
+          <div className="absolute top-0 left-0 right-0 bottom-[25%] pointer-events-none z-40">
+            {renderHeader(true)}
+          </div>
+          <div className="flex items-center w-full px-6 md:px-8 pt-6 md:pt-8 pb-2 opacity-0 pointer-events-none" aria-hidden="true">
+            <h2>Dummy Spacer</h2>
+          </div>
+        </>
+      ) : (
+        renderHeader(false)
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full relative z-10">
         {visibleItems.map((item) => (
           <MediaCard key={item.id} item={item} className="w-full" />

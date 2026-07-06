@@ -81,8 +81,8 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
           <div className="absolute top-0 left-0 right-0 bottom-[25%] pointer-events-none z-40">
             {renderHeader(true)}
           </div>
-          <div className="flex items-center w-full px-6 md:px-8 pt-6 md:pt-8 pb-2 opacity-0 pointer-events-none" aria-hidden="true">
-            <h2>Dummy Spacer</h2>
+          <div className="flex items-center justify-between w-full px-6 md:px-8 pt-6 md:pt-8 pb-1 mb-2 opacity-0 pointer-events-none" aria-hidden="true">
+            <h2 className="text-2xl font-bold tracking-wide">{title}</h2>
           </div>
         </>
       ) : (

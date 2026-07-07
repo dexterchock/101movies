@@ -42,7 +42,7 @@ export function Layout() {
                 aria-label={item.name}
                 className={cn(
                   "relative z-10 flex items-center justify-center gap-2 w-[136px] py-2.5 rounded-full transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide will-change-transform transform-gpu backface-hidden [backface-visibility:hidden]",
-                  "focus:ring-2 focus:ring-white focus:scale-110 hover:scale-110",
+                  "focus:outline-none focus-visible:outline-none select-none focus:scale-110 hover:scale-110",
                   isActive ? "text-black" : "text-white/70 hover:text-white"
                 )}
               >

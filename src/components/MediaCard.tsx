@@ -23,16 +23,16 @@ export function MediaCard({ item, rank, className }: MediaCardProps) {
       to={`/player/${type}/${item.id}`}
       tabIndex={0}
       className={cn(
-        "group flex flex-col gap-3 flex-shrink-0 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none cursor-pointer",
+        "group flex flex-col gap-3 flex-shrink-0 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none cursor-pointer",
         "focus:z-30 hover:z-30",
         className
       )}
     >
-      <div className="w-full relative aspect-[2/3] rounded-2xl overflow-hidden bg-[#111] border border-white/10 group-focus:ring-4 group-focus:ring-white/80 group-focus:border-transparent group-hover:border-white/30 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-lg group-hover:shadow-[0_16px_40px_rgba(0,0,0,0.8)]">
+      <div className="w-full relative aspect-[2/3] rounded-2xl overflow-hidden bg-[#111] border border-white/10 group-focus:ring-4 group-focus:ring-white/80 group-focus:border-transparent group-hover:border-white/30 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-lg group-hover:shadow-[0_16px_40px_rgba(0,0,0,0.8)]">
         <img
           src={imageUrl}
           alt={title}
-          className="w-full h-full object-cover transform group-hover:scale-110 group-focus:scale-110 transition-transform duration-500 ease-out"
+          className="w-full h-full object-cover transform group-hover:scale-110 group-focus:scale-110 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu backface-hidden [backface-visibility:hidden]"
           loading="lazy"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-500" />

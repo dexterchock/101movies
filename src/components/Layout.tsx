@@ -10,6 +10,11 @@ export function Layout() {
     { name: "Search", path: "/search", icon: <Search size={20} /> },
   ];
 
+  const activeIndex = Math.max(
+    0,
+    navItems.findIndex((item) => item.path === location.pathname)
+  );
+
   return (
     <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden relative">
       {/* Global Top Edge Cinematic Dissolve Mask */}
@@ -17,9 +22,18 @@ export function Layout() {
 
       {/* Floating Bottom Navigation - Apple Liquid Glass */}
       <div className="fixed bottom-6 md:bottom-8 left-0 right-0 z-50 flex justify-center pointer-events-none">
-        <nav className="flex items-center gap-2 p-1.5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.2)] pointer-events-auto">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+        <nav className="relative flex items-center gap-2 p-1.5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.2)] pointer-events-auto">
+          {/* Absolute Sliding Highlight Track */}
+          <div
+            className="absolute top-1.5 bottom-1.5 bg-white text-black rounded-full transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-[0_0_30px_rgba(255,255,255,0.4)] border border-white/40 pointer-events-none"
+            style={{
+              width: "136px",
+              left: `calc(6px + ${activeIndex} * 136px + ${activeIndex} * 8px)`,
+            }}
+          />
+
+          {navItems.map((item, index) => {
+            const isActive = index === activeIndex;
             return (
               <Link
                 key={item.path}
@@ -27,11 +41,9 @@ export function Layout() {
                 tabIndex={0}
                 aria-label={item.name}
                 className={cn(
-                  "flex items-center gap-2 px-6 py-2.5 rounded-full transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide relative",
-                  "focus:ring-2 focus:ring-white focus:scale-105",
-                  isActive 
-                    ? "bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.4)] border border-white/40" 
-                    : "text-white/70 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 hover:scale-105"
+                  "relative z-10 flex items-center justify-center gap-2 w-[136px] py-2.5 rounded-full transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide will-change-transform transform-gpu backface-hidden [backface-visibility:hidden]",
+                  "focus:ring-2 focus:ring-white focus:scale-110 hover:scale-110",
+                  isActive ? "text-black" : "text-white/70 hover:text-white"
                 )}
               >
                 {item.icon}

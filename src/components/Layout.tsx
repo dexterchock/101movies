@@ -22,7 +22,7 @@ export function Layout() {
 
       {/* Floating Bottom Navigation - Apple Liquid Glass */}
       <div className="fixed bottom-6 md:bottom-8 left-0 right-0 z-50 flex justify-center pointer-events-none">
-        <nav className="relative flex items-center gap-2 p-1.5 rounded-full bg-white/5 backdrop-blur-2xl border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.2)] pointer-events-auto">
+        <nav className="relative flex items-center gap-2 p-1.5 rounded-full bg-white/5 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.2)] pointer-events-auto">
           {/* Absolute Sliding Highlight Track */}
           <div
             className="absolute top-1.5 bottom-1.5 bg-white text-black rounded-full transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] shadow-[0_0_30px_rgba(255,255,255,0.4)] border border-white/40 pointer-events-none"

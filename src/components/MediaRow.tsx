@@ -59,7 +59,7 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
             className={`group p-2 rounded-full border border-white/20 transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none ${showLeft ? 'bg-white/10 hover:bg-white/20 cursor-pointer text-white opacity-100' : 'bg-transparent text-neutral-600 opacity-40 cursor-not-allowed pointer-events-none'}`}
             aria-label="Previous page"
           >
-            <ChevronLeft className={`w-7 h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden] ${showLeft ? 'group-hover:scale-110 text-white' : 'text-neutral-600'}`} />
+            <ChevronLeft className={`w-7 h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden] ${showLeft ? 'group-hover:scale-125 text-white' : 'text-neutral-600'}`} />
           </button>
           <button
             onClick={nextPage}
@@ -67,7 +67,7 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
             className={`group p-2 rounded-full border border-white/20 transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none ${showRight ? 'bg-white/10 hover:bg-white/20 cursor-pointer text-white opacity-100' : 'bg-transparent text-neutral-600 opacity-40 cursor-not-allowed pointer-events-none'}`}
             aria-label="Next page"
           >
-            <ChevronRight className={`w-7 h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden] ${showRight ? 'group-hover:scale-110 text-white' : 'text-neutral-600'}`} />
+            <ChevronRight className={`w-7 h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden] ${showRight ? 'group-hover:scale-125 text-white' : 'text-neutral-600'}`} />
           </button>
         </div>
       </div>

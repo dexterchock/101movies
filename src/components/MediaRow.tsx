@@ -59,9 +59,7 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
             className={`group p-2 rounded-full border border-white/20 transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none ${showLeft ? 'bg-white/10 hover:bg-white/20 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
             aria-label="Previous page"
           >
-            <div className="transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]">
-              <ChevronLeft size={24} />
-            </div>
+            <ChevronLeft className="w-6 h-6 text-white transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]" />
           </button>
           <button
             onClick={nextPage}
@@ -69,9 +67,7 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
             className={`group p-2 rounded-full border border-white/20 transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none ${showRight ? 'bg-white/10 hover:bg-white/20 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
             aria-label="Next page"
           >
-            <div className="transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]">
-              <ChevronRight size={24} />
-            </div>
+            <ChevronRight className="w-6 h-6 text-white transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]" />
           </button>
         </div>
       </div>

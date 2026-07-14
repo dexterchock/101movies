@@ -90,12 +90,10 @@ export function Player() {
                   ref={playButtonRef}
                   onClick={() => setIsPlaying(true)}
                   tabIndex={0}
-                  className="group flex items-center justify-center bg-white text-black px-10 py-4 rounded-full font-bold text-xl transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none hover:bg-gray-200 shadow-2xl"
+                  className="flex items-center gap-3 bg-white text-black px-10 py-4 rounded-full font-bold text-xl transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none focus:ring-4 focus:ring-white/50 focus:scale-105 hover:scale-105 hover:bg-gray-200 shadow-2xl"
                 >
-                  <div className="flex items-center gap-3 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]">
-                    <Play size={28} className="fill-black" />
-                    Play Now
-                  </div>
+                  <Play size={28} className="fill-black" />
+                  Play Now
                 </button>
               </div>
             </div>
@@ -115,11 +113,9 @@ export function Player() {
                 setIsPlaying(true);
               }}
               tabIndex={0}
-              className={`group px-8 py-4 rounded-2xl font-medium transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none border ${activeSource === src.url ? 'bg-white text-black border-white shadow-[0_4px_24px_rgba(255,255,255,0.2)]' : 'bg-[#111] text-white border-white/10 hover:bg-white/10'}`}
+              className={`px-8 py-4 rounded-2xl font-medium transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none focus:ring-4 focus:ring-white focus:scale-105 border ${activeSource === src.url ? 'bg-white text-black border-white shadow-[0_4px_24px_rgba(255,255,255,0.2)]' : 'bg-[#111] text-white border-white/10 hover:bg-white/10 hover:scale-105'}`}
             >
-              <div className="transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]">
-                {src.name}
-              </div>
+              {src.name}
             </button>
           ))}
         </div>

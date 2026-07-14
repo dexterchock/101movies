@@ -44,28 +44,34 @@ export function MediaRow({ title, items, rows = 1, onClear }: MediaRowProps) {
           {onClear && (
             <button
               onClick={onClear}
-              className="mr-2 flex items-center gap-2 px-4 py-2 text-sm font-medium text-white/70 hover:text-white bg-transparent hover:bg-white/10 rounded-full border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+              className="group mr-2 flex items-center justify-center px-4 py-2 text-sm font-medium text-white/70 hover:text-white bg-transparent hover:bg-white/10 rounded-full border border-white/10 hover:border-white/20 transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
               title="Clear History"
             >
-              <Trash2 size={16} />
-              Clear
+              <div className="flex items-center gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]">
+                <Trash2 size={16} />
+                Clear
+              </div>
             </button>
           )}
           <button
             onClick={prevPage}
             disabled={!showLeft}
-            className={`p-2 rounded-full border border-white/20 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${showLeft ? 'bg-white/10 hover:bg-white/20 hover:scale-110 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
+            className={`group p-2 rounded-full border border-white/20 transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none ${showLeft ? 'bg-white/10 hover:bg-white/20 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
             aria-label="Previous page"
           >
-            <ChevronLeft size={24} />
+            <div className="transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]">
+              <ChevronLeft size={24} />
+            </div>
           </button>
           <button
             onClick={nextPage}
             disabled={!showRight}
-            className={`p-2 rounded-full border border-white/20 transition-all duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] ${showRight ? 'bg-white/10 hover:bg-white/20 hover:scale-110 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
+            className={`group p-2 rounded-full border border-white/20 transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none ${showRight ? 'bg-white/10 hover:bg-white/20 cursor-pointer text-white' : 'bg-transparent text-white/30 cursor-default'}`}
             aria-label="Next page"
           >
-            <ChevronRight size={24} />
+            <div className="transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 will-change-transform transform-gpu backface-visibility-hidden [backface-visibility:hidden]">
+              <ChevronRight size={24} />
+            </div>
           </button>
         </div>
       </div>

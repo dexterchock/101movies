@@ -6,12 +6,23 @@ import { MediaRow } from "../components/MediaRow";
 export function Home() {
   const [trendingMovies, setTrendingMovies] = useState<MediaItem[]>([]);
   const [trendingTV, setTrendingTV] = useState<MediaItem[]>([]);
+  const [loadingMovies, setLoadingMovies] = useState(true);
+  const [loadingTV, setLoadingTV] = useState(true);
   const [history, setHistory] = useState<MediaItem[]>([]);
 
   useEffect(() => {
-    api.getTrendingMovies().then(setTrendingMovies);
-    api.getTrendingTV().then(setTrendingTV);
-    
+    setLoadingMovies(true);
+    api
+      .getTrendingMovies()
+      .then(setTrendingMovies)
+      .finally(() => setLoadingMovies(false));
+
+    setLoadingTV(true);
+    api
+      .getTrendingTV()
+      .then(setTrendingTV)
+      .finally(() => setLoadingTV(false));
+
     try {
       const stored = localStorage.getItem("watch_history");
       if (stored) {
@@ -29,9 +40,11 @@ export function Home() {
 
   return (
     <div className="flex flex-col gap-6 md:gap-8 pt-0 pb-0 min-h-screen bg-black">
-      {history.length > 0 && <MediaRow title="Continue Watching" items={history} onClear={handleClearHistory} />}
-      <MediaRow title="Trending Movies" items={trendingMovies} rows={2} />
-      <MediaRow title="Trending TV Shows" items={trendingTV} rows={2} />
+      {history.length > 0 && (
+        <MediaRow title="Continue Watching" items={history} onClear={handleClearHistory} />
+      )}
+      <MediaRow title="Trending Movies" items={trendingMovies} rows={2} loading={loadingMovies} />
+      <MediaRow title="Trending TV Shows" items={trendingTV} rows={2} loading={loadingTV} />
     </div>
   );
 }

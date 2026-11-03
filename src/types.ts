@@ -1,7 +1,21 @@
+export interface WatchProgress {
+  sourceId?: string;
+  seasonNumber?: number;
+  seasonIndex?: number;
+  episodeIndex?: number;
+  episodeLabel?: string;
+  currentTime?: number;
+  duration?: number;
+  updatedAt?: number;
+}
+
 export interface MediaItem {
   id: number;
   title?: string;
   name?: string;
+  en_title?: string;
+  zh_title?: string;
+  is_chinese_origin?: boolean;
   poster_path: string | null;
   backdrop_path: string | null;
   overview: string;
@@ -9,6 +23,7 @@ export interface MediaItem {
   media_type?: 'movie' | 'tv';
   release_date?: string;
   first_air_date?: string;
+  watchProgress?: WatchProgress;
 }
 
 export interface MediaDetails extends MediaItem {
@@ -17,6 +32,7 @@ export interface MediaDetails extends MediaItem {
   tagline: string;
   number_of_seasons?: number;
   number_of_episodes?: number;
+  cast?: string[];
 }
 
 export interface TmdbResponse<T> {
@@ -55,9 +71,18 @@ export interface VodPlayGroup {
   episodes: VodEpisode[];
 }
 
+export interface VodSeasonGroup {
+  seasonNumber: number;
+  name: string;
+  vodId: string | number;
+  vodName: string;
+  episodes: VodEpisode[];
+}
+
 export interface ResolvedStreamSource {
   sourceId: string;
   sourceName: string;
+  audioLang?: '粤语' | '国语';
   fromConfig: string;
   vodId: string | number;
   vodName: string;
@@ -67,6 +92,7 @@ export interface ResolvedStreamSource {
   latencyMs: number;
   playGroups: VodPlayGroup[];
   episodes: VodEpisode[];
+  seasons?: VodSeasonGroup[];
 }
 
 export interface VodResolveResponse {

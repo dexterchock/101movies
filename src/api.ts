@@ -7,15 +7,25 @@ import {
 } from "./types";
 
 export const api = {
-  getTrendingMovies: async (): Promise<MediaItem[]> => {
-    const res = await fetch("/api/tmdb/trending/movie");
+  getTrendingMovies: async (genre?: string): Promise<MediaItem[]> => {
+    const query =
+      genre && genre !== "all" ? `?genre=${encodeURIComponent(genre)}` : "";
+    const res = await fetch(`/api/tmdb/trending/movie${query}`);
     const data = await res.json();
-    return data.results || [];
+    return (data.results || []).map((item: MediaItem) => ({
+      ...item,
+      media_type: "movie" as const,
+    }));
   },
-  getTrendingTV: async (): Promise<MediaItem[]> => {
-    const res = await fetch("/api/tmdb/trending/tv");
+  getTrendingTV: async (genre?: string): Promise<MediaItem[]> => {
+    const query =
+      genre && genre !== "all" ? `?genre=${encodeURIComponent(genre)}` : "";
+    const res = await fetch(`/api/tmdb/trending/tv${query}`);
     const data = await res.json();
-    return data.results || [];
+    return (data.results || []).map((item: MediaItem) => ({
+      ...item,
+      media_type: "tv" as const,
+    }));
   },
   search: async (query: string): Promise<MediaItem[]> => {
     const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
@@ -27,8 +37,14 @@ export const api = {
     const data = await res.json();
     return data;
   },
-  getRankings: async (type: "movie" | "tv", year: number): Promise<MediaItem[]> => {
-    const res = await fetch(`/api/tmdb/discover/${type}?year=${year}`);
+  getRankings: async (
+    type: "movie" | "tv",
+    year: number,
+    genre?: string
+  ): Promise<MediaItem[]> => {
+    const genreQuery =
+      genre && genre !== "all" ? `&genre=${encodeURIComponent(genre)}` : "";
+    const res = await fetch(`/api/tmdb/discover/${type}?year=${year}${genreQuery}`);
     const data = await res.json();
     return data.results || [];
   },

@@ -137,7 +137,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
       setParseFeedback({
         id,
         ok: data.result.ok,
-        message: data.result.message || "解析完成",
+        message: data.result.message || "Parsed successfully",
         subRepos: data.result.subRepos,
       });
       window.dispatchEvent(new CustomEvent("tvbox-sources-updated"));
@@ -145,7 +145,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
       setParseFeedback({
         id,
         ok: false,
-        message: "请求解析失败，请稍后重试",
+        message: "Failed to parse configuration. Please try again.",
       });
     } finally {
       setParsingId(null);
@@ -158,7 +158,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
     setCustomParsing(true);
     setParseFeedback(null);
     try {
-      const label = customName.trim() || "自定义 TVBox";
+      const label = customName.trim() || "Custom TVBox";
       const data = await api.parseTvboxConfig(customUrl.trim(), label);
       if (data.sites) {
         setSites(data.sites);
@@ -166,7 +166,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
       setParseFeedback({
         id: "custom",
         ok: data.result.ok,
-        message: data.result.message || "解析完成",
+        message: data.result.message || "Parsed successfully",
         subRepos: data.result.subRepos,
       });
       if (data.result.ok) {
@@ -198,10 +198,10 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
             </div>
             <div>
               <h3 className="text-lg font-bold tracking-wide text-white leading-tight">
-                TVBox / 影视仓配置中心
+                TVBox Source Center
               </h3>
-              <p className="text-xs text-white/50 mt-0.5">
-                已预载 awesome-zhuiju-free 配置源 · 启用 {enabledCount}/{sites.length} 条直连播放源
+              <p className="text-xs text-white/50 mt-0.5 tabular-nums">
+                Preloaded awesome-zhuiju-free repositories · {enabledCount}/{sites.length} direct sources enabled
               </p>
             </div>
           </div>
@@ -212,29 +212,29 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
               <div
                 className="absolute top-1 bottom-1 bg-white rounded-full transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
                 style={{
-                  width: "132px",
-                  left: activeTab === "sources" ? "4px" : "calc(4px + 132px + 4px)",
+                  width: "144px",
+                  left: activeTab === "sources" ? "4px" : "calc(4px + 144px + 4px)",
                 }}
               />
               <button
                 type="button"
                 onClick={() => setActiveTab("sources")}
                 className={cn(
-                  "relative z-10 w-[132px] h-[32px] text-xs font-medium rounded-full transition-colors duration-300 cursor-pointer focus:outline-none select-none",
+                  "relative z-10 w-[144px] h-[32px] text-xs font-medium rounded-full transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums",
                   activeTab === "sources" ? "text-black" : "text-white/70 hover:text-white"
                 )}
               >
-                采集播放源 ({sites.length})
+                Stream Sources ({sites.length})
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("configs")}
                 className={cn(
-                  "relative z-10 w-[132px] h-[32px] text-xs font-medium rounded-full transition-colors duration-300 cursor-pointer focus:outline-none select-none",
+                  "relative z-10 w-[144px] h-[32px] text-xs font-medium rounded-full transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums",
                   activeTab === "configs" ? "text-black" : "text-white/70 hover:text-white"
                 )}
               >
-                TVBox 配置地址 ({configs.length})
+                Config URLs ({configs.length})
               </button>
             </div>
 
@@ -268,7 +268,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
               {/* Action Bar */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-2">
                 <p className="text-xs text-white/60">
-                  点开任意影视详情页时，系统会自动并发检索以下启用的采集源并解析 M3U8 剧集。
+                  Opening any movie or TV show automatically queries enabled providers in parallel for direct M3U8 streams.
                 </p>
                 <div className="flex items-center gap-2">
                   {disabledIds.length > 0 && (
@@ -277,7 +277,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                       onClick={enableAllSites}
                       className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-black border border-white/10 text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                     >
-                      全部启用
+                      Enable All
                     </button>
                   )}
                   <button
@@ -286,7 +286,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                     className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium bg-white text-black hover:bg-white/90 transition-colors cursor-pointer"
                   >
                     <Activity size={14} />
-                    <span>一键测速</span>
+                    <span>Speed Test</span>
                   </button>
                 </div>
               </div>
@@ -344,7 +344,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                               ping.ok ? "text-emerald-400" : "text-red-400"
                             )}
                           >
-                            {ping.ok ? `${ping.latencyMs}ms` : "超时"}
+                            {ping.ok ? `${ping.latencyMs}ms` : "Timeout"}
                           </span>
                         )}
                         <div
@@ -355,7 +355,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                               : "bg-transparent text-white/40 border-white/15"
                           )}
                         >
-                          {isEnabled ? "已启用" : "已停用"}
+                          {isEnabled ? "Enabled" : "Disabled"}
                         </div>
                       </div>
                     </div>
@@ -373,7 +373,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-white/80 flex items-center gap-1.5">
                     <Plus size={14} />
-                    添加自定义 TVBox / 影视仓配置地址 (单仓或多多仓 JSON)
+                    Add Custom TVBox Config URL (Single or Multi-Repo JSON)
                   </span>
                   <a
                     href="https://github.com/laoma528/awesome-zhuiju-free"
@@ -390,14 +390,14 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                     type="text"
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
-                    placeholder="备注名称 (可选)"
+                    placeholder="Name (optional)"
                     className="sm:w-40 h-10 px-3.5 rounded-full bg-[#121212] border border-white/10 text-xs text-white placeholder:text-white/35 focus:outline-none focus:border-white/30"
                   />
                   <input
                     type="url"
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value)}
-                    placeholder="粘贴 TVBox 配置 URL，例如 https://raw.liucn.cc/box/m.json"
+                    placeholder="Paste TVBox config URL, e.g. https://raw.liucn.cc/box/m.json"
                     className="flex-1 h-10 px-4 rounded-full bg-[#121212] border border-white/10 text-xs text-white font-mono placeholder:text-white/35 focus:outline-none focus:border-white/30"
                   />
                   <button
@@ -405,7 +405,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                     disabled={customParsing || !customUrl.trim()}
                     className="h-10 px-5 rounded-full bg-white text-black text-xs font-semibold hover:bg-white/90 disabled:opacity-40 transition-colors cursor-pointer shrink-0"
                   >
-                    {customParsing ? "解析中..." : "解析并导入"}
+                    {customParsing ? "Parsing..." : "Parse & Import"}
                   </button>
                 </div>
                 {parseFeedback?.id === "custom" && (
@@ -445,11 +445,11 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                                 : "bg-white/5 text-white/70 border-white/10"
                             )}
                           >
-                            {cfg.type === "multi" ? "多仓聚合" : "单仓接口"}
+                            {cfg.type === "multi" ? "Multi-Repo" : "Single Repo"}
                           </span>
                           {cfg.cmsSiteCount && (
                             <span className="text-[11px] text-emerald-400 font-mono tabular-nums">
-                              含 {cfg.cmsSiteCount} 条直连源
+                              {cfg.cmsSiteCount} direct sources
                             </span>
                           )}
                         </div>
@@ -463,12 +463,12 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                             {copiedId === cfg.id ? (
                               <>
                                 <Check size={13} className="text-emerald-400" />
-                                <span>已复制</span>
+                                <span>Copied</span>
                               </>
                             ) : (
                               <>
                                 <Copy size={13} />
-                                <span>复制地址</span>
+                                <span>Copy URL</span>
                               </>
                             )}
                           </button>
@@ -485,7 +485,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                               size={13}
                               className={cn(isParsing && "animate-spin")}
                             />
-                            <span>{isParsing ? "解析中" : "同步源"}</span>
+                            <span>{isParsing ? "Syncing..." : "Sync Sources"}</span>
                           </button>
                         </div>
                       </div>
@@ -522,7 +522,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                                   }
                                   className="px-3 py-1 rounded-full text-xs bg-[#121212] border border-white/15 text-white/80 hover:text-white hover:border-white/40 transition-colors cursor-pointer"
                                 >
-                                  导入子仓: {sub.name}
+                                  Import Sub-Repo: {sub.name}
                                 </button>
                               ))}
                             </div>

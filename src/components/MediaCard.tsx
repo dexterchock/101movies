@@ -13,7 +13,10 @@ interface MediaCardProps {
 
 export function MediaCard({ item, rank, className }: MediaCardProps) {
   const [imgError, setImgError] = useState(false);
-  const title = item.title || item.name || "Untitled";
+  const title =
+    item.is_chinese_origin && item.zh_title
+      ? item.zh_title
+      : item.title || item.name || "Untitled";
   const type = item.media_type === "tv" || (!item.media_type && !item.title && item.name) ? "tv" : "movie";
   const hasPoster = Boolean(item.poster_path) && !imgError;
   const imageUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "";

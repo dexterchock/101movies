@@ -3,6 +3,7 @@ import {
   VodSite,
   VodEpisode,
   VodPlayGroup,
+  VodSeasonGroup,
   ResolvedStreamSource,
   VodResolveResponse,
 } from "../types";
@@ -13,7 +14,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "小马 TVBox",
     url: "https://szyyds.cn/tv/x.json",
     type: "single",
-    description: "awesome-zhuiju-free 精选单仓接口，内置 62 个站点与 16 条直连高速 CMS 影视源",
+    description: "Curated single-repo from awesome-zhuiju-free with 62 sites and 16 high-speed direct CMS sources",
     author: "小马",
     cmsSiteCount: 16,
     totalSiteCount: 62,
@@ -23,7 +24,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "老刘备 TVBox",
     url: "https://raw.liucn.cc/box/m.json",
     type: "single",
-    description: "awesome-zhuiju-free 经典稳定单仓，聚合 234 个影视站点与 15 条标准采集源",
+    description: "Classic stable single-repo from awesome-zhuiju-free aggregating 234 sites and 15 direct CMS sources",
     author: "老刘备",
     cmsSiteCount: 15,
     totalSiteCount: 234,
@@ -33,7 +34,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "创享影视 TVBox",
     url: "https://ys.cxkjg.cn/api/provide/tvbox",
     type: "single",
-    description: "创享影视官方 TVBox 聚合专线，提供金鹰、闪电、非凡、量子、红牛等 12 条直连源",
+    description: "Official Chuangxiang TVBox feed providing 12 direct M3U8 CMS streaming providers",
     author: "创享影视",
     cmsSiteCount: 12,
     totalSiteCount: 12,
@@ -43,7 +44,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "饭太硬",
     url: "http://www.饭太硬.net/tv",
     type: "single",
-    description: "awesome-zhuiju-free 置顶推荐接口，主流 TVBox / 影视仓标杆配置源",
+    description: "Top featured repository from awesome-zhuiju-free",
     author: "饭太硬",
   },
   {
@@ -51,7 +52,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "肥猫",
     url: "http://肥猫.net/",
     type: "single",
-    description: "awesome-zhuiju-free 热门推荐接口，更新频繁、画质清晰",
+    description: "Popular high-definition repository from awesome-zhuiju-free",
     author: "肥猫",
   },
   {
@@ -59,7 +60,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "小盒子4K",
     url: "http://xhztv.top/4k.json",
     type: "single",
-    description: "聚玩盒子 4K 影视仓单仓接口，主打高清剧集与院线电影",
+    description: "4K single-repo focused on high-definition series and theatrical releases",
     author: "小盒子",
     totalSiteCount: 48,
   },
@@ -68,7 +69,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "无名 TVBox",
     url: "https://6800.kstore.vip/fish.json",
     type: "single",
-    description: "awesome-zhuiju-free 收录单仓接口，含 103 个综合影视站点",
+    description: "Single-repo from awesome-zhuiju-free with 103 media sites",
     author: "无名",
     totalSiteCount: 103,
   },
@@ -77,7 +78,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "摸鱼儿",
     url: "http://www.y456y.com",
     type: "single",
-    description: "摸鱼儿影视仓接口，涵盖热门院线、番剧与综艺",
+    description: "Moyu TVBox feed covering movies, anime, and variety shows",
     author: "摸鱼儿",
   },
   {
@@ -85,7 +86,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "王二小放牛娃",
     url: "http://new.王二小放牛娃.top",
     type: "single",
-    description: "王二小放牛娃 TVBox 单仓配置地址",
+    description: "WangErXiao single-repo TVBox configuration URL",
     author: "王二小",
   },
   {
@@ -93,7 +94,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "影仓专线",
     url: "http://124.71.19.220/c/1",
     type: "single",
-    description: "影视仓专用精简配置源",
+    description: "Dedicated lightweight TVBox configuration feed",
     author: "影仓",
   },
   {
@@ -101,7 +102,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "小盒子单仓",
     url: "http://xhztv.top/xhz",
     type: "single",
-    description: "小盒子稳定单仓接口",
+    description: "Stable single-repo configuration from XiaoHeZi",
     author: "小盒子",
   },
   {
@@ -109,7 +110,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "嗷呜 TVBox",
     url: "http://itv666.cc/aowu/config.webp",
     type: "single",
-    description: "嗷呜伪装图片后缀 TVBox 接口",
+    description: "AoWu image-masked TVBox configuration feed",
     author: "嗷呜",
   },
   {
@@ -117,7 +118,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "挺好分享多仓",
     url: "http://ztha.top/TVBox/GYCK.json",
     type: "multi",
-    description: "awesome-zhuiju-free 多仓聚合接口，内含挺好分享、荷城茶秀等多个子仓库",
+    description: "Multi-repo index from awesome-zhuiju-free containing multiple sub-repositories",
     author: "挺好分享",
   },
   {
@@ -125,7 +126,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "小盒子多仓",
     url: "http://xhztv.top/dc",
     type: "multi",
-    description: "小盒子多仓聚合源，整合小盒子、肥猫、饭太硬、唐三等多条线路",
+    description: "XiaoHeZi multi-repo index aggregating multiple popular TVBox feeds",
     author: "小盒子",
   },
   {
@@ -133,7 +134,7 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
     name: "拾光多仓",
     url: "http://xmbjm.fh4u.org/dc.txt",
     type: "multi",
-    description: "拾光多仓文本聚合配置源",
+    description: "ShiGuang multi-repo text configuration feed",
     author: "拾光",
   },
 ];
@@ -165,7 +166,7 @@ export const BUILTIN_VOD_SITES: VodSite[] = [
     id: "ruyi",
     name: "如意资源",
     api: "https://cj.rycjapi.com/api.php/provide/vod",
-    fromConfig: "awesome-zhuiju 直连",
+    fromConfig: "awesome-zhuiju Direct",
     enabled: true,
   },
   {
@@ -214,14 +215,14 @@ export const BUILTIN_VOD_SITES: VodSite[] = [
     id: "ikun",
     name: "iKun资源",
     api: "https://ikunzyapi.com/api.php/provide/vod",
-    fromConfig: "awesome-zhuiju 直连",
+    fromConfig: "awesome-zhuiju Direct",
     enabled: true,
   },
   {
     id: "360zy",
     name: "360资源",
     api: "https://360zy.com/api.php/provide/vod",
-    fromConfig: "awesome-zhuiju 直连",
+    fromConfig: "awesome-zhuiju Direct",
     enabled: true,
   },
   {
@@ -336,7 +337,7 @@ export async function parseTvboxConfig(
         type: "unknown",
         totalSites: 0,
         extractedSites: [],
-        message: "该接口使用了专属 JAR 壳加密 (如立播/肥猫 AES 密文)，内置高速源已为您自动代理解析其同源采集站",
+        message: "This feed uses custom JAR encryption; built-in high-speed CMS providers are active as fallback.",
       };
     }
 
@@ -346,7 +347,7 @@ export async function parseTvboxConfig(
       const subRepos = multiUrls
         .filter((u: any) => u && typeof u.url === "string")
         .map((u: any) => ({
-          name: String(u.name || u.sourceName || "子仓库").trim(),
+          name: String(u.name || u.sourceName || "Sub-Repo").trim(),
           url: String(u.url).trim(),
         }));
       return {
@@ -355,7 +356,7 @@ export async function parseTvboxConfig(
         totalSites: subRepos.length,
         extractedSites: [],
         subRepos,
-        message: `成功解析多仓配置，包含 ${subRepos.length} 个子仓库`,
+        message: `Parsed multi-repo config with ${subRepos.length} sub-repositories.`,
       };
     }
 
@@ -386,13 +387,13 @@ export async function parseTvboxConfig(
       if (isCmsVod) {
         const cleanApi = normalizeApiUrl(apiRaw);
         const siteId = `dyn_${Buffer.from(cleanApi).toString("base64url").slice(0, 14)}`;
-        const cleanName = String(s.name || s.key || "TVBox采集源")
+        const cleanName = String(s.name || s.key || "TVBox Source")
           .replace(/[^\u4e00-\u9fa5a-zA-Z0-9\s|()-]/g, "")
           .trim();
 
         const vodSite: VodSite = {
           id: siteId,
-          name: cleanName || "TVBox源",
+          name: cleanName || "TVBox Source",
           api: cleanApi,
           fromConfig: configName,
           enabled: true,
@@ -409,8 +410,8 @@ export async function parseTvboxConfig(
       extractedSites,
       message:
         extractedSites.length > 0
-          ? `成功解析 ${sites.length} 个站点，提取并激活 ${extractedSites.length} 条网页直连 M3U8 采集源`
-          : `解析成功（共 ${sites.length} 个站点，均为安卓原生 JAR 爬虫源，网页端已通过内置直连 CMS 源保障播放）`,
+          ? `Parsed ${sites.length} sites and activated ${extractedSites.length} direct M3U8 providers.`
+          : `Parsed ${sites.length} sites (Android JAR spiders; built-in direct CMS providers remain active).`,
     };
   } catch (err: any) {
     return {
@@ -418,7 +419,7 @@ export async function parseTvboxConfig(
       type: "unknown",
       totalSites: 0,
       extractedSites: [],
-      message: err?.message || "连接配置地址超时",
+      message: err?.message || "Connection timed out while fetching config URL.",
     };
   }
 }
@@ -433,7 +434,7 @@ export function parseVodPlayGroups(
   const playGroups: VodPlayGroup[] = [];
 
   urlGroupList.forEach((rawGroup, idx) => {
-    const groupName = (fromList[idx] || `线路 ${idx + 1}`).trim();
+    const groupName = (fromList[idx] || `Route ${idx + 1}`).trim();
     const rawItems = rawGroup
       .split("#")
       .map((item) => item.trim())
@@ -442,7 +443,7 @@ export function parseVodPlayGroups(
     const episodes: VodEpisode[] = [];
     for (let i = 0; i < rawItems.length; i++) {
       const part = rawItems[i];
-      let epName = `第 ${i + 1} 集`;
+      let epName = `Ep ${i + 1}`;
       let epUrl = part;
 
       const dollarIdx = part.indexOf("$");
@@ -478,32 +479,281 @@ export function parseVodPlayGroups(
   };
 }
 
-function normalizeTitleForComparison(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[\s:：·\-—_!！?？,，.。'’"“”()（）[\]【】]/g, "")
+const TRAD_CHARS =
+  "複復質閃電俠龍戰絕師權遊戲語鏡紙將軍輻異聯驚隊長級壞腦轉彎奧達鐵號駭國際啟動盜夢間門開關見觀視聽聲音樂傳說話記錄憶愛戀親兒孫媽爺兄敵殺傷醫藥療運氣風雲霧陽陰紅綠藍黃銀銅鋼鑽寶島樹葉鳥獸魚蟲馬貓獅鷹鷗鴿雞鴨鵝鳳聖偵諜賊幫會團黨鎮鄉莊園館樓橋場廠鋪宮廟獄籠網線絲繩帶環鏈鎖鑰匙劍槍彈車艦機飛時紀節曉東內後淺遠強舊醜貧貴賤難遲閒熱溫涼乾濕淨髒亂齊雙單萬億貳弎陸柒捌玖拾佰仟兩隻條種類眾獨們誰麼樣裏裡邊處點體頭臉齒膽腎腸膚髮腳殼劇員導編寫畫圖書籍頁冊報雜志碼數學練試驗證據實況態勢論識覺緒願懼淚歡慶祿壽財業務勞動飯湯飲裝襪褲牆層階躍潛墜滯離終敗輸贏勝負爭奪搶佔統規懲罰賞賜贈給歸返還進尋覓詢應諾許認塗測算謀術藝慣聞稱題載擊斷滅毀損觸擁護衛禦襲闖過顯隱換變創築補癒甦";
+const SIMP_CHARS =
+  "复复质闪电侠龙战绝师权游戏语镜纸将军辐异联惊队长级坏脑转弯奥达铁号骇国际启动盗梦间门开关见观视听声音乐传说话记录忆爱恋亲儿孙妈爷兄敌杀伤医药疗运气风云雾阳阴红绿蓝黄银铜钢钻宝岛树叶鸟兽鱼虫马猫狮鹰鸥鸽鸡鸭鹅凤圣侦谍贼帮会团党镇乡庄园馆楼桥场厂铺宫庙狱笼网线丝绳带环链锁钥匙剑枪弹车舰机飞时纪节晓东内后浅远强旧丑贫贵贱难迟闲热温凉干湿净脏乱齐双单万亿二三六七八九十百千两只条种类众独们谁么样里里边处点体头脸齿胆肾肠肤发脚壳剧员导编写画图书籍页册报杂志码数学练试验证据实况态势论识觉绪愿惧泪欢庆禄寿财业务劳动饭汤饮装袜裤墙层阶跃潜坠滞离终败输赢胜负争夺抢占统规惩罚赏赐赠给归返还进寻觅询应诺许认涂测算谋术艺惯闻称题载击断灭毁损触拥护卫御袭闯过显隐换变创筑补愈苏";
+
+const TRAD_TO_SIMP_MAP: Record<string, string> = {};
+for (let i = 0; i < TRAD_CHARS.length; i++) {
+  TRAD_TO_SIMP_MAP[TRAD_CHARS[i]] = SIMP_CHARS[i];
+}
+
+export function toSimplifiedChinese(input: string): string {
+  if (!input) return "";
+  let out = "";
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    out += TRAD_TO_SIMP_MAP[ch] || ch;
+  }
+  return out;
+}
+
+const CHINESE_NUMERAL_MAP: Record<string, number> = {
+  零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5,
+  六: 6, 七: 7, 八: 8, 九: 9, 十: 10,
+};
+
+function parseChineseNumeral(str: string): number | null {
+  const trimmed = str.trim();
+  if (/^\d+$/.test(trimmed)) {
+    return parseInt(trimmed, 10);
+  }
+  if (trimmed === "十") return 10;
+  if (trimmed.startsWith("十") && trimmed.length === 2) {
+    const ones = CHINESE_NUMERAL_MAP[trimmed[1]];
+    return ones !== undefined ? 10 + ones : null;
+  }
+  if (trimmed.endsWith("十") && trimmed.length === 2) {
+    const tens = CHINESE_NUMERAL_MAP[trimmed[0]];
+    return tens !== undefined ? tens * 10 : null;
+  }
+  if (trimmed.length === 3 && trimmed[1] === "十") {
+    const tens = CHINESE_NUMERAL_MAP[trimmed[0]];
+    const ones = CHINESE_NUMERAL_MAP[trimmed[2]];
+    if (tens !== undefined && ones !== undefined) return tens * 10 + ones;
+  }
+  if (trimmed.length === 1 && CHINESE_NUMERAL_MAP[trimmed] !== undefined) {
+    return CHINESE_NUMERAL_MAP[trimmed];
+  }
+  return null;
+}
+
+function stripYearSuffix(title: string): string {
+  return title.replace(/\s*[(（【[]?(19|20)\d{2}[)）】\]]?\s*$/, "").trim();
+}
+
+export function extractAudioLangFromText(
+  vodName: string,
+  vodLang = "",
+  vodRemarks = ""
+): "粤语" | "国语" | undefined {
+  const simpName = toSimplifiedChinese(vodName);
+  const simpRemarks = toSimplifiedChinese(vodRemarks);
+  const simpLang = toSimplifiedChinese(vodLang);
+
+  // Check vod_name first (most authoritative for split Cantonese/Mandarin entries)
+  if (/(粤语|粤配|粤音)/.test(simpName)) return "粤语";
+  if (/(国语|普通话|国配)/.test(simpName)) return "国语";
+
+  // Check vod_remarks next
+  if (/(粤语|粤配)/.test(simpRemarks) && !/(国语|普通话)/.test(simpRemarks)) {
+    return "粤语";
+  }
+  if (/(国语|普通话)/.test(simpRemarks) && !/(粤语|粤配)/.test(simpRemarks)) {
+    return "国语";
+  }
+
+  // Check vod_lang if it unambiguously specifies single Cantonese or Mandarin
+  if (simpLang) {
+    const hasYue = /(粤语|粤)/.test(simpLang);
+    const hasGuo = /(国语|普通话)/.test(simpLang);
+    if (hasYue && !hasGuo) return "粤语";
+    if (hasGuo && !hasYue) return "国语";
+  }
+
+  return undefined;
+}
+
+function stripLanguageAndStatusTags(input: string): string {
+  let clean = input.trim();
+  // Strip bracketed tags like [美剧], (粤语), (国语版), 【更新至16集】
+  clean = clean
+    .replace(
+      /[(（【\[][^)\]）】]*(更新|全集|完结|国语|粤语|普通话|国配|粤配|台配|双语|中字|双字|BD|HD|4K|1080P)[^)\]）】]*[)\]）】]/gi,
+      ""
+    )
     .trim();
+
+  // Strip unbracketed trailing language edition suffixes like "璀璨之城粤语", "璀璨之城国语版", "新闻女王 普通话", "巾帼枭雄-粤语版"
+  clean = clean
+    .replace(
+      /[\s\-—_·:：]*(?:国粤双语版?|粤语配音版?|国语配音版?|普通话配音版?|粤语版|国语版|普通话版|粤配版|国配版|台配版|粤语|国语|普通话)\s*$/gi,
+      ""
+    )
+    .trim();
+
+  return clean;
+}
+
+export function parseSeasonInfo(rawTitle: string): {
+  baseTitle: string;
+  seasonNumber: number | null;
+  audioLang?: "粤语" | "国语";
+} {
+  const simpRaw = toSimplifiedChinese(stripYearSuffix(rawTitle)).trim();
+  const audioLang = extractAudioLangFromText(simpRaw);
+
+  let clean = stripLanguageAndStatusTags(simpRaw);
+
+  // Match Chinese "第X季" or "第X部" at or near the end
+  const zhSeasonMatch = clean.match(
+    /^(.*?)\s*第\s*([一二两三四五六七八九十\d]+)\s*[季部]\s*$/
+  );
+  if (zhSeasonMatch) {
+    const base = stripLanguageAndStatusTags(zhSeasonMatch[1]);
+    const num = parseChineseNumeral(zhSeasonMatch[2]);
+    if (base.length >= 1 && num !== null && num > 0 && num <= 50) {
+      return { baseTitle: base, seasonNumber: num, audioLang };
+    }
+  }
+
+  // Match English "Season X" or "S01" at the end
+  const enSeasonMatch = clean.match(
+    /^(.*?)\s*(?:Season\s*0*(\d+)|S0*(\d+))\s*$/i
+  );
+  if (enSeasonMatch) {
+    const base = stripLanguageAndStatusTags(enSeasonMatch[1]);
+    const num = parseInt(enSeasonMatch[2] || enSeasonMatch[3], 10);
+    if (base.length >= 1 && !Number.isNaN(num) && num > 0 && num <= 50) {
+      return { baseTitle: base, seasonNumber: num, audioLang };
+    }
+  }
+
+  // Match trailing sequel/season digit like "新闻女王2" or "庆余年2" (single digit 2..9 after Chinese/non-digit characters)
+  const trailingDigitSeasonMatch = clean.match(
+    /^([\u4e00-\u9fffA-Za-z][^0-9]*?)\s*([2-9])$/
+  );
+  if (trailingDigitSeasonMatch) {
+    const base = stripLanguageAndStatusTags(trailingDigitSeasonMatch[1]);
+    const num = parseInt(trailingDigitSeasonMatch[2], 10);
+    if (base.length >= 2 && !Number.isNaN(num)) {
+      return { baseTitle: base, seasonNumber: num, audioLang };
+    }
+  }
+
+  return { baseTitle: clean, seasonNumber: null, audioLang };
+}
+
+function normalizeTitleForComparison(title: string): string {
+  return toSimplifiedChinese(title)
+    .toLowerCase()
+    .replace(/[\s:：·\-—_!！?？,，.。'’"“”()（）[\]【】*＊]/g, "")
+    .trim();
+}
+
+function extractNumbers(str: string): string[] {
+  return str.match(/\d+/g) || [];
 }
 
 function buildSearchKeywords(titles: string[]): string[] {
   const candidates: string[] = [];
   const addCandidate = (t?: string) => {
     if (!t) return;
-    const clean = t.trim();
-    if (clean.length >= 1 && !candidates.includes(clean)) {
-      candidates.push(clean);
-    }
-    // Also strip colon/subtitle for broader Chinese VOD search if needed
-    const beforeColon = clean.split(/[:：\-—]/)[0].trim();
-    if (beforeColon.length >= 2 && !candidates.includes(beforeColon)) {
-      candidates.push(beforeColon);
+    const simp = toSimplifiedChinese(stripYearSuffix(t)).trim();
+    const { baseTitle } = parseSeasonInfo(simp);
+    for (const variant of [baseTitle, simp]) {
+      if (variant.length >= 1 && !candidates.includes(variant)) {
+        candidates.push(variant);
+      }
+      const beforeColon = variant.split(/[:：]/)[0].trim();
+      if (
+        beforeColon.length >= 2 &&
+        beforeColon !== variant &&
+        !candidates.includes(beforeColon)
+      ) {
+        candidates.push(beforeColon);
+      }
     }
   };
 
-  for (const t of titles) {
+  // Prioritize titles containing Chinese characters first since VOD CMS sites index primarily in Chinese
+  const zhTitles = titles.filter((t) => /[\u4e00-\u9fff]/.test(t));
+  const otherTitles = titles.filter((t) => !/[\u4e00-\u9fff]/.test(t));
+
+  for (const t of [...zhTitles, ...otherTitles]) {
     addCandidate(t);
   }
   return candidates;
+}
+
+function computeTitleMatchScore(
+  vodName: string,
+  vodSub: string,
+  targetTitles: string[],
+  mediaType?: "movie" | "tv"
+): number {
+  const cleanVod = stripLanguageAndStatusTags(
+    toSimplifiedChinese(stripYearSuffix(vodName))
+  );
+  const { baseTitle: vodBaseTitle } =
+    mediaType === "tv"
+      ? parseSeasonInfo(vodName)
+      : { baseTitle: cleanVod };
+
+  const normVodName = normalizeTitleForComparison(vodBaseTitle);
+  const normCleanVod = normalizeTitleForComparison(cleanVod);
+  if (!normVodName) return 0;
+
+  const normAliases = vodSub
+    .split(/[\/|,，;；、]+/)
+    .map((s) => {
+      const cleaned = stripLanguageAndStatusTags(
+        toSimplifiedChinese(stripYearSuffix(s))
+      );
+      const base =
+        mediaType === "tv" ? parseSeasonInfo(s).baseTitle : cleaned;
+      return normalizeTitleForComparison(base);
+    })
+    .filter(Boolean);
+
+  const vodNumbers = extractNumbers(normVodName);
+  let bestScore = 0;
+
+  for (const rawTarget of targetTitles) {
+    const cleanTarget = stripLanguageAndStatusTags(
+      toSimplifiedChinese(stripYearSuffix(rawTarget))
+    );
+    const { baseTitle: targetBaseTitle } =
+      mediaType === "tv"
+        ? parseSeasonInfo(rawTarget)
+        : { baseTitle: cleanTarget };
+
+    const target = normalizeTitleForComparison(targetBaseTitle);
+    const normFullTarget = normalizeTitleForComparison(cleanTarget);
+    if (!target) continue;
+
+    if (normVodName === target || normCleanVod === normFullTarget) {
+      bestScore = Math.max(bestScore, 260);
+      continue;
+    }
+
+    if (normAliases.includes(target) || normAliases.includes(normFullTarget)) {
+      bestScore = Math.max(bestScore, 210);
+      continue;
+    }
+
+    const targetNumbers = extractNumbers(target);
+    const numbersConflict =
+      (targetNumbers.length > 0 || vodNumbers.length > 0) &&
+      targetNumbers.join(",") !== vodNumbers.join(",");
+
+    if (numbersConflict) {
+      continue;
+    }
+
+    // Allow close containment if the shorter title is at least 75% of the longer title
+    if (normVodName.includes(target) || target.includes(normVodName)) {
+      const minLen = Math.min(normVodName.length, target.length);
+      const maxLen = Math.max(normVodName.length, target.length);
+      const ratio = maxLen > 0 ? minLen / maxLen : 0;
+      if (ratio >= 0.75 && minLen >= 2) {
+        bestScore = Math.max(bestScore, Math.round(145 + ratio * 50));
+      }
+    }
+  }
+
+  return bestScore;
 }
 
 async function searchSingleVodSite(
@@ -512,7 +762,7 @@ async function searchSingleVodSite(
   targetTitles: string[],
   targetYear?: string,
   mediaType?: "movie" | "tv"
-): Promise<ResolvedStreamSource | null> {
+): Promise<ResolvedStreamSource[]> {
   const start = Date.now();
   const sep = site.api.includes("?") ? "&" : "?";
   const searchUrl = `${site.api}${sep}ac=videolist&wd=${encodeURIComponent(keyword)}`;
@@ -526,23 +776,24 @@ async function searchSingleVodSite(
       signal: AbortSignal.timeout(4500),
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const data = await res.json();
     const list = Array.isArray(data?.list) ? data.list : [];
-    if (list.length === 0) return null;
+    if (list.length === 0) return [];
 
     const latencyMs = Date.now() - start;
-    const normalizedTargets = targetTitles
-      .map(normalizeTitleForComparison)
-      .filter(Boolean);
 
-    // Score each item in data.list and verify it has playable .m3u8/.mp4 streams
-    let bestCandidate: {
+    type ScoredCandidate = {
       item: any;
       score: number;
+      seasonNumber: number;
+      audioLang?: "粤语" | "国语";
+      explicitTitleLang?: "粤语" | "国语";
       playGroups: VodPlayGroup[];
       episodes: VodEpisode[];
-    } | null = null;
+    };
+
+    const validCandidates: ScoredCandidate[] = [];
 
     for (const item of list) {
       const { playGroups, bestEpisodes } = parseVodPlayGroups(
@@ -553,82 +804,225 @@ async function searchSingleVodSite(
 
       const vodName = String(item.vod_name || "").trim();
       const vodSub = String(item.vod_sub || "").trim();
-      const normVodName = normalizeTitleForComparison(vodName);
-      const normVodSub = normalizeTitleForComparison(vodSub);
-      const vodYear = String(item.vod_year || "").trim();
+      const vodRemarks = String(item.vod_remarks || "").trim();
+      const vodLang = String(item.vod_lang || "").trim();
+      const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
+      const vodYear = vodYearMatch ? vodYearMatch[0] : "";
 
-      let score = 0;
-
-      for (const target of normalizedTargets) {
-        if (!target) continue;
-        if (normVodName === target) {
-          score += 220;
-        } else if (normVodSub === target) {
-          score += 180;
-        } else if (normVodName.includes(target) || target.includes(normVodName)) {
-          const lengthDiff = Math.abs(normVodName.length - target.length);
-          score += Math.max(20, 70 - lengthDiff * 6);
-        } else if (normVodSub && normVodSub.includes(target)) {
-          score += 35;
-        }
+      // Reject recaps ("解说") and trailer-only placeholders ("预告") or short-drama parodies ("短剧版")
+      if (
+        vodName.includes("解说") ||
+        vodName.includes("预告") ||
+        vodName.includes("短剧") ||
+        vodRemarks.includes("预告")
+      ) {
+        continue;
+      }
+      const hasNonTrailerEpisode = bestEpisodes.some(
+        (ep) => !ep.name.includes("预告") && !ep.name.includes("花絮")
+      );
+      if (!hasNonTrailerEpisode) {
+        continue;
       }
 
+      const titleScore = computeTitleMatchScore(
+        vodName,
+        vodSub,
+        targetTitles,
+        mediaType
+      );
+      if (titleScore < 140) {
+        continue;
+      }
+
+      const { seasonNumber: parsedSeason, audioLang: titleAudioLang } =
+        parseSeasonInfo(vodName);
+      const seasonNumber = parsedSeason || 1;
+      const detectedLang =
+        titleAudioLang || extractAudioLangFromText(vodName, vodLang, vodRemarks);
+
+      let score = titleScore;
+
+      // Release year verification
       if (targetYear && vodYear) {
-        if (vodYear === targetYear) {
-          score += 120;
-        } else if (Math.abs(Number(vodYear) - Number(targetYear)) === 1) {
-          score += 30;
+        const targetY = Number(targetYear);
+        const vodY = Number(vodYear);
+        const yearDiff = Math.abs(vodY - targetY);
+
+        if (mediaType === "tv") {
+          // Multi-season TV shows have Season 1 in targetYear and Season 2..N in subsequent years
+          if (vodY === targetY) {
+            score += 120;
+          } else if (
+            seasonNumber > 1 &&
+            vodY >= targetY &&
+            vodY <= targetY + seasonNumber + 3 &&
+            titleScore >= 200
+          ) {
+            score += 95;
+          } else if (yearDiff === 1 && titleScore >= 210) {
+            score += 40;
+          } else if (vodY > targetY && titleScore >= 250) {
+            score += 30;
+          } else {
+            continue;
+          }
         } else {
-          score -= 60;
+          // Strict release year verification for movies
+          if (vodY === targetY) {
+            score += 120;
+          } else if (yearDiff === 1 && titleScore >= 240) {
+            score += 25;
+          } else {
+            continue;
+          }
         }
       }
 
-      // Prefer multi-episode entries for TV shows and single/few episodes for movies
       if (mediaType === "tv" && bestEpisodes.length > 1) {
         score += 20;
       } else if (mediaType === "movie" && bestEpisodes.length <= 4) {
         score += 15;
       }
 
-      // Penalize movie recaps ("解说") and trailers ("预告")
-      if (vodName.includes("解说") || vodName.includes("预告")) {
-        score -= 120;
-      }
-      const isOnlyTrailer =
-        bestEpisodes.length === 1 && bestEpisodes[0].name.includes("预告");
-      if (isOnlyTrailer) {
-        score -= 80;
-      }
-
-      if (!bestCandidate || score > bestCandidate.score) {
-        bestCandidate = {
+      if (score >= 160) {
+        validCandidates.push({
           item,
           score,
+          seasonNumber,
+          audioLang: detectedLang,
+          explicitTitleLang: titleAudioLang,
           playGroups,
           episodes: bestEpisodes,
-        };
+        });
       }
     }
 
-    if (!bestCandidate || bestCandidate.score < 0) return null;
+    if (validCandidates.length === 0) return [];
 
-    return {
-      sourceId: site.id,
-      sourceName: site.name,
-      fromConfig: site.fromConfig,
-      vodId: bestCandidate.item.vod_id,
-      vodName: String(bestCandidate.item.vod_name || keyword).trim(),
-      vodYear: bestCandidate.item.vod_year ? String(bestCandidate.item.vod_year) : undefined,
-      vodRemarks: bestCandidate.item.vod_remarks
-        ? String(bestCandidate.item.vod_remarks)
-        : undefined,
-      vodPic: bestCandidate.item.vod_pic ? String(bestCandidate.item.vod_pic) : undefined,
-      latencyMs,
-      playGroups: bestCandidate.playGroups,
-      episodes: bestCandidate.episodes,
+    // Check if this provider has explicit 粤语 / 国语 variants (or any Cantonese stream)
+    const hasExplicitLangVariants = validCandidates.some(
+      (c) => c.explicitTitleLang !== undefined || c.audioLang === "粤语"
+    );
+
+    const buildSourceFromCandidates = (
+      cands: ScoredCandidate[],
+      langTag?: "粤语" | "国语"
+    ): ResolvedStreamSource | null => {
+      if (cands.length === 0) return null;
+      const suffix =
+        langTag === "粤语" ? "_yue" : langTag === "国语" ? "_guo" : "";
+      const sourceId = `${site.id}${suffix}`;
+
+      if (mediaType === "tv") {
+        const seasonMap = new Map<number, ScoredCandidate>();
+        for (const cand of cands) {
+          const existing = seasonMap.get(cand.seasonNumber);
+          if (
+            !existing ||
+            cand.score > existing.score ||
+            (cand.score === existing.score &&
+              cand.episodes.length > existing.episodes.length)
+          ) {
+            seasonMap.set(cand.seasonNumber, cand);
+          }
+        }
+
+        const sortedSeasons = Array.from(seasonMap.values()).sort(
+          (a, b) => a.seasonNumber - b.seasonNumber
+        );
+        const primaryCand = sortedSeasons[0];
+        const seasons: VodSeasonGroup[] = sortedSeasons.map((sc) => ({
+          seasonNumber: sc.seasonNumber,
+          name: `Season ${sc.seasonNumber}`,
+          vodId: sc.item.vod_id,
+          vodName: String(sc.item.vod_name || keyword).trim(),
+          episodes: sc.episodes,
+        }));
+
+        return {
+          sourceId,
+          sourceName: site.name,
+          audioLang: langTag,
+          fromConfig: site.fromConfig,
+          vodId: primaryCand.item.vod_id,
+          vodName: String(primaryCand.item.vod_name || keyword).trim(),
+          vodYear: primaryCand.item.vod_year
+            ? String(primaryCand.item.vod_year)
+            : undefined,
+          vodRemarks: primaryCand.item.vod_remarks
+            ? String(primaryCand.item.vod_remarks)
+            : undefined,
+          vodPic: primaryCand.item.vod_pic
+            ? String(primaryCand.item.vod_pic)
+            : undefined,
+          latencyMs,
+          playGroups: primaryCand.playGroups,
+          episodes: primaryCand.episodes,
+          seasons,
+        };
+      }
+
+      const sorted = [...cands].sort((a, b) => b.score - a.score);
+      const bestCandidate = sorted[0];
+
+      return {
+        sourceId,
+        sourceName: site.name,
+        audioLang: langTag,
+        fromConfig: site.fromConfig,
+        vodId: bestCandidate.item.vod_id,
+        vodName: String(bestCandidate.item.vod_name || keyword).trim(),
+        vodYear: bestCandidate.item.vod_year
+          ? String(bestCandidate.item.vod_year)
+          : undefined,
+        vodRemarks: bestCandidate.item.vod_remarks
+          ? String(bestCandidate.item.vod_remarks)
+          : undefined,
+        vodPic: bestCandidate.item.vod_pic
+          ? String(bestCandidate.item.vod_pic)
+          : undefined,
+        latencyMs,
+        playGroups: bestCandidate.playGroups,
+        episodes: bestCandidate.episodes,
+      };
     };
+
+    if (hasExplicitLangVariants) {
+      const yueCands = validCandidates.filter(
+        (c) => (c.explicitTitleLang || c.audioLang) === "粤语"
+      );
+      const guoCands = validCandidates.filter(
+        (c) => (c.explicitTitleLang || c.audioLang) === "国语"
+      );
+      const neutralCands = validCandidates.filter(
+        (c) => !c.explicitTitleLang && !c.audioLang
+      );
+
+      const results: ResolvedStreamSource[] = [];
+      if (yueCands.length > 0) {
+        const yueSrc = buildSourceFromCandidates(
+          [...yueCands, ...neutralCands],
+          "粤语"
+        );
+        if (yueSrc) results.push(yueSrc);
+      }
+      if (guoCands.length > 0) {
+        const guoSrc = buildSourceFromCandidates(
+          [...guoCands, ...neutralCands],
+          "国语"
+        );
+        if (guoSrc) results.push(guoSrc);
+      }
+      if (results.length > 0) {
+        return results;
+      }
+    }
+
+    const singleSource = buildSourceFromCandidates(validCandidates, undefined);
+    return singleSource ? [singleSource] : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -665,23 +1059,44 @@ export async function resolveStreamsForMedia(params: {
   const { tmdbId, type, customKeyword, disabledSiteIds = [], tmdbApiKey } = params;
   const candidateTitles: string[] = [];
   let releaseYear: string | undefined;
+  let isUnreleased = false;
+
+  const addCandidateTitle = (raw?: string) => {
+    if (!raw || typeof raw !== "string") return;
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const simp = toSimplifiedChinese(trimmed);
+    if (!candidateTitles.includes(simp)) {
+      candidateTitles.push(simp);
+    }
+    if (trimmed !== simp && !candidateTitles.includes(trimmed)) {
+      candidateTitles.push(trimmed);
+    }
+  };
 
   if (customKeyword && customKeyword.trim()) {
-    candidateTitles.push(customKeyword.trim());
+    addCandidateTitle(customKeyword.trim());
   }
 
-  // Fetch localized Chinese (zh-CN) and English (en-US) titles from TMDB
+  // Fetch localized Chinese (zh-CN), English (en-US), translations, and alternative_titles from TMDB
   if (tmdbId && tmdbApiKey) {
     try {
       const [zhRes, enRes] = await Promise.allSettled([
         fetch(
-          `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&api_key=${tmdbApiKey}`,
-          { signal: AbortSignal.timeout(4000) }
+          `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${tmdbApiKey}`,
+          { signal: AbortSignal.timeout(4500) }
         ).then((r) => r.json()),
         fetch(
           `https://api.themoviedb.org/3/${type}/${tmdbId}?language=en-US&api_key=${tmdbApiKey}`,
-          { signal: AbortSignal.timeout(4000) }
+          { signal: AbortSignal.timeout(4500) }
         ).then((r) => r.json()),
+      ]);
+
+      const unreleasedStatuses = new Set([
+        "Rumored",
+        "Planned",
+        "In Production",
+        "Post Production",
       ]);
 
       if (zhRes.status === "fulfilled" && zhRes.value) {
@@ -692,28 +1107,82 @@ export async function resolveStreamsForMedia(params: {
         if (dateStr && typeof dateStr === "string") {
           releaseYear = dateStr.slice(0, 4);
         }
-        if (zhTitle) candidateTitles.push(zhTitle);
-        if (origTitle && !candidateTitles.includes(origTitle)) {
-          candidateTitles.push(origTitle);
+        if (
+          (d.status && unreleasedStatuses.has(String(d.status))) ||
+          Number(d.vote_count || 0) === 0
+        ) {
+          isUnreleased = true;
         }
+
+        if (zhTitle && /[\u4e00-\u9fff]/.test(zhTitle)) {
+          addCandidateTitle(zhTitle);
+        }
+
+        // Extract Chinese titles from translations (CN, SG, TW, HK)
+        const transList = Array.isArray(d?.translations?.translations)
+          ? d.translations.translations
+          : [];
+        const zhCountryOrder = ["CN", "SG", "TW", "HK"];
+        for (const region of zhCountryOrder) {
+          for (const tr of transList) {
+            if (tr?.iso_639_1 === "zh" && tr?.iso_3166_1 === region) {
+              const trTitle = tr?.data?.title || tr?.data?.name;
+              if (trTitle && /[\u4e00-\u9fff]/.test(trTitle)) {
+                addCandidateTitle(trTitle);
+              }
+            }
+          }
+        }
+
+        // Extract Chinese titles from alternative_titles
+        const altList = Array.isArray(d?.alternative_titles?.results)
+          ? d.alternative_titles.results
+          : Array.isArray(d?.alternative_titles?.titles)
+          ? d.alternative_titles.titles
+          : [];
+        for (const alt of altList) {
+          const altTitle = alt?.title || alt?.name;
+          if (altTitle && /[\u4e00-\u9fff]/.test(altTitle)) {
+            addCandidateTitle(altTitle);
+          }
+        }
+
+        if (zhTitle) addCandidateTitle(zhTitle);
+        if (origTitle) addCandidateTitle(origTitle);
       }
 
       if (enRes.status === "fulfilled" && enRes.value) {
         const d = enRes.value;
         const enTitle = d.title || d.name;
         const dateStr = d.release_date || d.first_air_date;
-        if (!releaseYear && dateStr && typeof dateStr === "string") {
+        if (dateStr && typeof dateStr === "string" && !releaseYear) {
           releaseYear = dateStr.slice(0, 4);
         }
-        if (enTitle && !candidateTitles.includes(enTitle)) {
-          candidateTitles.push(enTitle);
+        if (
+          (d.status && unreleasedStatuses.has(String(d.status))) ||
+          Number(d.vote_count || 0) === 0
+        ) {
+          isUnreleased = true;
         }
+        if (enTitle) addCandidateTitle(enTitle);
       }
     } catch {}
   }
 
   const searchKeywords = buildSearchKeywords(candidateTitles);
   const primaryQuery = searchKeywords[0] || "";
+
+  // Do not resolve streams for unreleased movies/shows
+  if (isUnreleased && !customKeyword) {
+    return {
+      tmdbId,
+      mediaType: type,
+      searchQuery: primaryQuery,
+      candidateTitles,
+      releaseYear,
+      sources: [],
+    };
+  }
 
   const disabledSet = new Set(disabledSiteIds);
   const activeSites = getAllVodSites().filter(
@@ -731,45 +1200,57 @@ export async function resolveStreamsForMedia(params: {
     };
   }
 
-  // Query all active VOD sites concurrently using primaryQuery
-  let settled = await Promise.allSettled(
-    activeSites.map((site) =>
-      searchSingleVodSite(site, primaryQuery, candidateTitles, releaseYear, type)
-    )
-  );
+  let matchedSources: ResolvedStreamSource[] = [];
+  const matchedBaseSiteIds = new Set<string>();
+  const maxKeywordsToTry = Math.min(searchKeywords.length, 3);
 
-  let matchedSources = settled
-    .map((r) => (r.status === "fulfilled" ? r.value : null))
-    .filter((s): s is ResolvedStreamSource => s !== null);
-
-  // If primaryQuery yielded < 2 results and we have a secondary keyword (e.g. stripped subtitle or original title), try it
-  if (matchedSources.length < 2 && searchKeywords.length > 1) {
-    const secondaryQuery = searchKeywords[1];
-    const existingIds = new Set(matchedSources.map((m) => m.sourceId));
-    const remainingSites = activeSites.filter((s) => !existingIds.has(s.id));
-
-    const secondSettled = await Promise.allSettled(
-      remainingSites.map((site) =>
-        searchSingleVodSite(site, secondaryQuery, candidateTitles, releaseYear, type)
-      )
+  for (let kIdx = 0; kIdx < maxKeywordsToTry; kIdx++) {
+    const kw = searchKeywords[kIdx];
+    const remainingSites = activeSites.filter(
+      (s) => !matchedBaseSiteIds.has(s.id)
     );
-    const secondMatches = secondSettled
-      .map((r) => (r.status === "fulfilled" ? r.value : null))
-      .filter((s): s is ResolvedStreamSource => s !== null);
+    if (remainingSites.length === 0) break;
 
-    matchedSources = [...matchedSources, ...secondMatches];
+    // Only try additional keywords if we haven't found many sources yet or if the next keyword is also Chinese
+    if (kIdx > 0 && matchedBaseSiteIds.size >= 6 && !/[\u4e00-\u9fff]/.test(kw)) {
+      break;
+    }
+
+    const settled = await Promise.allSettled(
+      remainingSites.map(async (site) => {
+        const siteSources = await searchSingleVodSite(
+          site,
+          kw,
+          candidateTitles,
+          releaseYear,
+          type
+        );
+        return { siteId: site.id, siteSources };
+      })
+    );
+
+    for (const r of settled) {
+      if (r.status === "fulfilled" && r.value.siteSources.length > 0) {
+        matchedBaseSiteIds.add(r.value.siteId);
+        matchedSources.push(...r.value.siteSources);
+      }
+    }
   }
 
   // Sort by exact title/year match, full episode availability, and response speed
-  const normPrimary = normalizeTitleForComparison(primaryQuery);
+  const normPrimary = normalizeTitleForComparison(
+    parseSeasonInfo(primaryQuery).baseTitle
+  );
   matchedSources.sort((a, b) => {
-    const aExactTitle = normalizeTitleForComparison(a.vodName) === normPrimary ? 1 : 0;
-    const bExactTitle = normalizeTitleForComparison(b.vodName) === normPrimary ? 1 : 0;
+    const aBase = normalizeTitleForComparison(
+      parseSeasonInfo(a.vodName).baseTitle
+    );
+    const bBase = normalizeTitleForComparison(
+      parseSeasonInfo(b.vodName).baseTitle
+    );
+    const aExactTitle = aBase === normPrimary ? 1 : 0;
+    const bExactTitle = bBase === normPrimary ? 1 : 0;
     if (aExactTitle !== bExactTitle) return bExactTitle - aExactTitle;
-
-    const aYearMatch = releaseYear && a.vodYear === releaseYear ? 1 : 0;
-    const bYearMatch = releaseYear && b.vodYear === releaseYear ? 1 : 0;
-    if (aYearMatch !== bYearMatch) return bYearMatch - aYearMatch;
 
     const aHasFull = a.episodes.some((e) => !e.name.includes("预告")) ? 1 : 0;
     const bHasFull = b.episodes.some((e) => !e.name.includes("预告")) ? 1 : 0;

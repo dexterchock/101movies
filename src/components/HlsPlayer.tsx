@@ -3,12 +3,29 @@ import Hls from "hls.js";
 
 interface HlsPlayerProps {
   src: string;
+  initialTime?: number;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: () => void;
 }
 
-export function HlsPlayer({ src, onError }: HlsPlayerProps) {
+export function HlsPlayer({
+  src,
+  initialTime = 0,
+  onTimeUpdate,
+  onError,
+}: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [useProxy, setUseProxy] = useState(false);
+  const pendingSeekRef = useRef<number>(initialTime);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate;
+  }, [onTimeUpdate]);
+
+  useEffect(() => {
+    pendingSeekRef.current = initialTime;
+  }, [src, initialTime]);
 
   // Reset proxy state whenever src changes; force proxy immediately if http:// on https:// page
   useEffect(() => {
@@ -28,12 +45,29 @@ export function HlsPlayer({ src, onError }: HlsPlayerProps) {
       : src;
 
     let hls: Hls | null = null;
-    const isMp4 = src.toLowerCase().includes(".mp4") && !src.toLowerCase().includes(".m3u8");
+    const isMp4 =
+      src.toLowerCase().includes(".mp4") &&
+      !src.toLowerCase().includes(".m3u8");
+
+    const applyInitialSeekAndPlay = () => {
+      if (pendingSeekRef.current && pendingSeekRef.current > 0) {
+        try {
+          video.currentTime = pendingSeekRef.current;
+        } catch {}
+        pendingSeekRef.current = 0;
+      }
+      video.play().catch(() => {});
+    };
 
     if (isMp4) {
       video.src = effectiveSrc;
-      video.play().catch(() => {});
-      return;
+      const handleLoaded = () => {
+        applyInitialSeekAndPlay();
+      };
+      video.addEventListener("loadedmetadata", handleLoaded, { once: true });
+      return () => {
+        video.removeEventListener("loadedmetadata", handleLoaded);
+      };
     }
 
     if (Hls.isSupported()) {
@@ -44,9 +78,7 @@ export function HlsPlayer({ src, onError }: HlsPlayerProps) {
       hls.loadSource(effectiveSrc);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(() => {
-          // Auto-play might require user gesture
-        });
+        applyInitialSeekAndPlay();
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -64,9 +96,15 @@ export function HlsPlayer({ src, onError }: HlsPlayerProps) {
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = effectiveSrc;
-      video.addEventListener("loadedmetadata", () => {
-        video.play().catch(() => {});
+      const handleNativeLoaded = () => {
+        applyInitialSeekAndPlay();
+      };
+      video.addEventListener("loadedmetadata", handleNativeLoaded, {
+        once: true,
       });
+      return () => {
+        video.removeEventListener("loadedmetadata", handleNativeLoaded);
+      };
     }
 
     return () => {
@@ -82,6 +120,12 @@ export function HlsPlayer({ src, onError }: HlsPlayerProps) {
       controls
       autoPlay
       playsInline
+      onTimeUpdate={(e) => {
+        const vid = e.currentTarget;
+        if (vid.currentTime > 0) {
+          onTimeUpdateRef.current?.(vid.currentTime, vid.duration || 0);
+        }
+      }}
       className="w-full h-full object-contain bg-black outline-none focus:outline-none"
       tabIndex={0}
     />

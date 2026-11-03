@@ -4,14 +4,23 @@ import { MediaItem } from "../types";
 import { MediaCard } from "../components/MediaCard";
 import { Search as SearchIcon, X } from "lucide-react";
 
+let cachedSearchQuery = "";
+let cachedSearchResults: MediaItem[] = [];
+
 export function Search() {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<MediaItem[]>([]);
+  const [query, setQuery] = useState(() => cachedSearchQuery);
+  const [results, setResults] = useState<MediaItem[]>(() => cachedSearchResults);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const trimmed = query.trim();
+    if (trimmed === cachedSearchQuery && cachedSearchResults.length > 0) {
+      setResults(cachedSearchResults);
+      setLoading(false);
+      return;
+    }
+
     if (trimmed.length > 2) {
       setLoading(true);
       const timer = setTimeout(() => {
@@ -21,30 +30,38 @@ export function Search() {
             const filtered = data.filter(
               (item) => item.media_type === "movie" || item.media_type === "tv" || !item.media_type
             );
+            cachedSearchQuery = trimmed;
+            cachedSearchResults = filtered;
             setResults(filtered);
           })
           .finally(() => setLoading(false));
       }, 400);
       return () => clearTimeout(timer);
     } else {
+      cachedSearchQuery = trimmed;
+      cachedSearchResults = [];
       setResults([]);
       setLoading(false);
     }
   }, [query]);
 
-  // Auto-focus input for TV use
+  // Auto-focus input when entering empty search without scrolling container
   useEffect(() => {
-    inputRef.current?.focus();
+    if (cachedSearchResults.length === 0) {
+      inputRef.current?.focus({ preventScroll: true });
+    }
   }, []);
 
   const handleClear = () => {
+    cachedSearchQuery = "";
+    cachedSearchResults = [];
     setQuery("");
     setResults([]);
-    inputRef.current?.focus();
+    inputRef.current?.focus({ preventScroll: true });
   };
 
   return (
-    <div className="flex flex-col gap-6 md:gap-8 pt-0 pb-0 min-h-screen bg-black">
+    <div className="flex flex-col gap-6 md:gap-8 pt-0 pb-0 min-h-full bg-black">
       <div className="flex flex-col w-full relative z-20">
         <div className="relative flex items-center justify-between gap-4 w-full px-6 md:px-8 pt-6 md:pt-8 pb-6 md:pb-8 sticky top-0 z-40 pointer-events-none">
           <div className="absolute inset-x-0 -top-4 h-32 md:h-40 bg-gradient-to-b from-black via-black/60 to-transparent -z-10 pointer-events-none" />
@@ -54,7 +71,7 @@ export function Search() {
           </h2>
 
           <div className="relative z-10 flex items-center justify-end flex-1 max-w-xs sm:max-w-sm md:max-w-md h-[46px] pointer-events-auto">
-            <div className="relative flex items-center w-full h-[46px] rounded-full bg-[#121212] border border-white/10 focus-within:border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.8)] transition-colors duration-300">
+            <div className="relative flex items-center w-full h-[46px] rounded-full bg-white/[0.07] backdrop-blur-md border border-white/[0.14] focus-within:border-white/30 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300">
               <SearchIcon
                 className="absolute left-4 text-white/50 pointer-events-none"
                 size={18}

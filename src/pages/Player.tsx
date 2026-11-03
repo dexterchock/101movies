@@ -229,13 +229,19 @@ export function Player() {
       try {
         const stored = localStorage.getItem("watch_history");
         let history: MediaItem[] = stored ? JSON.parse(stored) : [];
-        const existingItem = history.find((item) => item.id.toString() === id);
+        const existingItem = history.find(
+          (item) =>
+            item.id.toString() === id && (item.media_type || "movie") === type
+        );
         const mergedProgress: WatchProgress = {
           ...(existingItem?.watchProgress || {}),
           ...progressUpdate,
           updatedAt: Date.now(),
         };
-        history = history.filter((item) => item.id.toString() !== id);
+        history = history.filter(
+          (item) =>
+            !(item.id.toString() === id && (item.media_type || "movie") === type)
+        );
         history.unshift({
           ...(mediaDetails as MediaItem),
           media_type: type,
@@ -285,7 +291,10 @@ export function Player() {
       try {
         const stored = localStorage.getItem("watch_history");
         const history: MediaItem[] = stored ? JSON.parse(stored) : [];
-        const existing = history.find((item) => item.id.toString() === id);
+        const existing = history.find(
+          (item) =>
+            item.id.toString() === id && (item.media_type || "movie") === type
+        );
         setSavedProgress(existing?.watchProgress || null);
       } catch {
         setSavedProgress(null);
@@ -672,11 +681,11 @@ export function Player() {
       )}
 
       {/* Seamless Pure-Black Bottom Controls with Apple Liquid Glass Buttons */}
-      <div className="shrink-0 w-full bg-black px-6 md:px-8 pt-3 pb-6 md:pb-8 flex items-center justify-between gap-6 relative z-30">
+      <div className="shrink-0 w-full bg-black px-5 sm:px-6 md:px-8 pt-2 sm:pt-3 pb-5 sm:pb-6 md:pb-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-6 relative z-30">
         {/* Left & Center: Single-Row Paginated Server Pills + Prev/Next Buttons */}
         <div
           ref={serverBarRef}
-          className="flex items-center gap-2 flex-1 min-w-0"
+          className="flex items-center justify-between sm:justify-start gap-2 flex-1 min-w-0"
         >
           {resolving ? (
             <div className="flex items-center gap-2 overflow-hidden">
@@ -808,7 +817,7 @@ export function Player() {
         </div>
 
         {/* Right: Resume Pill (when watchProgress exists) + White Episode Popover Trigger */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center justify-end gap-2.5 shrink-0">
           {showResumePill && resumeLabel && (
             <button
               type="button"

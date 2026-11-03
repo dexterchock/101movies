@@ -1,8 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
 import { api } from "../api";
-import { MediaItem } from "../types";
+import { MediaItem, MediaCategoryOption } from "../types";
 import { MediaCard } from "../components/MediaCard";
-import { MediaCategoryOption } from "../components/MediaRow";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "../utils";
 
@@ -15,7 +14,7 @@ const ALL_YEARS = Array.from(
 
 const MEDIA_TYPES: { id: "movie" | "tv"; label: string }[] = [
   { id: "movie", label: "Movies" },
-  { id: "tv", label: "TV Shows" },
+  { id: "tv", label: "Shows" },
 ];
 
 const MOVIE_CATEGORIES: MediaCategoryOption[] = [
@@ -49,6 +48,12 @@ const GENRE_PILL_GAP = 4;
 
 let cachedRankingsKey = "";
 let cachedRankingsItems: MediaItem[] | null = null;
+
+function getColsForWidth(width: number): number {
+  if (width >= 768) return 6;
+  if (width >= 640) return 3;
+  return 2;
+}
 
 export function Rankings() {
   const [mediaType, setMediaType] = useState<"movie" | "tv">(() => {
@@ -125,65 +130,115 @@ export function Rankings() {
     setCanScrollGenreRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
   }, []);
 
+  const [colsPerRow, setColsPerRow] = useState(() =>
+    typeof window !== "undefined" ? getColsForWidth(window.innerWidth) : 6
+  );
+  const [isMobileView, setIsMobileView] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 640 : false
+  );
+
+  useEffect(() => {
+    const onResize = () => {
+      setColsPerRow(getColsForWidth(window.innerWidth));
+      setIsMobileView(window.innerWidth < 640);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const mediaTypeTabWidth = isMobileView ? 78 : 88;
+
+  const centerYearTrack = useCallback(
+    (smooth: boolean) => {
+      const el = yearTrackRef.current;
+      if (!el) return;
+      const stride = YEAR_PILL_WIDTH + YEAR_PILL_GAP;
+      const visiblePills = el.clientWidth >= 180 ? 3 : 1;
+      const startIdx =
+        visiblePills === 3
+          ? Math.max(0, Math.min(ALL_YEARS.length - 3, activeYearIndex - 1))
+          : activeYearIndex;
+      const targetScroll = startIdx * stride;
+      if (smooth) {
+        el.scrollTo({ left: targetScroll, behavior: "smooth" });
+      } else {
+        el.scrollLeft = targetScroll;
+      }
+      updateScrollButtons();
+    },
+    [activeYearIndex, updateScrollButtons]
+  );
+
   useEffect(() => {
     const el = yearTrackRef.current;
     if (!el) return;
+    const handleResize = () => centerYearTrack(false);
     updateScrollButtons();
     el.addEventListener("scroll", updateScrollButtons, { passive: true });
-    window.addEventListener("resize", updateScrollButtons);
+    window.addEventListener("resize", handleResize);
     return () => {
       el.removeEventListener("scroll", updateScrollButtons);
-      window.removeEventListener("resize", updateScrollButtons);
+      window.removeEventListener("resize", handleResize);
     };
-  }, [updateScrollButtons]);
+  }, [updateScrollButtons, centerYearTrack]);
+
+  const centerGenreTrack = useCallback(
+    (smooth: boolean) => {
+      const el = genreTrackRef.current;
+      if (!el || activeGenreList.length === 0) return;
+      const stride = GENRE_PILL_WIDTH + GENRE_PILL_GAP;
+      const visiblePills = Math.max(1, Math.round(el.clientWidth / stride));
+      const half = Math.floor(visiblePills / 2);
+      const startIdx = Math.max(
+        0,
+        Math.min(activeGenreList.length - visiblePills, activeGenreIndex - half)
+      );
+      const targetScroll = startIdx * stride;
+      if (smooth) {
+        el.scrollTo({ left: targetScroll, behavior: "smooth" });
+      } else {
+        el.scrollLeft = targetScroll;
+      }
+      updateGenreScrollButtons();
+    },
+    [activeGenreList.length, activeGenreIndex, updateGenreScrollButtons]
+  );
 
   useEffect(() => {
     const el = genreTrackRef.current;
     if (!el) return;
+    const onResize = () => centerGenreTrack(false);
     updateGenreScrollButtons();
     el.addEventListener("scroll", updateGenreScrollButtons, { passive: true });
-    window.addEventListener("resize", updateGenreScrollButtons);
+    window.addEventListener("resize", onResize);
     return () => {
       el.removeEventListener("scroll", updateGenreScrollButtons);
-      window.removeEventListener("resize", updateGenreScrollButtons);
+      window.removeEventListener("resize", onResize);
     };
-  }, [updateGenreScrollButtons, mediaType]);
+  }, [updateGenreScrollButtons, centerGenreTrack, mediaType]);
 
   const isInitialYearMountRef = useRef(true);
   const isInitialGenreMountRef = useRef(true);
 
   // Center the active year pill (instant on initial mount, smooth on user change)
   useLayoutEffect(() => {
-    const el = yearTrackRef.current;
-    if (!el) return;
-    const itemCenter =
-      activeYearIndex * (YEAR_PILL_WIDTH + YEAR_PILL_GAP) + YEAR_PILL_WIDTH / 2;
-    const targetScroll = Math.max(0, itemCenter - el.clientWidth / 2);
     if (isInitialYearMountRef.current) {
       isInitialYearMountRef.current = false;
-      el.scrollLeft = targetScroll;
-      updateScrollButtons();
+      centerYearTrack(false);
     } else {
-      el.scrollTo({ left: targetScroll, behavior: "smooth" });
+      centerYearTrack(true);
     }
-  }, [activeYearIndex, updateScrollButtons]);
+  }, [centerYearTrack]);
 
   // Center the active genre pill (instant on initial mount, smooth on user change)
   useLayoutEffect(() => {
-    const el = genreTrackRef.current;
-    if (!el) return;
-    const itemCenter =
-      activeGenreIndex * (GENRE_PILL_WIDTH + GENRE_PILL_GAP) +
-      GENRE_PILL_WIDTH / 2;
-    const targetScroll = Math.max(0, itemCenter - el.clientWidth / 2);
     if (isInitialGenreMountRef.current) {
       isInitialGenreMountRef.current = false;
-      el.scrollLeft = targetScroll;
-      updateGenreScrollButtons();
+      centerGenreTrack(false);
     } else {
-      el.scrollTo({ left: targetScroll, behavior: "smooth" });
+      centerGenreTrack(true);
     }
-  }, [activeGenreIndex, mediaType, updateGenreScrollButtons]);
+  }, [centerGenreTrack]);
 
   useEffect(() => {
     sessionStorage.setItem("rankings_media_type", mediaType);
@@ -254,8 +309,21 @@ export function Rankings() {
   const scrollYearsBy = (direction: -1 | 1) => {
     const el = yearTrackRef.current;
     if (!el) return;
-    const step = (YEAR_PILL_WIDTH + YEAR_PILL_GAP) * 2;
-    el.scrollBy({ left: direction * step, behavior: "smooth" });
+    const stride = YEAR_PILL_WIDTH + YEAR_PILL_GAP;
+    if (el.clientWidth < 180) {
+      const nextIndex = Math.max(
+        0,
+        Math.min(ALL_YEARS.length - 1, activeYearIndex + direction)
+      );
+      setYear(ALL_YEARS[nextIndex]);
+      return;
+    }
+    const currentIdx = Math.round(el.scrollLeft / stride);
+    const nextIdx = Math.max(
+      0,
+      Math.min(ALL_YEARS.length - 3, currentIdx + direction * 2)
+    );
+    el.scrollTo({ left: nextIdx * stride, behavior: "smooth" });
   };
 
   const handleGenreMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -295,253 +363,280 @@ export function Rankings() {
   const scrollGenresBy = (direction: -1 | 1) => {
     const el = genreTrackRef.current;
     if (!el) return;
-    const step = (GENRE_PILL_WIDTH + GENRE_PILL_GAP) * 2;
-    el.scrollBy({ left: direction * step, behavior: "smooth" });
+    const stride = GENRE_PILL_WIDTH + GENRE_PILL_GAP;
+    const visiblePills = Math.max(1, Math.round(el.clientWidth / stride));
+    if (visiblePills <= 1) {
+      const nextIndex = Math.max(
+        0,
+        Math.min(activeGenreList.length - 1, activeGenreIndex + direction)
+      );
+      setGenre(activeGenreList[nextIndex].id);
+      return;
+    }
+    const currentIdx = Math.round(el.scrollLeft / stride);
+    const step = Math.max(1, visiblePills - 1);
+    const nextIdx = Math.max(
+      0,
+      Math.min(activeGenreList.length - visiblePills, currentIdx + direction * step)
+    );
+    el.scrollTo({ left: nextIdx * stride, behavior: "smooth" });
   };
 
+  const itemsPerPage = colsPerRow * 2;
+  const displayedItems = items.slice(0, itemsPerPage);
+  const placeholderCount = !loading
+    ? Math.max(0, itemsPerPage - displayedItems.length)
+    : 0;
+
   return (
-    <div className="flex flex-col gap-6 md:gap-8 pt-0 pb-0 min-h-full bg-black">
-      <div className="flex flex-col w-full relative z-20">
-        <div className="relative flex items-center justify-between w-full px-6 md:px-8 pt-6 md:pt-8 pb-6 md:pb-8 sticky top-0 z-40 pointer-events-none">
-          <div className="absolute inset-x-0 -top-4 h-32 md:h-40 bg-gradient-to-b from-black via-black/60 to-transparent -z-10 pointer-events-none" />
+    <div className="flex flex-col h-full w-full overflow-hidden bg-black select-none">
+      {/* Locked Top Control Bar (Identical Placements to Trending) */}
+      <div className="shrink-0 relative flex flex-wrap lg:flex-nowrap items-center justify-between gap-y-2.5 w-full px-6 md:px-8 pt-5 md:pt-6 pb-4 md:pb-5 z-40">
+        {/* Left: Movies / Shows Capsule Toggle */}
+        <div
+          role="tablist"
+          aria-label="Content Type"
+          className="order-1 relative flex items-center gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
+        >
+          <div
+            className="absolute top-1 bottom-1 left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
+            style={{
+              width: `${mediaTypeTabWidth}px`,
+              transform: `translate3d(${activeMediaTypeIndex * (mediaTypeTabWidth + 4)}px, 0, 0)`,
+            }}
+          />
+          {MEDIA_TYPES.map((cat) => {
+            const isActive = mediaType === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setMediaType(cat.id)}
+                tabIndex={0}
+                style={{ width: `${mediaTypeTabWidth}px` }}
+                className={cn(
+                  "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
+                  "focus:outline-none focus-visible:outline-none select-none",
+                  isActive
+                    ? "text-black"
+                    : "text-white/75 hover:text-white focus:text-white"
+                )}
+              >
+                <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110 will-change-transform transform-gpu">
+                  {cat.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-          <h2 className="relative z-10 flex items-center h-[46px] text-2xl font-bold text-white/95 tracking-wide leading-none pointer-events-auto shrink-0">
-            Top Rankings
-          </h2>
-
-          <div className="relative z-10 flex items-center gap-2.5 h-[46px] pointer-events-auto">
-            {/* Movies / TV Shows Capsule Toggle with Apple Liquid Glass Blur */}
-            <div
-              role="tablist"
-              aria-label="Content Type"
-              className="relative flex items-center gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] backdrop-blur-md border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
+        {/* Center on Desktop / Row 2 on Mobile: Sliding Category Switcher Capsule */}
+        <div className="order-3 lg:order-2 w-full lg:w-auto flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex items-center justify-between gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+            <button
+              type="button"
+              onClick={() => scrollGenresBy(-1)}
+              disabled={!canScrollGenreLeft && activeGenreIndex === 0}
+              aria-label="Scroll categories left"
+              className={cn(
+                "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+                canScrollGenreLeft || activeGenreIndex > 0
+                  ? "hover:bg-white/15 cursor-pointer text-white"
+                  : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+              )}
             >
+              <ChevronLeft
+                className={cn(
+                  "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                  canScrollGenreLeft || activeGenreIndex > 0
+                    ? "group-hover:scale-125 text-white"
+                    : "text-white/25"
+                )}
+              />
+            </button>
+
+            <div
+              ref={genreTrackRef}
+              onMouseDown={handleGenreMouseDown}
+              onMouseMove={handleGenreMouseMove}
+              onMouseUp={stopGenreDragging}
+              onMouseLeave={stopGenreDragging}
+              onWheel={handleGenreWheel}
+              className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[172px] min-[400px]:w-[260px] sm:w-[348px] lg:w-[260px] xl:w-[436px] h-[36px] rounded-full"
+            >
+              <div className="relative flex items-center gap-1 w-max h-[36px]">
+                <div
+                  className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
+                  style={{
+                    width: `${GENRE_PILL_WIDTH}px`,
+                    transform: `translate3d(${
+                      activeGenreIndex * (GENRE_PILL_WIDTH + GENRE_PILL_GAP)
+                    }px, 0, 0)`,
+                  }}
+                />
+
+                {activeGenreList.map((cat) => {
+                  const isSelected = validGenre === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => {
+                        if (!hasDraggedGenreRef.current) {
+                          setGenre(cat.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      style={{ width: `${GENRE_PILL_WIDTH}px` }}
+                      className={cn(
+                        "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
+                        "focus:outline-none focus-visible:outline-none select-none",
+                        isSelected
+                          ? "text-black"
+                          : "text-white/75 hover:text-white focus:text-white"
+                      )}
+                    >
+                      <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110 will-change-transform transform-gpu">
+                        {cat.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollGenresBy(1)}
+              disabled={
+                !canScrollGenreRight &&
+                activeGenreIndex === activeGenreList.length - 1
+              }
+              aria-label="Scroll categories right"
+              className={cn(
+                "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+                canScrollGenreRight ||
+                  activeGenreIndex < activeGenreList.length - 1
+                  ? "hover:bg-white/15 cursor-pointer text-white"
+                  : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+              )}
+            >
+              <ChevronRight
+                className={cn(
+                  "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                  canScrollGenreRight ||
+                    activeGenreIndex < activeGenreList.length - 1
+                    ? "group-hover:scale-125 text-white"
+                    : "text-white/25"
+                )}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Dynamic Swipeable Year Switcher Capsule */}
+        <div className="order-2 lg:order-3 flex items-center justify-between gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+          <button
+            type="button"
+            onClick={() => scrollYearsBy(-1)}
+            disabled={!canScrollLeft && activeYearIndex === 0}
+            aria-label="Scroll to newer years"
+            className={cn(
+              "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+              canScrollLeft || activeYearIndex > 0
+                ? "hover:bg-white/15 cursor-pointer text-white"
+                : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+            )}
+          >
+            <ChevronLeft
+              className={cn(
+                "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                canScrollLeft || activeYearIndex > 0 ? "group-hover:scale-125 text-white" : "text-white/25"
+              )}
+            />
+          </button>
+
+          <div
+            ref={yearTrackRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={stopDragging}
+            onMouseLeave={stopDragging}
+            onWheel={handleWheel}
+            className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[64px] sm:w-[200px] h-[36px] rounded-full"
+          >
+            <div className="relative flex items-center gap-1 w-max h-[36px]">
+              {/* Sliding Active Year Pill */}
               <div
-                className="absolute top-1 bottom-1 left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
+                className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
                 style={{
-                  width: "96px",
-                  transform: `translate3d(${activeMediaTypeIndex * (96 + 4)}px, 0, 0)`,
+                  width: `${YEAR_PILL_WIDTH}px`,
+                  transform: `translate3d(${
+                    activeYearIndex * (YEAR_PILL_WIDTH + YEAR_PILL_GAP)
+                  }px, 0, 0)`,
                 }}
               />
-              {MEDIA_TYPES.map((cat) => {
-                const isActive = mediaType === cat.id;
+
+              {ALL_YEARS.map((y) => {
+                const isSelected = year === y;
                 return (
                   <button
-                    key={cat.id}
+                    key={y}
                     type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    onClick={() => setMediaType(cat.id)}
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      if (!hasDraggedRef.current) {
+                        setYear(y);
+                      }
+                    }}
                     tabIndex={0}
+                    style={{ width: `${YEAR_PILL_WIDTH}px` }}
                     className={cn(
-                      "group relative z-10 flex items-center justify-center w-[96px] h-[36px] text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
+                      "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
                       "focus:outline-none focus-visible:outline-none select-none",
-                      isActive
+                      isSelected
                         ? "text-black"
                         : "text-white/75 hover:text-white focus:text-white"
                     )}
                   >
-                    <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
-                      {cat.label}
+                    <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110 will-change-transform transform-gpu">
+                      {y}
                     </span>
                   </button>
                 );
               })}
             </div>
-
-            {/* 5-Category Sliding Switcher Capsule with Apple Liquid Glass Blur */}
-            <div className="hidden xl:flex items-center gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] backdrop-blur-md border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
-              <button
-                type="button"
-                onClick={() => scrollGenresBy(-1)}
-                disabled={!canScrollGenreLeft}
-                aria-label="Scroll categories left"
-                className={cn(
-                  "group flex items-center justify-center w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-                  canScrollGenreLeft
-                    ? "hover:bg-white/15 cursor-pointer text-white"
-                    : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
-                )}
-              >
-                <ChevronLeft
-                  className={cn(
-                    "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                    canScrollGenreLeft ? "group-hover:scale-125 text-white" : "text-white/25"
-                  )}
-                />
-              </button>
-
-              <div
-                ref={genreTrackRef}
-                onMouseDown={handleGenreMouseDown}
-                onMouseMove={handleGenreMouseMove}
-                onMouseUp={stopGenreDragging}
-                onMouseLeave={stopGenreDragging}
-                onWheel={handleGenreWheel}
-                className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[436px] h-[36px] rounded-full"
-              >
-                <div className="relative flex items-center gap-1 w-max h-[36px]">
-                  <div
-                    className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
-                    style={{
-                      width: `${GENRE_PILL_WIDTH}px`,
-                      transform: `translate3d(${
-                        activeGenreIndex * (GENRE_PILL_WIDTH + GENRE_PILL_GAP)
-                      }px, 0, 0)`,
-                    }}
-                  />
-
-                  {activeGenreList.map((cat) => {
-                    const isSelected = validGenre === cat.id;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        aria-pressed={isSelected}
-                        onClick={() => {
-                          if (!hasDraggedGenreRef.current) {
-                            setGenre(cat.id);
-                          }
-                        }}
-                        tabIndex={0}
-                        style={{ width: `${GENRE_PILL_WIDTH}px` }}
-                        className={cn(
-                          "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
-                          "focus:outline-none focus-visible:outline-none select-none",
-                          isSelected
-                            ? "text-black"
-                            : "text-white/75 hover:text-white focus:text-white"
-                        )}
-                      >
-                        <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
-                          {cat.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => scrollGenresBy(1)}
-                disabled={!canScrollGenreRight}
-                aria-label="Scroll categories right"
-                className={cn(
-                  "group flex items-center justify-center w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-                  canScrollGenreRight
-                    ? "hover:bg-white/15 cursor-pointer text-white"
-                    : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
-                )}
-              >
-                <ChevronRight
-                  className={cn(
-                    "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                    canScrollGenreRight ? "group-hover:scale-125 text-white" : "text-white/25"
-                  )}
-                />
-              </button>
-            </div>
-
-            {/* Dynamic Swipeable Year Switcher Capsule with Apple Liquid Glass Blur */}
-            <div className="flex items-center gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] backdrop-blur-md border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
-              <button
-                type="button"
-                onClick={() => scrollYearsBy(-1)}
-                disabled={!canScrollLeft}
-                aria-label="Scroll to newer years"
-                className={cn(
-                  "group flex items-center justify-center w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-                  canScrollLeft
-                    ? "hover:bg-white/15 cursor-pointer text-white"
-                    : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
-                )}
-              >
-                <ChevronLeft
-                  className={cn(
-                    "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                    canScrollLeft ? "group-hover:scale-125 text-white" : "text-white/25"
-                  )}
-                />
-              </button>
-
-              <div
-                ref={yearTrackRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={stopDragging}
-                onMouseLeave={stopDragging}
-                onWheel={handleWheel}
-                className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[200px] h-[36px] rounded-full"
-              >
-                <div className="relative flex items-center gap-1 w-max h-[36px]">
-                  {/* Sliding Active Year Pill */}
-                  <div
-                    className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
-                    style={{
-                      width: `${YEAR_PILL_WIDTH}px`,
-                      transform: `translate3d(${
-                        activeYearIndex * (YEAR_PILL_WIDTH + YEAR_PILL_GAP)
-                      }px, 0, 0)`,
-                    }}
-                  />
-
-                  {ALL_YEARS.map((y) => {
-                    const isSelected = year === y;
-                    return (
-                      <button
-                        key={y}
-                        type="button"
-                        aria-pressed={isSelected}
-                        onClick={() => {
-                          if (!hasDraggedRef.current) {
-                            setYear(y);
-                          }
-                        }}
-                        tabIndex={0}
-                        style={{ width: `${YEAR_PILL_WIDTH}px` }}
-                        className={cn(
-                          "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
-                          "focus:outline-none focus-visible:outline-none select-none",
-                          isSelected
-                            ? "text-black"
-                            : "text-white/75 hover:text-white focus:text-white"
-                        )}
-                      >
-                        <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
-                          {y}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => scrollYearsBy(1)}
-                disabled={!canScrollRight}
-                aria-label="Scroll to older years"
-                className={cn(
-                  "group flex items-center justify-center w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-                  canScrollRight
-                    ? "hover:bg-white/15 cursor-pointer text-white"
-                    : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
-                )}
-              >
-                <ChevronRight
-                  className={cn(
-                    "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                    canScrollRight ? "group-hover:scale-125 text-white" : "text-white/25"
-                  )}
-                />
-              </button>
-            </div>
           </div>
-        </div>
 
-        {!loading && items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 px-6 md:px-8 text-center relative z-10">
+          <button
+            type="button"
+            onClick={() => scrollYearsBy(1)}
+            disabled={!canScrollRight && activeYearIndex === ALL_YEARS.length - 1}
+            aria-label="Scroll to older years"
+            className={cn(
+              "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+              canScrollRight || activeYearIndex < ALL_YEARS.length - 1
+                ? "hover:bg-white/15 cursor-pointer text-white"
+                : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+            )}
+          >
+            <ChevronRight
+              className={cn(
+                "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                canScrollRight || activeYearIndex < ALL_YEARS.length - 1 ? "group-hover:scale-125 text-white" : "text-white/25"
+              )}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Locked 2-Row Viewport Grid (Zero Scroll, Clears Bottom Nav Pill) */}
+      <div className="flex-1 min-h-0 w-full px-6 md:px-8 pb-[78px] sm:pb-[88px] md:pb-[96px] relative z-10">
+        {!loading && displayedItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-xl text-white/70 font-medium mb-2">
               No rankings found for {year}
             </p>
@@ -550,23 +645,42 @@ export function Rankings() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8 px-6 md:px-8 w-full relative z-10">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 grid-rows-2 gap-x-5 sm:gap-x-6 md:gap-x-7 gap-y-3.5 sm:gap-y-4 md:gap-y-5 w-full h-full md:max-h-[calc((100vw-64px)*0.54)] min-h-0">
             {loading
-              ? Array.from({ length: 12 }).map((_, idx) => (
-                  <div key={idx} className="flex flex-col gap-3 w-full">
-                    <div className="w-full aspect-[2/3] rounded-2xl bg-white/5 border border-white/5 animate-pulse" />
-                    <div className="h-4 w-3/4 rounded bg-white/5 animate-pulse" />
-                    <div className="h-3 w-1/3 rounded bg-white/5 animate-pulse" />
+              ? Array.from({ length: itemsPerPage }).map((_, idx) => (
+                  <div key={idx} className="flex flex-col gap-2 h-full min-h-0 w-full">
+                    <div className="w-full flex-1 min-h-0 rounded-2xl bg-white/5 border border-white/5 animate-pulse" />
+                    <div className="flex flex-col px-1 shrink-0 gap-1">
+                      <div className="h-4 w-3/4 rounded bg-white/5 animate-pulse" />
+                      <div className="h-3.5 w-1/3 rounded bg-white/5 animate-pulse" />
+                    </div>
                   </div>
                 ))
-              : items.map((item, index) => (
-                  <MediaCard
-                    key={`${mediaType}-${year}-${validGenre}-${item.id}`}
-                    item={item}
-                    rank={index + 1}
-                    className="w-full"
-                  />
-                ))}
+              : (
+                <>
+                  {displayedItems.map((item, index) => (
+                    <MediaCard
+                      key={`${mediaType}-${year}-${validGenre}-${item.id}`}
+                      item={item}
+                      rank={index + 1}
+                      className="w-full"
+                    />
+                  ))}
+                  {Array.from({ length: placeholderCount }).map((_, idx) => (
+                    <div
+                      key={`placeholder-${idx}`}
+                      aria-hidden="true"
+                      className="flex flex-col gap-2 h-full min-h-0 w-full invisible pointer-events-none select-none"
+                    >
+                      <div className="w-full flex-1 min-h-0" />
+                      <div className="flex flex-col px-1 shrink-0">
+                        <span className="text-sm sm:text-base leading-tight">&nbsp;</span>
+                        <span className="text-xs sm:text-sm mt-0.5 leading-tight">&nbsp;</span>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
           </div>
         )}
       </div>

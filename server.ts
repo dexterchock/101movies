@@ -4,6 +4,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import {
   AWESOME_ZHUIJU_TVBOX_CONFIGS,
+  filterItemsByServerAvailability,
   getAllVodSites,
   parseTvboxConfig,
   pingVodSite,
@@ -81,12 +82,14 @@ function normalizeMediaItemTitles(item: any): any {
 
 function filterReleasedMedia(items: any[], minVotes = 3): any[] {
   if (!Array.isArray(items)) return [];
+  const todayIso = new Date().toISOString().slice(0, 10);
   return items
     .filter((item: any) => {
       if (!item || !item.poster_path) return false;
       const dateStr = item.release_date || item.first_air_date;
       if (!dateStr || typeof dateStr !== "string") return false;
-      // Unreleased future movies/shows (like Avengers: Doomsday) have 0 votes/rating on TMDB
+      if (dateStr > todayIso) return false;
+      // Unreleased future movies/shows (like Avengers: Doomsday / Godzilla Minus Zero)
       const voteCount = Number(item.vote_count || 0);
       const voteAvg = Number(item.vote_average || 0);
       if (voteCount < minVotes || voteAvg <= 0) return false;
@@ -95,31 +98,66 @@ function filterReleasedMedia(items: any[], minVotes = 3): any[] {
     .map(normalizeMediaItemTitles);
 }
 
+const tmdbListCache = new Map<string, { results: any[]; expiresAt: number }>();
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
 
-  // TMDB Proxy helper
+  // TMDB Proxy helper that fetches candidates and verifies VOD server stream availability
   const fetchTmdb = async (
     endpoint: string,
     res: express.Response,
+    defaultType: "movie" | "tv",
     minVotes = 3
   ) => {
     if (!TMDB_API_KEY) {
       console.warn("TMDB API Key not configured.");
       return res.json({ results: [] });
     }
+    const cached = tmdbListCache.get(endpoint);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json({ page: 1, results: cached.results });
+    }
+
     try {
       const separator = endpoint.includes("?") ? "&" : "?";
-      const url = `${TMDB_BASE_URL}${endpoint}${separator}api_key=${TMDB_API_KEY}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (Array.isArray(data?.results)) {
-        data.results = filterReleasedMedia(data.results, minVotes);
+      const urlPage1 = `${TMDB_BASE_URL}${endpoint}${separator}page=1&api_key=${TMDB_API_KEY}`;
+      const urlPage2 = `${TMDB_BASE_URL}${endpoint}${separator}page=2&api_key=${TMDB_API_KEY}`;
+
+      const [res1, res2] = await Promise.allSettled([
+        fetch(urlPage1).then((r) => r.json()),
+        fetch(urlPage2).then((r) => r.json()),
+      ]);
+
+      const rawCombined: any[] = [];
+      const seenIds = new Set<number>();
+      for (const settled of [res1, res2]) {
+        if (settled.status === "fulfilled" && Array.isArray(settled.value?.results)) {
+          for (const item of settled.value.results) {
+            if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
+              seenIds.add(item.id);
+              rawCombined.push({ ...item, media_type: item.media_type || defaultType });
+            }
+          }
+        }
       }
-      res.json(data);
+
+      const releasedCandidates = filterReleasedMedia(rawCombined, minVotes).slice(0, 28);
+      const verifiedResults = await filterItemsByServerAvailability(
+        releasedCandidates,
+        defaultType,
+        TMDB_API_KEY
+      );
+
+      tmdbListCache.set(endpoint, {
+        results: verifiedResults,
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      });
+
+      res.json({ page: 1, results: verifiedResults });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Failed to fetch from TMDB" });
@@ -131,16 +169,22 @@ async function startServer() {
     if (genre && genre !== "all") {
       fetchTmdb(
         `/discover/movie?sort_by=popularity.desc&vote_count.gte=10&with_genres=${encodeURIComponent(genre)}`,
-        res
+        res,
+        "movie"
       );
     } else {
-      fetchTmdb("/trending/movie/week", res);
+      fetchTmdb("/trending/movie/week", res, "movie");
     }
   });
   app.get("/api/tmdb/trending/tv", async (req, res) => {
     const genre = req.query.genre ? String(req.query.genre).trim() : "";
     if (genre.toLowerCase() === "hk") {
       if (!TMDB_API_KEY) return res.json({ results: [] });
+      const hkCacheKey = "trending_tv_hk";
+      const cachedHk = tmdbListCache.get(hkCacheKey);
+      if (cachedHk && cachedHk.expiresAt > Date.now()) {
+        return res.json({ page: 1, results: cachedHk.results });
+      }
       try {
         const recentYear = new Date().getFullYear() - 3;
         const recentDate = `${recentYear}-01-01`;
@@ -165,7 +209,16 @@ async function startServer() {
             }
           }
         }
-        const results = filterReleasedMedia(combined, 1);
+        const releasedCandidates = filterReleasedMedia(combined, 1).slice(0, 28);
+        const results = await filterItemsByServerAvailability(
+          releasedCandidates,
+          "tv",
+          TMDB_API_KEY
+        );
+        tmdbListCache.set(hkCacheKey, {
+          results,
+          expiresAt: Date.now() + 15 * 60 * 1000,
+        });
         return res.json({ page: 1, results, total_pages: 1, total_results: results.length });
       } catch (err) {
         console.error(err);
@@ -175,10 +228,11 @@ async function startServer() {
     if (genre && genre !== "all") {
       fetchTmdb(
         `/discover/tv?sort_by=popularity.desc&vote_count.gte=10&with_genres=${encodeURIComponent(genre)}`,
-        res
+        res,
+        "tv"
       );
     } else {
-      fetchTmdb("/trending/tv/week", res);
+      fetchTmdb("/trending/tv/week", res, "tv");
     }
   });
   app.get("/api/tmdb/search", async (req, res) => {
@@ -189,7 +243,7 @@ async function startServer() {
       const url = `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&api_key=${TMDB_API_KEY}`;
       const response = await fetch(url);
       const data = await response.json();
-      const filtered = filterReleasedMedia(
+      const releasedCandidates = filterReleasedMedia(
         Array.isArray(data.results)
           ? data.results.filter(
               (item: any) => item.media_type === "movie" || item.media_type === "tv"
@@ -197,7 +251,12 @@ async function startServer() {
           : [],
         1
       );
-      res.json({ ...data, results: filtered });
+      const verified = await filterItemsByServerAvailability(
+        releasedCandidates,
+        "movie",
+        TMDB_API_KEY
+      );
+      res.json({ ...data, results: verified });
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Failed to fetch from TMDB" });
@@ -306,21 +365,11 @@ async function startServer() {
         : `primary_release_year=${year}`;
     const genreParam =
       genre && genre !== "all" ? `&with_genres=${encodeURIComponent(genre)}` : "";
-    if (!TMDB_API_KEY) return res.json({ results: [] });
-    try {
-      const url = `${TMDB_BASE_URL}/discover/${type}?sort_by=popularity.desc&vote_count.gte=10&${yearParam}${genreParam}&api_key=${TMDB_API_KEY}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      const results = filterReleasedMedia(
-        Array.isArray(data.results)
-          ? data.results.map((item: any) => ({ ...item, media_type: type }))
-          : []
-      );
-      res.json({ ...data, results });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Failed to fetch from TMDB" });
-    }
+    fetchTmdb(
+      `/discover/${type}?sort_by=popularity.desc&vote_count.gte=10&${yearParam}${genreParam}`,
+      res,
+      type
+    );
   });
 
   // TVBox / 影视仓 Configuration & VOD Stream Resolver Routes
@@ -462,6 +511,12 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    // Pre-warm default Home page rows so first page load is instantaneous
+    setTimeout(() => {
+      fetch(`http://localhost:${PORT}/api/tmdb/trending/movie`).catch(() => {});
+      fetch(`http://localhost:${PORT}/api/tmdb/trending/tv`).catch(() => {});
+      fetch(`http://localhost:${PORT}/api/tmdb/trending/tv?genre=hk`).catch(() => {});
+    }, 100);
   });
 }
 

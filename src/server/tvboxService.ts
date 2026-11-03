@@ -761,7 +761,8 @@ async function searchSingleVodSite(
   keyword: string,
   targetTitles: string[],
   targetYear?: string,
-  mediaType?: "movie" | "tv"
+  mediaType?: "movie" | "tv",
+  timeoutMs = 3800
 ): Promise<ResolvedStreamSource[]> {
   const start = Date.now();
   const sep = site.api.includes("?") ? "&" : "?";
@@ -773,7 +774,7 @@ async function searchSingleVodSite(
         "User-Agent": "okhttp/4.12.0",
         Accept: "application/json, text/plain, */*",
       },
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!res.ok) return [];
@@ -1049,17 +1050,48 @@ export async function pingVodSite(siteId: string): Promise<{
   }
 }
 
-export async function resolveStreamsForMedia(params: {
-  tmdbId: string;
-  type: "movie" | "tv";
-  customKeyword?: string;
-  disabledSiteIds?: string[];
-  tmdbApiKey?: string;
-}): Promise<VodResolveResponse> {
-  const { tmdbId, type, customKeyword, disabledSiteIds = [], tmdbApiKey } = params;
+interface TmdbCandidateMetadata {
+  candidateTitles: string[];
+  releaseYear?: string;
+  isUnreleased: boolean;
+  primaryZhTitle?: string;
+  expiresAt: number;
+}
+
+const tmdbMetadataCache = new Map<string, TmdbCandidateMetadata>();
+const resolvedStreamsCache = new Map<
+  string,
+  { data: VodResolveResponse; expiresAt: number }
+>();
+const availabilityCache = new Map<
+  string,
+  { available: boolean; primaryZhTitle?: string; expiresAt: number }
+>();
+
+const UNRELEASED_STATUSES = new Set([
+  "Rumored",
+  "Planned",
+  "In Production",
+  "Post Production",
+  "Canceled",
+]);
+
+async function getTmdbCandidateMetadata(
+  type: "movie" | "tv",
+  tmdbId: string,
+  tmdbApiKey?: string,
+  hintItem?: any
+): Promise<TmdbCandidateMetadata> {
+  const cacheKey = `${type}:${tmdbId}`;
+  const cached = tmdbMetadataCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached;
+  }
+
   const candidateTitles: string[] = [];
   let releaseYear: string | undefined;
   let isUnreleased = false;
+  let primaryZhTitle: string | undefined;
 
   const addCandidateTitle = (raw?: string) => {
     if (!raw || typeof raw !== "string") return;
@@ -1074,47 +1106,60 @@ export async function resolveStreamsForMedia(params: {
     }
   };
 
-  if (customKeyword && customKeyword.trim()) {
-    addCandidateTitle(customKeyword.trim());
+  if (hintItem) {
+    const hintDate = hintItem.release_date || hintItem.first_air_date;
+    if (hintDate && typeof hintDate === "string") {
+      releaseYear = hintDate.slice(0, 4);
+      const todayIso = new Date().toISOString().slice(0, 10);
+      if (hintDate > todayIso) {
+        isUnreleased = true;
+      }
+    }
+    if (Number(hintItem.vote_count || 0) === 0) {
+      isUnreleased = true;
+    }
   }
 
-  // Fetch localized Chinese (zh-CN), English (en-US), translations, and alternative_titles from TMDB
   if (tmdbId && tmdbApiKey) {
     try {
-      const [zhRes, enRes] = await Promise.allSettled([
+      const promises: Promise<any>[] = [
         fetch(
           `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${tmdbApiKey}`,
-          { signal: AbortSignal.timeout(4500) }
+          { signal: AbortSignal.timeout(4000) }
         ).then((r) => r.json()),
-        fetch(
-          `https://api.themoviedb.org/3/${type}/${tmdbId}?language=en-US&api_key=${tmdbApiKey}`,
-          { signal: AbortSignal.timeout(4500) }
-        ).then((r) => r.json()),
-      ]);
+      ];
+      if (!hintItem) {
+        promises.push(
+          fetch(
+            `https://api.themoviedb.org/3/${type}/${tmdbId}?language=en-US&api_key=${tmdbApiKey}`,
+            { signal: AbortSignal.timeout(4000) }
+          ).then((r) => r.json())
+        );
+      }
 
-      const unreleasedStatuses = new Set([
-        "Rumored",
-        "Planned",
-        "In Production",
-        "Post Production",
-      ]);
+      const [zhRes, enRes] = await Promise.allSettled(promises);
 
-      if (zhRes.status === "fulfilled" && zhRes.value) {
+      if (zhRes && zhRes.status === "fulfilled" && zhRes.value) {
         const d = zhRes.value;
         const zhTitle = d.title || d.name;
         const origTitle = d.original_title || d.original_name;
         const dateStr = d.release_date || d.first_air_date;
         if (dateStr && typeof dateStr === "string") {
           releaseYear = dateStr.slice(0, 4);
+          const todayIso = new Date().toISOString().slice(0, 10);
+          if (dateStr > todayIso) {
+            isUnreleased = true;
+          }
         }
         if (
-          (d.status && unreleasedStatuses.has(String(d.status))) ||
+          (d.status && UNRELEASED_STATUSES.has(String(d.status))) ||
           Number(d.vote_count || 0) === 0
         ) {
           isUnreleased = true;
         }
 
         if (zhTitle && /[\u4e00-\u9fff]/.test(zhTitle)) {
+          primaryZhTitle = toSimplifiedChinese(String(zhTitle).trim());
           addCandidateTitle(zhTitle);
         }
 
@@ -1128,6 +1173,9 @@ export async function resolveStreamsForMedia(params: {
             if (tr?.iso_639_1 === "zh" && tr?.iso_3166_1 === region) {
               const trTitle = tr?.data?.title || tr?.data?.name;
               if (trTitle && /[\u4e00-\u9fff]/.test(trTitle)) {
+                if (!primaryZhTitle) {
+                  primaryZhTitle = toSimplifiedChinese(String(trTitle).trim());
+                }
                 addCandidateTitle(trTitle);
               }
             }
@@ -1143,6 +1191,9 @@ export async function resolveStreamsForMedia(params: {
         for (const alt of altList) {
           const altTitle = alt?.title || alt?.name;
           if (altTitle && /[\u4e00-\u9fff]/.test(altTitle)) {
+            if (!primaryZhTitle) {
+              primaryZhTitle = toSimplifiedChinese(String(altTitle).trim());
+            }
             addCandidateTitle(altTitle);
           }
         }
@@ -1151,7 +1202,7 @@ export async function resolveStreamsForMedia(params: {
         if (origTitle) addCandidateTitle(origTitle);
       }
 
-      if (enRes.status === "fulfilled" && enRes.value) {
+      if (enRes && enRes.status === "fulfilled" && enRes.value) {
         const d = enRes.value;
         const enTitle = d.title || d.name;
         const dateStr = d.release_date || d.first_air_date;
@@ -1159,7 +1210,7 @@ export async function resolveStreamsForMedia(params: {
           releaseYear = dateStr.slice(0, 4);
         }
         if (
-          (d.status && unreleasedStatuses.has(String(d.status))) ||
+          (d.status && UNRELEASED_STATUSES.has(String(d.status))) ||
           Number(d.vote_count || 0) === 0
         ) {
           isUnreleased = true;
@@ -1169,12 +1220,58 @@ export async function resolveStreamsForMedia(params: {
     } catch {}
   }
 
+  if (hintItem) {
+    const hintEn = hintItem.en_title || hintItem.title || hintItem.name;
+    const hintOrig = hintItem.original_title || hintItem.original_name;
+    if (hintEn) addCandidateTitle(String(hintEn));
+    if (hintOrig) addCandidateTitle(String(hintOrig));
+  }
+
+  const meta: TmdbCandidateMetadata = {
+    candidateTitles,
+    releaseYear,
+    isUnreleased,
+    primaryZhTitle,
+    expiresAt: Date.now() + 60 * 60 * 1000,
+  };
+  tmdbMetadataCache.set(cacheKey, meta);
+  return meta;
+}
+
+export async function resolveStreamsForMedia(params: {
+  tmdbId: string;
+  type: "movie" | "tv";
+  customKeyword?: string;
+  disabledSiteIds?: string[];
+  tmdbApiKey?: string;
+}): Promise<VodResolveResponse> {
+  const { tmdbId, type, customKeyword, disabledSiteIds = [], tmdbApiKey } = params;
+  const cacheKey = `${type}:${tmdbId}:${customKeyword || ""}:${disabledSiteIds.join(",")}`;
+  const cachedResolved = resolvedStreamsCache.get(cacheKey);
+  if (cachedResolved && cachedResolved.expiresAt > Date.now()) {
+    return cachedResolved.data;
+  }
+
+  const meta = await getTmdbCandidateMetadata(type, tmdbId, tmdbApiKey);
+  const candidateTitles = [...meta.candidateTitles];
+  const releaseYear = meta.releaseYear;
+  const isUnreleased = meta.isUnreleased;
+
+  if (customKeyword && customKeyword.trim()) {
+    const trimmed = customKeyword.trim();
+    const simp = toSimplifiedChinese(trimmed);
+    if (!candidateTitles.includes(simp)) candidateTitles.unshift(simp);
+    if (trimmed !== simp && !candidateTitles.includes(trimmed)) {
+      candidateTitles.unshift(trimmed);
+    }
+  }
+
   const searchKeywords = buildSearchKeywords(candidateTitles);
   const primaryQuery = searchKeywords[0] || "";
 
   // Do not resolve streams for unreleased movies/shows
   if (isUnreleased && !customKeyword) {
-    return {
+    const emptyRes: VodResolveResponse = {
       tmdbId,
       mediaType: type,
       searchQuery: primaryQuery,
@@ -1182,6 +1279,12 @@ export async function resolveStreamsForMedia(params: {
       releaseYear,
       sources: [],
     };
+    availabilityCache.set(`${type}:${tmdbId}`, {
+      available: false,
+      primaryZhTitle: meta.primaryZhTitle,
+      expiresAt: Date.now() + 30 * 60 * 1000,
+    });
+    return emptyRes;
   }
 
   const disabledSet = new Set(disabledSiteIds);
@@ -1211,7 +1314,6 @@ export async function resolveStreamsForMedia(params: {
     );
     if (remainingSites.length === 0) break;
 
-    // Only try additional keywords if we haven't found many sources yet or if the next keyword is also Chinese
     if (kIdx > 0 && matchedBaseSiteIds.size >= 6 && !/[\u4e00-\u9fff]/.test(kw)) {
       break;
     }
@@ -1237,7 +1339,6 @@ export async function resolveStreamsForMedia(params: {
     }
   }
 
-  // Sort by exact title/year match, full episode availability, and response speed
   const normPrimary = normalizeTitleForComparison(
     parseSeasonInfo(primaryQuery).baseTitle
   );
@@ -1259,7 +1360,7 @@ export async function resolveStreamsForMedia(params: {
     return a.latencyMs - b.latencyMs;
   });
 
-  return {
+  const response: VodResolveResponse = {
     tmdbId,
     mediaType: type,
     searchQuery: primaryQuery,
@@ -1267,4 +1368,152 @@ export async function resolveStreamsForMedia(params: {
     releaseYear,
     sources: matchedSources,
   };
+
+  const ttl = matchedSources.length > 0 ? 30 * 60 * 1000 : 15 * 60 * 1000;
+  resolvedStreamsCache.set(cacheKey, {
+    data: response,
+    expiresAt: Date.now() + ttl,
+  });
+  availabilityCache.set(`${type}:${tmdbId}`, {
+    available: matchedSources.length > 0,
+    primaryZhTitle: meta.primaryZhTitle,
+    expiresAt: Date.now() + ttl,
+  });
+
+  return response;
+}
+
+// Fast probe sites ordered by lowest latency and broadest catalog coverage
+const FAST_PROBE_SITE_IDS = new Set([
+  "jisu",
+  "huya",
+  "hhzy",
+  "hongniu",
+  "guangsu",
+  "bfzy",
+  "lzzy",
+  "ffzy",
+  "ruyi",
+  "ikun",
+]);
+
+export async function checkMediaHasPlayableStreams(
+  item: any,
+  defaultType: "movie" | "tv",
+  tmdbApiKey?: string
+): Promise<{ available: boolean; primaryZhTitle?: string }> {
+  if (!item || !item.id) return { available: false };
+  const type: "movie" | "tv" =
+    item.media_type === "tv" || defaultType === "tv" ? "tv" : "movie";
+  const tmdbId = String(item.id);
+  const availKey = `${type}:${tmdbId}`;
+
+  const cached = availabilityCache.get(availKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return {
+      available: cached.available,
+      primaryZhTitle: cached.primaryZhTitle,
+    };
+  }
+
+  const meta = await getTmdbCandidateMetadata(type, tmdbId, tmdbApiKey, item);
+  if (meta.isUnreleased || meta.candidateTitles.length === 0) {
+    availabilityCache.set(availKey, {
+      available: false,
+      primaryZhTitle: meta.primaryZhTitle,
+      expiresAt: Date.now() + 30 * 60 * 1000,
+    });
+    return { available: false, primaryZhTitle: meta.primaryZhTitle };
+  }
+
+  const searchKeywords = buildSearchKeywords(meta.candidateTitles);
+  if (searchKeywords.length === 0) {
+    return { available: false, primaryZhTitle: meta.primaryZhTitle };
+  }
+
+  const probeSites = getAllVodSites().filter(
+    (s) => s.enabled !== false && FAST_PROBE_SITE_IDS.has(s.id)
+  );
+  const sitesToUse =
+    probeSites.length > 0 ? probeSites : getAllVodSites().slice(0, 8);
+
+  const keywordsToProbe = searchKeywords.slice(0, 2);
+
+  for (const kw of keywordsToProbe) {
+    try {
+      const found = await Promise.any(
+        sitesToUse.map(async (site) => {
+          const sources = await searchSingleVodSite(
+            site,
+            kw,
+            meta.candidateTitles,
+            meta.releaseYear,
+            type,
+            1800
+          );
+          if (sources.length === 0) {
+            throw new Error("no_match");
+          }
+          return true;
+        })
+      );
+      if (found) {
+        availabilityCache.set(availKey, {
+          available: true,
+          primaryZhTitle: meta.primaryZhTitle,
+          expiresAt: Date.now() + 30 * 60 * 1000,
+        });
+        return { available: true, primaryZhTitle: meta.primaryZhTitle };
+      }
+    } catch {
+      // Try next keyword if available
+    }
+  }
+
+  availabilityCache.set(availKey, {
+    available: false,
+    primaryZhTitle: meta.primaryZhTitle,
+    expiresAt: Date.now() + 15 * 60 * 1000,
+  });
+  return { available: false, primaryZhTitle: meta.primaryZhTitle };
+}
+
+export async function filterItemsByServerAvailability(
+  items: any[],
+  defaultType: "movie" | "tv",
+  tmdbApiKey?: string,
+  concurrency = 8
+): Promise<any[]> {
+  if (!Array.isArray(items) || items.length === 0) return [];
+
+  const results: (any | null)[] = new Array(items.length).fill(null);
+  let cursor = 0;
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (true) {
+        const idx = cursor++;
+        if (idx >= items.length) break;
+        const item = items[idx];
+        const { available, primaryZhTitle } =
+          await checkMediaHasPlayableStreams(item, defaultType, tmdbApiKey);
+        if (available) {
+          if (item.is_chinese_origin && primaryZhTitle) {
+            results[idx] = {
+              ...item,
+              title: item.title !== undefined ? primaryZhTitle : undefined,
+              name: item.name !== undefined ? primaryZhTitle : undefined,
+              zh_title: primaryZhTitle,
+            };
+          } else {
+            results[idx] = item;
+          }
+        }
+      }
+    }
+  );
+
+  await Promise.all(workers);
+  return results.filter(Boolean);
 }

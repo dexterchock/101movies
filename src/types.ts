@@ -1,3 +1,8 @@
+export interface MediaCategoryOption {
+  id: string;
+  label: string;
+}
+
 export interface WatchProgress {
   sourceId?: string;
   seasonNumber?: number;

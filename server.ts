@@ -164,8 +164,55 @@ async function startServer() {
     }
   };
 
-  app.get("/api/tmdb/trending/movie", (req, res) => {
+  app.get("/api/tmdb/trending/movie", async (req, res) => {
     const genre = req.query.genre ? String(req.query.genre).trim() : "";
+    if (genre.toLowerCase() === "hk") {
+      if (!TMDB_API_KEY) return res.json({ results: [] });
+      const hkCacheKey = "trending_movie_hk";
+      const cachedHk = tmdbListCache.get(hkCacheKey);
+      if (cachedHk && cachedHk.expiresAt > Date.now()) {
+        return res.json({ page: 1, results: cachedHk.results });
+      }
+      try {
+        const recentYear = new Date().getFullYear() - 3;
+        const recentDate = `${recentYear}-01-01`;
+        const [recentRes, popRes] = await Promise.allSettled([
+          fetch(
+            `${TMDB_BASE_URL}/discover/movie?sort_by=popularity.desc&with_origin_country=HK&primary_release_date.gte=${recentDate}&vote_count.gte=1&api_key=${TMDB_API_KEY}`
+          ).then((r) => r.json()),
+          fetch(
+            `${TMDB_BASE_URL}/discover/movie?sort_by=popularity.desc&with_origin_country=HK&vote_count.gte=5&api_key=${TMDB_API_KEY}`
+          ).then((r) => r.json()),
+        ]);
+
+        const combined: any[] = [];
+        const seenIds = new Set<number>();
+        for (const settled of [recentRes, popRes]) {
+          if (settled.status === "fulfilled" && Array.isArray(settled.value?.results)) {
+            for (const item of settled.value.results) {
+              if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
+                seenIds.add(item.id);
+                combined.push({ ...item, media_type: "movie" });
+              }
+            }
+          }
+        }
+        const releasedCandidates = filterReleasedMedia(combined, 1).slice(0, 28);
+        const results = await filterItemsByServerAvailability(
+          releasedCandidates,
+          "movie",
+          TMDB_API_KEY
+        );
+        tmdbListCache.set(hkCacheKey, {
+          results,
+          expiresAt: Date.now() + 15 * 60 * 1000,
+        });
+        return res.json({ page: 1, results, total_pages: 1, total_results: results.length });
+      } catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: "Failed to fetch HK movies from TMDB" });
+      }
+    }
     if (genre && genre !== "all") {
       fetchTmdb(
         `/discover/movie?sort_by=popularity.desc&vote_count.gte=10&with_genres=${encodeURIComponent(genre)}`,

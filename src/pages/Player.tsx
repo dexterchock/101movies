@@ -165,6 +165,7 @@ export function Player() {
   const { type, id } = useParams<{ type: "movie" | "tv"; id: string }>();
   const navigate = useNavigate();
   const [details, setDetails] = useState<MediaDetails | null>(null);
+  const [backdropLoaded, setBackdropLoaded] = useState(false);
   const [sources, setSources] = useState<ResolvedStreamSource[]>([]);
   const [resolving, setResolving] = useState(true);
 
@@ -278,6 +279,7 @@ export function Player() {
   useEffect(() => {
     if (type && id) {
       setDetails(null);
+      setBackdropLoaded(false);
       setIsPlaying(false);
       setActiveServerIndex(null);
       setActiveSeasonIndex(0);
@@ -352,8 +354,79 @@ export function Player() {
 
   if (!details) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-black">
-        <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+      <div className="h-screen w-full overflow-hidden flex flex-col bg-black relative select-none">
+        {/* Top Left Back Button */}
+        <div className="fixed top-5 left-6 md:top-6 md:left-8 z-[100] pointer-events-auto">
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={handleBack}
+            className="group relative flex items-center gap-2 px-4 h-[46px] rounded-full text-white/90 hover:text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+            aria-label="Go back"
+          >
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
+            />
+            <span className="relative z-10 flex items-center gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
+              <ArrowLeft size={19} />
+              <span className="font-medium text-sm">Back</span>
+            </span>
+          </button>
+        </div>
+
+        {/* Main Stage Skeleton: Upper Poster + Lower Editorial Info */}
+        <div className="flex-1 min-h-0 w-full flex flex-col justify-between bg-black overflow-hidden relative">
+          {/* Upper Poster Artwork Skeleton */}
+          <div className="relative w-full h-[68vh] md:h-[75vh] shrink-0 overflow-hidden bg-black">
+            <div className="w-full h-full bg-white/[0.04] animate-pulse" />
+            <div className="absolute inset-x-0 bottom-0 h-[50%] bg-[linear-gradient(to_top,#000000_0%,rgba(0,0,0,0.92)_12%,rgba(0,0,0,0.68)_28%,rgba(0,0,0,0.38)_48%,rgba(0,0,0,0.14)_68%,rgba(0,0,0,0.03)_86%,transparent_100%)] pointer-events-none" />
+          </div>
+
+          {/* Lower Editorial Info Skeleton */}
+          <div className="relative z-10 px-6 md:px-8 -mt-24 md:-mt-32 pb-4 md:pb-6 flex flex-col justify-end">
+            {/* Title Skeleton */}
+            <div className="h-8 sm:h-10 md:h-12 w-60 sm:w-80 md:w-[420px] rounded-xl bg-white/[0.06] animate-pulse mb-3.5" />
+
+            {/* Metadata + Cast Row Skeleton */}
+            <div className="flex flex-wrap items-center gap-2.5 mb-3.5">
+              <div className="h-4 md:h-5 w-12 rounded-md bg-white/[0.05] animate-pulse" />
+              <div className="h-4 md:h-5 w-8 rounded-md bg-white/[0.05] animate-pulse" />
+              <div className="h-4 md:h-5 w-14 rounded-md bg-white/[0.05] animate-pulse" />
+              <div className="h-4 md:h-5 w-28 rounded-md bg-white/[0.05] animate-pulse" />
+              <div className="h-4 md:h-5 w-44 sm:w-64 rounded-md bg-white/[0.05] animate-pulse" />
+            </div>
+
+            {/* 2-Line Overview Skeleton */}
+            <div className="flex flex-col gap-2 max-w-2xl">
+              <div className="h-3.5 sm:h-4 w-full rounded-md bg-white/[0.05] animate-pulse" />
+              <div className="h-3.5 sm:h-4 w-2/3 rounded-md bg-white/[0.05] animate-pulse" />
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Controls Bar Skeleton */}
+        <div className="shrink-0 w-full bg-black px-5 sm:px-6 md:px-8 pt-2 sm:pt-3 pb-5 sm:pb-6 md:pb-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-6 relative z-30">
+          <div
+            ref={serverBarRef}
+            className="flex items-center justify-between sm:justify-start gap-2 flex-1 min-w-0"
+          >
+            <div className="flex items-center gap-2.5 py-1 overflow-hidden">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-[42px] w-28 rounded-full bg-white/[0.06] border border-white/10 animate-pulse shrink-0"
+                />
+              ))}
+            </div>
+          </div>
+
+          {type === "tv" && (
+            <div className="flex items-center justify-end gap-2.5 shrink-0">
+              <div className="h-[42px] w-36 rounded-full bg-white/[0.06] border border-white/10 animate-pulse shrink-0" />
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -418,6 +491,38 @@ export function Player() {
   const activeStreamUrl = activeServer ? activeEpisodeObj?.url || "" : "";
 
   const releaseYear = (details.release_date || details.first_air_date)?.substring(0, 4);
+  const countryCode = (() => {
+    if (Array.isArray(details.origin_country) && details.origin_country.length > 0) {
+      const code = String(details.origin_country[0] || "").toUpperCase().trim();
+      if (code) return code;
+    }
+    if (
+      Array.isArray(details.production_countries) &&
+      details.production_countries.length > 0
+    ) {
+      const code = String(details.production_countries[0]?.iso_3166_1 || "")
+        .toUpperCase()
+        .trim();
+      if (code) return code;
+    }
+    const langMap: Record<string, string> = {
+      en: "US",
+      ja: "JP",
+      ko: "KR",
+      yue: "HK",
+      zh: "CN",
+      cn: "CN",
+      fr: "FR",
+      es: "ES",
+      de: "DE",
+      it: "IT",
+      th: "TH",
+      hi: "IN",
+      ru: "RU",
+    };
+    const origLang = String(details.original_language || "").toLowerCase().trim();
+    return langMap[origLang] || "";
+  })();
   const genreNames = details.genres?.slice(0, 3).map((g) => g.name).join(", ");
 
   const visiblePageItems = serverPages[serverPage]?.items || [];
@@ -577,7 +682,7 @@ export function Player() {
   return (
     <div className="h-screen w-full overflow-hidden flex flex-col bg-black relative select-none">
       {/* Top Left Back Button with Apple Liquid Glass Blur */}
-      <div className="fixed top-6 left-6 md:top-8 md:left-8 z-[100] pointer-events-auto">
+      <div className="fixed top-5 left-6 md:top-6 md:left-8 z-[100] pointer-events-auto">
         <button
           type="button"
           onMouseDown={(e) => e.stopPropagation()}
@@ -609,21 +714,29 @@ export function Player() {
       ) : (
         <div className="flex-1 min-h-0 w-full flex flex-col justify-between bg-black overflow-hidden relative">
           {/* Upper Poster Artwork */}
-          <div className="relative w-full h-[58vh] md:h-[64vh] shrink-0 overflow-hidden bg-black">
+          <div className="relative w-full h-[68vh] md:h-[75vh] shrink-0 overflow-hidden bg-black">
+            {backdropUrl && !backdropLoaded && (
+              <div className="absolute inset-0 bg-white/[0.04] animate-pulse" />
+            )}
             {backdropUrl && (
               <img
                 src={backdropUrl}
                 alt={primaryTitle}
                 referrerPolicy="no-referrer"
-                className="w-full h-full object-cover object-top"
+                onLoad={() => setBackdropLoaded(true)}
+                onError={() => setBackdropLoaded(true)}
+                className={cn(
+                  "w-full h-full object-cover object-top transition-opacity duration-500",
+                  backdropLoaded ? "opacity-100" : "opacity-0"
+                )}
               />
             )}
-            {/* Soft bottom-only fade into the pure black info stage below */}
-            <div className="absolute inset-x-0 bottom-0 h-[65%] bg-gradient-to-t from-black via-black/75 to-transparent pointer-events-none" />
+            {/* Smooth multi-stop eased bottom fade that ends lower to reveal more artwork */}
+            <div className="absolute inset-x-0 bottom-0 h-[50%] bg-[linear-gradient(to_top,#000000_0%,rgba(0,0,0,0.92)_12%,rgba(0,0,0,0.68)_28%,rgba(0,0,0,0.38)_48%,rgba(0,0,0,0.14)_68%,rgba(0,0,0,0.03)_86%,transparent_100%)] pointer-events-none" />
           </div>
 
           {/* Spacious Lower Editorial Info Block */}
-          <div className="relative z-10 px-6 md:px-8 -mt-20 md:-mt-24 pb-4 md:pb-6 flex flex-col justify-end">
+          <div className="relative z-10 px-6 md:px-8 -mt-24 md:-mt-32 pb-4 md:pb-6 flex flex-col justify-end">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 drop-shadow-2xl max-w-5xl text-balance leading-tight tracking-tight">
               <span onClick={() => copyTextSilently(primaryTitle)}>
                 {primaryTitle}
@@ -641,6 +754,12 @@ export function Player() {
             {/* Single-line unified metadata + lead cast row */}
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs sm:text-sm md:text-base font-medium text-white/80 mb-3 tabular-nums">
               {releaseYear && <span>{releaseYear}</span>}
+              {countryCode && (
+                <>
+                  {releaseYear && <span className="text-white/30">·</span>}
+                  <span>{countryCode}</span>
+                </>
+              )}
               {details.runtime ? (
                 <>
                   <span className="text-white/30">·</span>
@@ -831,8 +950,13 @@ export function Player() {
             </button>
           )}
 
-          {!resolving && episodeSourceServer && episodes.length > 0 && (
-            <div ref={popoverRef} className="relative shrink-0">
+          {resolving && type === "tv" ? (
+            <div className="h-[42px] w-36 rounded-full bg-white/[0.06] border border-white/10 animate-pulse shrink-0" />
+          ) : (
+            !resolving &&
+            episodeSourceServer &&
+            episodes.length > 0 && (
+              <div ref={popoverRef} className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setIsEpisodePopoverOpen((prev) => !prev)}
@@ -950,6 +1074,7 @@ export function Player() {
                 </div>
               )}
             </div>
+            )
           )}
         </div>
       </div>

@@ -318,12 +318,16 @@ export function Rankings() {
       setYear(ALL_YEARS[nextIndex]);
       return;
     }
+    const maxIdx = Math.max(0, ALL_YEARS.length - 3);
     const currentIdx = Math.round(el.scrollLeft / stride);
-    const nextIdx = Math.max(
-      0,
-      Math.min(ALL_YEARS.length - 3, currentIdx + direction * 2)
-    );
-    el.scrollTo({ left: nextIdx * stride, behavior: "smooth" });
+    const nextIdx = Math.max(0, Math.min(maxIdx, currentIdx + direction * 2));
+    const targetLeft =
+      nextIdx >= maxIdx
+        ? el.scrollWidth - el.clientWidth
+        : nextIdx <= 0
+          ? 0
+          : nextIdx * stride;
+    el.scrollTo({ left: targetLeft, behavior: "smooth" });
   };
 
   const handleGenreMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -373,13 +377,17 @@ export function Rankings() {
       setGenre(activeGenreList[nextIndex].id);
       return;
     }
+    const maxIdx = Math.max(0, activeGenreList.length - visiblePills);
     const currentIdx = Math.round(el.scrollLeft / stride);
     const step = Math.max(1, visiblePills - 1);
-    const nextIdx = Math.max(
-      0,
-      Math.min(activeGenreList.length - visiblePills, currentIdx + direction * step)
-    );
-    el.scrollTo({ left: nextIdx * stride, behavior: "smooth" });
+    const nextIdx = Math.max(0, Math.min(maxIdx, currentIdx + direction * step));
+    const targetLeft =
+      nextIdx >= maxIdx
+        ? el.scrollWidth - el.clientWidth
+        : nextIdx <= 0
+          ? 0
+          : nextIdx * stride;
+    el.scrollTo({ left: targetLeft, behavior: "smooth" });
   };
 
   const itemsPerPage = colsPerRow * 2;
@@ -438,11 +446,11 @@ export function Rankings() {
             <button
               type="button"
               onClick={() => scrollGenresBy(-1)}
-              disabled={!canScrollGenreLeft && activeGenreIndex === 0}
+              disabled={!canScrollGenreLeft}
               aria-label="Scroll categories left"
               className={cn(
                 "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-                canScrollGenreLeft || activeGenreIndex > 0
+                canScrollGenreLeft
                   ? "hover:bg-white/15 cursor-pointer text-white"
                   : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
               )}
@@ -450,7 +458,7 @@ export function Rankings() {
               <ChevronLeft
                 className={cn(
                   "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                  canScrollGenreLeft || activeGenreIndex > 0
+                  canScrollGenreLeft
                     ? "group-hover:scale-125 text-white"
                     : "text-white/25"
                 )}
@@ -511,15 +519,11 @@ export function Rankings() {
             <button
               type="button"
               onClick={() => scrollGenresBy(1)}
-              disabled={
-                !canScrollGenreRight &&
-                activeGenreIndex === activeGenreList.length - 1
-              }
+              disabled={!canScrollGenreRight}
               aria-label="Scroll categories right"
               className={cn(
                 "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-                canScrollGenreRight ||
-                  activeGenreIndex < activeGenreList.length - 1
+                canScrollGenreRight
                   ? "hover:bg-white/15 cursor-pointer text-white"
                   : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
               )}
@@ -527,8 +531,7 @@ export function Rankings() {
               <ChevronRight
                 className={cn(
                   "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                  canScrollGenreRight ||
-                    activeGenreIndex < activeGenreList.length - 1
+                  canScrollGenreRight
                     ? "group-hover:scale-125 text-white"
                     : "text-white/25"
                 )}
@@ -542,11 +545,11 @@ export function Rankings() {
           <button
             type="button"
             onClick={() => scrollYearsBy(-1)}
-            disabled={!canScrollLeft && activeYearIndex === 0}
+            disabled={!canScrollLeft}
             aria-label="Scroll to newer years"
             className={cn(
               "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-              canScrollLeft || activeYearIndex > 0
+              canScrollLeft
                 ? "hover:bg-white/15 cursor-pointer text-white"
                 : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
             )}
@@ -554,7 +557,7 @@ export function Rankings() {
             <ChevronLeft
               className={cn(
                 "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                canScrollLeft || activeYearIndex > 0 ? "group-hover:scale-125 text-white" : "text-white/25"
+                canScrollLeft ? "group-hover:scale-125 text-white" : "text-white/25"
               )}
             />
           </button>
@@ -614,11 +617,11 @@ export function Rankings() {
           <button
             type="button"
             onClick={() => scrollYearsBy(1)}
-            disabled={!canScrollRight && activeYearIndex === ALL_YEARS.length - 1}
+            disabled={!canScrollRight}
             aria-label="Scroll to older years"
             className={cn(
               "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-              canScrollRight || activeYearIndex < ALL_YEARS.length - 1
+              canScrollRight
                 ? "hover:bg-white/15 cursor-pointer text-white"
                 : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
             )}
@@ -626,7 +629,7 @@ export function Rankings() {
             <ChevronRight
               className={cn(
                 "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                canScrollRight || activeYearIndex < ALL_YEARS.length - 1 ? "group-hover:scale-125 text-white" : "text-white/25"
+                canScrollRight ? "group-hover:scale-125 text-white" : "text-white/25"
               )}
             />
           </button>

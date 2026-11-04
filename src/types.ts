@@ -38,6 +38,9 @@ export interface MediaDetails extends MediaItem {
   number_of_seasons?: number;
   number_of_episodes?: number;
   cast?: string[];
+  origin_country?: string[];
+  production_countries?: { iso_3166_1: string; name: string }[];
+  original_language?: string;
 }
 
 export interface TmdbResponse<T> {

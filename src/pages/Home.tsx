@@ -7,6 +7,7 @@ import { cn } from "../utils";
 
 const MOVIE_CATEGORIES: MediaCategoryOption[] = [
   { id: "all", label: "All" },
+  { id: "hk", label: "HK" },
   { id: "28", label: "Action" },
   { id: "878", label: "Sci-Fi" },
   { id: "35", label: "Comedy" },
@@ -401,13 +402,17 @@ export function Home() {
       setActiveCategory(activeCategories[nextIndex].id);
       return;
     }
+    const maxIdx = Math.max(0, activeCategories.length - visiblePills);
     const currentIdx = Math.round(el.scrollLeft / stride);
     const step = Math.max(1, visiblePills - 1);
-    const nextIdx = Math.max(
-      0,
-      Math.min(activeCategories.length - visiblePills, currentIdx + direction * step)
-    );
-    el.scrollTo({ left: nextIdx * stride, behavior: "smooth" });
+    const nextIdx = Math.max(0, Math.min(maxIdx, currentIdx + direction * step));
+    const targetLeft =
+      nextIdx >= maxIdx
+        ? el.scrollWidth - el.clientWidth
+        : nextIdx <= 0
+          ? 0
+          : nextIdx * stride;
+    el.scrollTo({ left: targetLeft, behavior: "smooth" });
   };
 
   const displayCategories =
@@ -468,11 +473,11 @@ export function Home() {
             <button
               type="button"
               onClick={() => scrollCategoriesBy(-1)}
-              disabled={!canScrollCatLeft && activeCategoryIndex === 0}
+              disabled={!canScrollCatLeft}
               aria-label="Scroll categories left"
               className={cn(
                 "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-                canScrollCatLeft || activeCategoryIndex > 0
+                canScrollCatLeft
                   ? "hover:bg-white/15 cursor-pointer text-white"
                   : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
               )}
@@ -480,7 +485,7 @@ export function Home() {
               <ChevronLeft
                 className={cn(
                   "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                  canScrollCatLeft || activeCategoryIndex > 0
+                  canScrollCatLeft
                     ? "group-hover:scale-125 text-white"
                     : "text-white/25"
                 )}
@@ -542,15 +547,11 @@ export function Home() {
             <button
               type="button"
               onClick={() => scrollCategoriesBy(1)}
-              disabled={
-                !canScrollCatRight &&
-                activeCategoryIndex === displayCategories.length - 1
-              }
+              disabled={!canScrollCatRight}
               aria-label="Scroll categories right"
               className={cn(
                 "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-                canScrollCatRight ||
-                  activeCategoryIndex < displayCategories.length - 1
+                canScrollCatRight
                   ? "hover:bg-white/15 cursor-pointer text-white"
                   : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
               )}
@@ -558,8 +559,7 @@ export function Home() {
               <ChevronRight
                 className={cn(
                   "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                  canScrollCatRight ||
-                    activeCategoryIndex < displayCategories.length - 1
+                  canScrollCatRight
                     ? "group-hover:scale-125 text-white"
                     : "text-white/25"
                 )}

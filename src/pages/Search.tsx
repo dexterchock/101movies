@@ -52,7 +52,7 @@ export function Search() {
 
     setPage(0);
 
-    if (trimmed.length > 2) {
+    if (trimmed.length > 0) {
       setLoading(true);
       const timer = setTimeout(() => {
         api
@@ -280,7 +280,7 @@ export function Search() {
               </div>
             ))}
           </div>
-        ) : query.trim().length > 2 ? (
+        ) : query.trim().length > 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-lg sm:text-xl text-white/70 font-medium mb-2">
               No movies or shows found for "{query.trim()}"
@@ -292,7 +292,7 @@ export function Search() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-xs sm:text-sm text-white/40 tracking-wide">
-              Type at least 3 characters to search movies and shows.
+              Type to search movies and shows...
             </p>
           </div>
         )}

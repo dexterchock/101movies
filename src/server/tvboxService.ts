@@ -661,6 +661,57 @@ function extractNumbers(str: string): string[] {
   return str.match(/\d+/g) || [];
 }
 
+export function generateZhTitleVariants(rawZh?: string): {
+  variants: string[];
+  probeKeyword: string;
+} {
+  if (!rawZh || typeof rawZh !== "string") {
+    return { variants: [], probeKeyword: "" };
+  }
+  const simp = toSimplifiedChinese(stripYearSuffix(rawZh)).trim();
+  if (!simp) return { variants: [], probeKeyword: "" };
+
+  const variants = new Set<string>();
+  variants.add(simp);
+
+  // Check colon or space separating subtitle: e.g. "生化危机6：终章" or "生化危机：终章" or "蜘蛛侠：英雄归来"
+  const colonMatch = simp.match(
+    /^(.+?)(?:\s*([0-9一二两三四五六七八九十]+)\s*)?[:：\s]+(.+)$/
+  );
+  let probeKeyword = simp;
+
+  if (colonMatch) {
+    const base = colonMatch[1].trim();
+    const num = colonMatch[2] ? colonMatch[2].trim() : "";
+    const sub = colonMatch[3].trim();
+
+    probeKeyword = base; // e.g. "生化危机" or "蜘蛛侠"
+
+    variants.add(base + "：" + sub);
+    variants.add(base + " " + sub);
+    variants.add(base + sub);
+    if (num) {
+      variants.add(base + num + "：" + sub);
+      variants.add(base + num + " " + sub);
+      variants.add(base + num + sub);
+      variants.add(base + num);
+    }
+    variants.add(base);
+    variants.add(sub);
+  } else {
+    // Check trailing sequel number: e.g. "生化危机6" or "蜘蛛侠3"
+    const trailMatch = simp.match(/^(.+?)\s*([0-9一二两三四五六七八九十]+)$/);
+    if (trailMatch) {
+      const base = trailMatch[1].trim();
+      probeKeyword = base;
+      variants.add(base);
+      variants.add(base + " " + trailMatch[2].trim());
+    }
+  }
+
+  return { variants: Array.from(variants), probeKeyword };
+}
+
 function buildSearchKeywords(titles: string[]): string[] {
   const candidates: string[] = [];
   const addCandidate = (t?: string) => {
@@ -678,6 +729,15 @@ function buildSearchKeywords(titles: string[]): string[] {
         !candidates.includes(beforeColon)
       ) {
         candidates.push(beforeColon);
+      }
+      // Also extract base franchise by stripping trailing digits from beforeColon (e.g. "生化危机6" -> "生化危机")
+      const baseFranchise = beforeColon.replace(/\d+$/, "").trim();
+      if (
+        baseFranchise.length >= 2 &&
+        baseFranchise !== beforeColon &&
+        !candidates.includes(baseFranchise)
+      ) {
+        candidates.push(baseFranchise);
       }
     }
   };
@@ -1192,6 +1252,10 @@ async function getTmdbCandidateMetadata(
         if (zhTitle && /[\u4e00-\u9fff]/.test(zhTitle)) {
           primaryZhTitle = toSimplifiedChinese(String(zhTitle).trim());
           addCandidateTitle(zhTitle);
+          const { variants } = generateZhTitleVariants(primaryZhTitle);
+          for (const v of variants) {
+            addCandidateTitle(v);
+          }
         }
 
         // Extract Chinese titles from translations (CN, SG, TW, HK)

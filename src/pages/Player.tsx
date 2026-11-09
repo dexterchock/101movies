@@ -680,23 +680,23 @@ export function Player() {
     !isAlreadyPlayingSavedSpot;
 
   return (
-    <div className="h-screen w-full overflow-hidden flex flex-col bg-black relative select-none">
+    <div className="min-h-[100dvh] h-[100dvh] w-full overflow-hidden flex flex-col bg-black relative select-none">
       {/* Top Left Back Button with Apple Liquid Glass Blur */}
-      <div className="fixed top-5 left-6 md:top-6 md:left-8 z-[100] pointer-events-auto">
+      <div className="fixed top-3 left-4 sm:top-5 sm:left-6 md:top-6 md:left-8 z-[100] pt-[env(safe-area-inset-top)] pointer-events-auto">
         <button
           type="button"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={handleBack}
-          className="group relative flex items-center gap-2 px-4 h-[46px] rounded-full text-white/90 hover:text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+          className="group relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 h-[38px] sm:h-[46px] rounded-full text-white/90 hover:text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
           aria-label="Go back"
         >
           <span
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
           />
-          <span className="relative z-10 flex items-center gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
-            <ArrowLeft size={19} />
-            <span className="font-medium text-sm">Back</span>
+          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
+            <ArrowLeft className="w-4 h-4 sm:w-[19px] sm:h-[19px]" />
+            <span className="font-medium text-xs sm:text-sm">Back</span>
           </span>
         </button>
       </div>
@@ -714,7 +714,7 @@ export function Player() {
       ) : (
         <div className="flex-1 min-h-0 w-full flex flex-col justify-between bg-black overflow-hidden relative">
           {/* Upper Poster Artwork */}
-          <div className="relative w-full h-[68vh] md:h-[75vh] shrink-0 overflow-hidden bg-black">
+          <div className="relative w-full h-[44vh] sm:h-[58vh] md:h-[72vh] shrink-0 overflow-hidden bg-black">
             {backdropUrl && !backdropLoaded && (
               <div className="absolute inset-0 bg-white/[0.04] animate-pulse" />
             )}
@@ -736,8 +736,8 @@ export function Player() {
           </div>
 
           {/* Spacious Lower Editorial Info Block */}
-          <div className="relative z-10 px-6 md:px-8 -mt-24 md:-mt-32 pb-4 md:pb-6 flex flex-col justify-end">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 drop-shadow-2xl max-w-5xl text-balance leading-tight tracking-tight">
+          <div className="relative z-10 px-4 sm:px-6 md:px-8 -mt-16 sm:-mt-24 md:-mt-32 pb-3 sm:pb-4 md:pb-6 flex flex-col justify-end">
+            <h1 className="text-xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2 sm:mb-3 drop-shadow-2xl max-w-5xl text-balance leading-tight tracking-tight">
               <span onClick={() => copyTextSilently(primaryTitle)}>
                 {primaryTitle}
               </span>
@@ -800,11 +800,11 @@ export function Player() {
       )}
 
       {/* Seamless Pure-Black Bottom Controls with Apple Liquid Glass Buttons */}
-      <div className="shrink-0 w-full bg-black px-5 sm:px-6 md:px-8 pt-2 sm:pt-3 pb-5 sm:pb-6 md:pb-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-6 relative z-30">
+      <div className="shrink-0 w-full bg-black px-4 sm:px-6 md:px-8 pt-2 sm:pt-3 pb-3 sm:pb-5 md:pb-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-6 relative z-30">
         {/* Left & Center: Single-Row Paginated Server Pills + Prev/Next Buttons */}
         <div
           ref={serverBarRef}
-          className="flex items-center justify-between sm:justify-start gap-2 flex-1 min-w-0"
+          className="flex items-center justify-between sm:justify-start gap-1.5 sm:gap-2 flex-1 min-w-0"
         >
           {resolving ? (
             <div className="flex items-center gap-2 overflow-hidden">
@@ -843,7 +843,7 @@ export function Player() {
                       }}
                       tabIndex={0}
                       className={cn(
-                        "group flex items-center h-[42px] px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 transition-colors duration-300 outline-none cursor-pointer border select-none",
+                        "group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 transition-colors duration-300 outline-none cursor-pointer border select-none",
                         isSelected
                           ? isHighPing
                             ? "bg-red-500/25 text-red-200 border-red-400/50 shadow-[inset_0_1px_0_0_rgba(255,150,150,0.25),0_8px_24px_rgba(0,0,0,0.65)] font-bold"
@@ -858,14 +858,14 @@ export function Player() {
                           : `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""} (${src.latencyMs}ms)`
                       }
                     >
-                      <span className="flex items-center gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
+                      <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
                         <span>
                           {src.sourceName}
                           {src.audioLang ? ` · ${src.audioLang}` : ""}
                         </span>
                         <span
                           className={cn(
-                            "text-[11px] font-mono tabular-nums",
+                            "text-[10px] sm:text-[11px] font-mono tabular-nums",
                             isSelected
                               ? isHighPing
                                 ? "text-red-200/80"
@@ -884,13 +884,13 @@ export function Player() {
               </div>
 
               {totalServerPages > 1 && (
-                <div className="flex items-center gap-1.5 ml-1 shrink-0">
+                <div className="flex items-center gap-1 sm:gap-1.5 ml-0.5 sm:ml-1 shrink-0">
                   <button
                     type="button"
                     onClick={() => setServerPage((p) => Math.max(0, p - 1))}
                     disabled={!showServerPrev}
                     className={cn(
-                      "group flex items-center justify-center w-[42px] h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
+                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
                       showServerPrev
                         ? "hover:bg-white/15 cursor-pointer text-white"
                         : "text-white/25 cursor-not-allowed pointer-events-none"
@@ -899,7 +899,7 @@ export function Player() {
                   >
                     <ChevronLeft
                       className={cn(
-                        "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                         showServerPrev
                           ? "group-hover:scale-125 text-white"
                           : "text-white/25"
@@ -913,7 +913,7 @@ export function Player() {
                     }
                     disabled={!showServerNext}
                     className={cn(
-                      "group flex items-center justify-center w-[42px] h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
+                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
                       showServerNext
                         ? "hover:bg-white/15 cursor-pointer text-white"
                         : "text-white/25 cursor-not-allowed pointer-events-none"
@@ -922,7 +922,7 @@ export function Player() {
                   >
                     <ChevronRight
                       className={cn(
-                        "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                         showServerNext
                           ? "group-hover:scale-125 text-white"
                           : "text-white/25"
@@ -936,22 +936,22 @@ export function Player() {
         </div>
 
         {/* Right: Resume Pill (when watchProgress exists) + White Episode Popover Trigger */}
-        <div className="flex items-center justify-end gap-2.5 shrink-0">
+        <div className="flex items-center justify-end gap-2 sm:gap-2.5 shrink-0">
           {showResumePill && resumeLabel && (
             <button
               type="button"
               onClick={handleResumeClick}
-              className="group flex items-center h-[42px] px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 bg-white/[0.09] text-white border border-white/[0.18] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.16] hover:border-white/30 transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums"
+              className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 bg-white/[0.09] text-white border border-white/[0.18] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.16] hover:border-white/30 transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums"
             >
-              <span className="flex items-center gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
-                <Play size={14} className="fill-white text-white shrink-0" />
+              <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
+                <Play size={13} className="fill-white text-white shrink-0" />
                 <span>{resumeLabel}</span>
               </span>
             </button>
           )}
 
           {resolving && type === "tv" ? (
-            <div className="h-[42px] w-36 rounded-full bg-white/[0.06] border border-white/10 animate-pulse shrink-0" />
+            <div className="h-[38px] sm:h-[42px] w-28 sm:w-36 rounded-full bg-white/[0.06] border border-white/10 animate-pulse shrink-0" />
           ) : (
             !resolving &&
             episodeSourceServer &&
@@ -960,10 +960,10 @@ export function Player() {
               <button
                 type="button"
                 onClick={() => setIsEpisodePopoverOpen((prev) => !prev)}
-                className="group flex items-center h-[42px] px-4 rounded-full text-xs md:text-sm font-bold whitespace-nowrap shrink-0 bg-white text-black border border-white shadow-[0_8px_32px_rgba(255,255,255,0.14)] hover:bg-white/90 transition-colors duration-300 cursor-pointer focus:outline-none select-none"
+                className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-bold whitespace-nowrap shrink-0 bg-white text-black border border-white shadow-[0_8px_32px_rgba(255,255,255,0.14)] hover:bg-white/90 transition-colors duration-300 cursor-pointer focus:outline-none select-none"
               >
-                <span className="flex items-center gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
-                  <Layers size={15} />
+                <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
+                  <Layers size={14} />
                   <span>
                     {hasMultipleSeasons && currentSeasonGroup
                       ? `S${currentSeasonGroup.seasonNumber} · Episodes`
@@ -973,7 +973,7 @@ export function Player() {
                     {safeEpisodeIndex + 1}/{episodes.length}
                   </span>
                   <ChevronUp
-                    size={15}
+                    size={14}
                     className={cn(
                       "transition-transform duration-300",
                       isEpisodePopoverOpen && "rotate-180"
@@ -983,7 +983,7 @@ export function Player() {
               </button>
 
               {isEpisodePopoverOpen && (
-                <div className="absolute bottom-full right-0 mb-3 w-[310px] sm:w-[390px] md:w-[460px] max-h-[60vh] rounded-3xl bg-black/80 backdrop-blur-xl border border-white/[0.16] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18),0_16px_48px_rgba(0,0,0,0.92)] p-4 z-50 flex flex-col">
+                <div className="absolute bottom-full right-0 mb-3 w-[min(380px,calc(100vw-32px))] max-h-[60vh] rounded-3xl bg-black/85 backdrop-blur-xl border border-white/[0.16] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18),0_16px_48px_rgba(0,0,0,0.92)] p-3.5 sm:p-4 z-50 flex flex-col">
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm font-bold text-white truncate">

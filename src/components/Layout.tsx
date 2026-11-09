@@ -39,19 +39,19 @@ export function Layout() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const navTabWidth = isMobileNav ? 104 : 136;
+  const navTabWidth = isMobileNav ? 96 : 136;
   const navTabGap = isMobileNav ? 4 : 8;
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-black text-white overflow-hidden relative select-none">
+    <div className="flex flex-col min-h-[100dvh] h-[100dvh] w-screen bg-black text-white overflow-hidden relative select-none">
       {/* Floating Bottom Navigation */}
       {!isPlayerPage && (
-        <div className="fixed bottom-4 sm:bottom-5 md:bottom-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
-          <nav className="relative flex items-center gap-1 sm:gap-2 p-1.5 rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] pointer-events-auto max-w-full">
+        <div className="fixed bottom-3 sm:bottom-5 md:bottom-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none pb-[env(safe-area-inset-bottom)]">
+          <nav className="relative flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] pointer-events-auto max-w-full">
             {/* Sliding Highlight Track */}
             <div
               className={cn(
-                "absolute top-1.5 bottom-1.5 left-1.5 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none",
+                "absolute top-1 sm:top-1.5 bottom-1 sm:bottom-1.5 left-1 sm:left-1.5 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none",
                 hasActiveTab ? "opacity-100 scale-100" : "opacity-0 scale-95"
               )}
               style={{

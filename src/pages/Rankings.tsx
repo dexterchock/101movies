@@ -40,19 +40,26 @@ const TV_CATEGORIES: MediaCategoryOption[] = [
   { id: "16", label: "Animation" },
 ];
 
-const YEAR_PILL_WIDTH = 64;
+const YEAR_PILL_WIDTH_DESKTOP = 64;
+const YEAR_PILL_WIDTH_MOBILE = 54;
 const YEAR_PILL_GAP = 4;
 
-const GENRE_PILL_WIDTH = 84;
+const GENRE_PILL_WIDTH_DESKTOP = 84;
+const GENRE_PILL_WIDTH_MOBILE = 72;
 const GENRE_PILL_GAP = 4;
 
 let cachedRankingsKey = "";
 let cachedRankingsItems: MediaItem[] | null = null;
 
 function getColsForWidth(width: number): number {
+  if (width >= 1280) return 8; // 8 columns on modern wide screens
   if (width >= 768) return 6;
   if (width >= 640) return 3;
   return 2;
+}
+
+function getRowsForHeight(height: number): number {
+  return height < 500 ? 1 : 2;
 }
 
 export function Rankings() {
@@ -116,6 +123,30 @@ export function Rankings() {
     activeGenreList.findIndex((g) => g.id === validGenre)
   );
 
+  const [colsPerRow, setColsPerRow] = useState(() =>
+    typeof window !== "undefined" ? getColsForWidth(window.innerWidth) : 6
+  );
+  const [rowsPerPage, setRowsPerPage] = useState(() =>
+    typeof window !== "undefined" ? getRowsForHeight(window.innerHeight) : 2
+  );
+  const [isMobileView, setIsMobileView] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 640 : false
+  );
+
+  useEffect(() => {
+    const onResize = () => {
+      setColsPerRow(getColsForWidth(window.innerWidth));
+      setRowsPerPage(getRowsForHeight(window.innerHeight));
+      setIsMobileView(window.innerWidth < 640);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const mediaTypeTabWidth = isMobileView ? 68 : 88;
+  const yearPillWidth = isMobileView ? YEAR_PILL_WIDTH_MOBILE : YEAR_PILL_WIDTH_DESKTOP;
+  const genrePillWidth = isMobileView ? GENRE_PILL_WIDTH_MOBILE : GENRE_PILL_WIDTH_DESKTOP;
+
   const updateScrollButtons = useCallback(() => {
     const el = yearTrackRef.current;
     if (!el) return;
@@ -130,29 +161,11 @@ export function Rankings() {
     setCanScrollGenreRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
   }, []);
 
-  const [colsPerRow, setColsPerRow] = useState(() =>
-    typeof window !== "undefined" ? getColsForWidth(window.innerWidth) : 6
-  );
-  const [isMobileView, setIsMobileView] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth < 640 : false
-  );
-
-  useEffect(() => {
-    const onResize = () => {
-      setColsPerRow(getColsForWidth(window.innerWidth));
-      setIsMobileView(window.innerWidth < 640);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  const mediaTypeTabWidth = isMobileView ? 78 : 88;
-
   const centerYearTrack = useCallback(
     (smooth: boolean) => {
       const el = yearTrackRef.current;
       if (!el) return;
-      const stride = YEAR_PILL_WIDTH + YEAR_PILL_GAP;
+      const stride = yearPillWidth + YEAR_PILL_GAP;
       const visiblePills = el.clientWidth >= 180 ? 3 : 1;
       const startIdx =
         visiblePills === 3
@@ -162,7 +175,7 @@ export function Rankings() {
       safeScrollTo(el, targetScroll, smooth);
       updateScrollButtons();
     },
-    [activeYearIndex, updateScrollButtons]
+    [activeYearIndex, updateScrollButtons, yearPillWidth]
   );
 
   useEffect(() => {
@@ -182,7 +195,7 @@ export function Rankings() {
     (smooth: boolean) => {
       const el = genreTrackRef.current;
       if (!el || activeGenreList.length === 0) return;
-      const stride = GENRE_PILL_WIDTH + GENRE_PILL_GAP;
+      const stride = genrePillWidth + GENRE_PILL_GAP;
       const visiblePills = Math.max(1, Math.round(el.clientWidth / stride));
       const half = Math.floor(visiblePills / 2);
       const startIdx = Math.max(
@@ -193,7 +206,7 @@ export function Rankings() {
       safeScrollTo(el, targetScroll, smooth);
       updateGenreScrollButtons();
     },
-    [activeGenreList.length, activeGenreIndex, updateGenreScrollButtons]
+    [activeGenreList.length, activeGenreIndex, genrePillWidth, updateGenreScrollButtons]
   );
 
   useEffect(() => {
@@ -212,7 +225,6 @@ export function Rankings() {
   const isInitialYearMountRef = useRef(true);
   const isInitialGenreMountRef = useRef(true);
 
-  // Center the active year pill (instant on initial mount, smooth on user change)
   useLayoutEffect(() => {
     try {
       if (isInitialYearMountRef.current) {
@@ -226,7 +238,6 @@ export function Rankings() {
     }
   }, [centerYearTrack]);
 
-  // Center the active genre pill (instant on initial mount, smooth on user change)
   useLayoutEffect(() => {
     try {
       if (isInitialGenreMountRef.current) {
@@ -256,19 +267,20 @@ export function Rankings() {
 
     let active = true;
     setLoading(true);
-    api
-      .getRankings(mediaType, year, validGenre)
+    const fetchPromise = api.getRankings(mediaType, year, validGenre);
+
+    fetchPromise
       .then((data) => {
         if (active) {
-          const mapped = data.map((item) => ({ ...item, media_type: mediaType }));
           cachedRankingsKey = key;
-          cachedRankingsItems = mapped;
-          setItems(mapped);
+          cachedRankingsItems = data;
+          setItems(data);
         }
       })
       .finally(() => {
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
     };
@@ -311,8 +323,9 @@ export function Rankings() {
   const scrollYearsBy = (direction: -1 | 1) => {
     const el = yearTrackRef.current;
     if (!el) return;
-    const stride = YEAR_PILL_WIDTH + YEAR_PILL_GAP;
-    if (el.clientWidth < 180) {
+    const stride = yearPillWidth + YEAR_PILL_GAP;
+    const visiblePills = el.clientWidth >= 180 ? 3 : 1;
+    if (visiblePills === 1) {
       const nextIndex = Math.max(
         0,
         Math.min(ALL_YEARS.length - 1, activeYearIndex + direction)
@@ -320,9 +333,10 @@ export function Rankings() {
       setYear(ALL_YEARS[nextIndex]);
       return;
     }
-    const maxIdx = Math.max(0, ALL_YEARS.length - 3);
+    const maxIdx = Math.max(0, ALL_YEARS.length - visiblePills);
     const currentIdx = Math.round(el.scrollLeft / stride);
-    const nextIdx = Math.max(0, Math.min(maxIdx, currentIdx + direction * 2));
+    const step = Math.max(1, visiblePills - 1);
+    const nextIdx = Math.max(0, Math.min(maxIdx, currentIdx + direction * step));
     const targetLeft =
       nextIdx >= maxIdx
         ? el.scrollWidth - el.clientWidth
@@ -369,7 +383,7 @@ export function Rankings() {
   const scrollGenresBy = (direction: -1 | 1) => {
     const el = genreTrackRef.current;
     if (!el) return;
-    const stride = GENRE_PILL_WIDTH + GENRE_PILL_GAP;
+    const stride = genrePillWidth + GENRE_PILL_GAP;
     const visiblePills = Math.max(1, Math.round(el.clientWidth / stride));
     if (visiblePills <= 1) {
       const nextIndex = Math.max(
@@ -392,7 +406,32 @@ export function Rankings() {
     safeScrollTo(el, targetLeft, true);
   };
 
-  const itemsPerPage = colsPerRow * 2;
+  // Touch swipe support to change year
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      if (deltaX < 0) {
+        scrollYearsBy(1); // Swipe left -> older year
+      } else {
+        scrollYearsBy(-1); // Swipe right -> newer year
+      }
+    }
+  };
+
+  const itemsPerPage = colsPerRow * rowsPerPage;
   const displayedItems = items.slice(0, itemsPerPage);
   const placeholderCount = !loading
     ? Math.max(0, itemsPerPage - displayedItems.length)
@@ -400,16 +439,16 @@ export function Rankings() {
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-black select-none">
-      {/* Locked Top Control Bar (Identical Placements to Trending) */}
-      <div className="shrink-0 relative flex flex-wrap lg:flex-nowrap items-center justify-between gap-y-2.5 w-full px-6 md:px-8 pt-5 md:pt-6 pb-4 md:pb-5 z-40">
+      {/* Responsive Top Control Bar */}
+      <div className="shrink-0 relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-y-2 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-6 pb-2.5 sm:pb-3 md:pb-5 z-40">
         {/* Left: Movies / Shows Capsule Toggle */}
         <div
           role="tablist"
           aria-label="Content Type"
-          className="order-1 relative flex items-center gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
+          className="order-1 relative flex items-center gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
         >
           <div
-            className="absolute top-1 bottom-1 left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
+            className="absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 left-0.5 sm:left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
             style={{
               width: `${mediaTypeTabWidth}px`,
               transform: `translate3d(${activeMediaTypeIndex * (mediaTypeTabWidth + 4)}px, 0, 0)`,
@@ -427,7 +466,7 @@ export function Rankings() {
                 tabIndex={0}
                 style={{ width: `${mediaTypeTabWidth}px` }}
                 className={cn(
-                  "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
+                  "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
                   "focus:outline-none focus-visible:outline-none select-none",
                   isActive
                     ? "text-black"
@@ -442,16 +481,16 @@ export function Rankings() {
           })}
         </div>
 
-        {/* Center on Desktop / Row 2 on Mobile: Sliding Category Switcher Capsule */}
-        <div className="order-3 lg:order-2 w-full lg:w-auto flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2">
-          <div className="flex items-center justify-between gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+        {/* Center on Desktop/Landscape / Row 2 on Portrait Mobile: Genre Switcher Capsule */}
+        <div className="order-3 sm:order-2 w-full sm:w-auto flex justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2">
+          <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
             <button
               type="button"
               onClick={() => scrollGenresBy(-1)}
               disabled={!canScrollGenreLeft}
               aria-label="Scroll categories left"
               className={cn(
-                "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+                "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollGenreLeft
                   ? "hover:bg-white/15 cursor-pointer text-white"
                   : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
@@ -459,7 +498,7 @@ export function Rankings() {
             >
               <ChevronLeft
                 className={cn(
-                  "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
                   canScrollGenreLeft
                     ? "group-hover:scale-125 text-white"
                     : "text-white/25"
@@ -474,15 +513,15 @@ export function Rankings() {
               onMouseUp={stopGenreDragging}
               onMouseLeave={stopGenreDragging}
               onWheel={handleGenreWheel}
-              className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[172px] min-[400px]:w-[260px] sm:w-[348px] lg:w-[260px] xl:w-[436px] h-[36px] rounded-full"
+              className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[160px] min-[400px]:w-[230px] sm:w-[260px] md:w-[320px] lg:w-[280px] xl:w-[436px] h-[30px] sm:h-[36px] rounded-full"
             >
-              <div className="relative flex items-center gap-1 w-max h-[36px]">
+              <div className="relative flex items-center gap-1 w-max h-[30px] sm:h-[36px]">
                 <div
                   className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
                   style={{
-                    width: `${GENRE_PILL_WIDTH}px`,
+                    width: `${genrePillWidth}px`,
                     transform: `translate3d(${
-                      activeGenreIndex * (GENRE_PILL_WIDTH + GENRE_PILL_GAP)
+                      activeGenreIndex * (genrePillWidth + GENRE_PILL_GAP)
                     }px, 0, 0)`,
                   }}
                 />
@@ -500,9 +539,9 @@ export function Rankings() {
                         }
                       }}
                       tabIndex={0}
-                      style={{ width: `${GENRE_PILL_WIDTH}px` }}
+                      style={{ width: `${genrePillWidth}px` }}
                       className={cn(
-                        "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
+                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
                         "focus:outline-none focus-visible:outline-none select-none",
                         isSelected
                           ? "text-black"
@@ -524,7 +563,7 @@ export function Rankings() {
               disabled={!canScrollGenreRight}
               aria-label="Scroll categories right"
               className={cn(
-                "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+                "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollGenreRight
                   ? "hover:bg-white/15 cursor-pointer text-white"
                   : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
@@ -532,7 +571,7 @@ export function Rankings() {
             >
               <ChevronRight
                 className={cn(
-                  "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
                   canScrollGenreRight
                     ? "group-hover:scale-125 text-white"
                     : "text-white/25"
@@ -542,15 +581,15 @@ export function Rankings() {
           </div>
         </div>
 
-        {/* Right: Dynamic Swipeable Year Switcher Capsule */}
-        <div className="order-2 lg:order-3 flex items-center justify-between gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+        {/* Right: Year Switcher Capsule */}
+        <div className="order-2 sm:order-3 flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
           <button
             type="button"
             onClick={() => scrollYearsBy(-1)}
             disabled={!canScrollLeft}
             aria-label="Scroll to newer years"
             className={cn(
-              "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+              "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
               canScrollLeft
                 ? "hover:bg-white/15 cursor-pointer text-white"
                 : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
@@ -558,7 +597,7 @@ export function Rankings() {
           >
             <ChevronLeft
               className={cn(
-                "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
                 canScrollLeft ? "group-hover:scale-125 text-white" : "text-white/25"
               )}
             />
@@ -571,16 +610,15 @@ export function Rankings() {
             onMouseUp={stopDragging}
             onMouseLeave={stopDragging}
             onWheel={handleWheel}
-            className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[64px] sm:w-[200px] h-[36px] rounded-full"
+            className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[60px] sm:w-[200px] h-[30px] sm:h-[36px] rounded-full"
           >
-            <div className="relative flex items-center gap-1 w-max h-[36px]">
-              {/* Sliding Active Year Pill */}
+            <div className="relative flex items-center gap-1 w-max h-[30px] sm:h-[36px]">
               <div
                 className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
                 style={{
-                  width: `${YEAR_PILL_WIDTH}px`,
+                  width: `${yearPillWidth}px`,
                   transform: `translate3d(${
-                    activeYearIndex * (YEAR_PILL_WIDTH + YEAR_PILL_GAP)
+                    activeYearIndex * (yearPillWidth + YEAR_PILL_GAP)
                   }px, 0, 0)`,
                 }}
               />
@@ -598,9 +636,9 @@ export function Rankings() {
                       }
                     }}
                     tabIndex={0}
-                    style={{ width: `${YEAR_PILL_WIDTH}px` }}
+                    style={{ width: `${yearPillWidth}px` }}
                     className={cn(
-                      "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
+                      "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
                       "focus:outline-none focus-visible:outline-none select-none",
                       isSelected
                         ? "text-black"
@@ -622,7 +660,7 @@ export function Rankings() {
             disabled={!canScrollRight}
             aria-label="Scroll to older years"
             className={cn(
-              "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+              "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
               canScrollRight
                 ? "hover:bg-white/15 cursor-pointer text-white"
                 : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
@@ -630,7 +668,7 @@ export function Rankings() {
           >
             <ChevronRight
               className={cn(
-                "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
                 canScrollRight ? "group-hover:scale-125 text-white" : "text-white/25"
               )}
             />
@@ -638,26 +676,37 @@ export function Rankings() {
         </div>
       </div>
 
-      {/* Locked 2-Row Viewport Grid (Zero Scroll, Clears Bottom Nav Pill) */}
-      <div className="flex-1 min-h-0 w-full px-6 md:px-8 pb-[78px] sm:pb-[88px] md:pb-[96px] relative z-10">
+      {/* Viewport Grid (Clears Bottom Nav Pill, Supports Touch Swipe, Adapts to Orientation & Wide Screens) */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[74px] sm:pb-[88px] md:pb-[96px] relative z-10"
+      >
         {!loading && displayedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <p className="text-xl text-white/70 font-medium mb-2">
+            <p className="text-lg sm:text-xl text-white/70 font-medium mb-2">
               No rankings found for {year}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500">
               Try swiping to a different year or switching categories.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 grid-rows-2 gap-x-5 sm:gap-x-6 md:gap-x-7 gap-y-3.5 sm:gap-y-4 md:gap-y-5 w-full h-full md:max-h-[calc((100vw-64px)*0.54)] min-h-0">
+          <div
+            className={cn(
+              "grid gap-x-3 sm:gap-x-5 md:gap-x-7 gap-y-2.5 sm:gap-y-4 md:gap-y-5 w-full h-full min-h-0",
+              rowsPerPage === 1 ? "grid-rows-1" : "grid-rows-2",
+              "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 xl:grid-cols-8",
+              "md:max-h-[calc((100vw-64px)*0.54)] xl:max-h-[calc((100vw-64px)*0.45)]"
+            )}
+          >
             {loading
               ? Array.from({ length: itemsPerPage }).map((_, idx) => (
-                  <div key={idx} className="flex flex-col gap-2 h-full min-h-0 w-full">
-                    <div className="w-full flex-1 min-h-0 rounded-2xl bg-white/5 border border-white/5 animate-pulse" />
+                  <div key={idx} className="flex flex-col gap-1.5 sm:gap-2 h-full min-h-0 w-full">
+                    <div className="w-full flex-1 min-h-0 rounded-xl sm:rounded-2xl bg-white/5 border border-white/5 animate-pulse" />
                     <div className="flex flex-col px-1 shrink-0 gap-1">
-                      <div className="h-4 w-3/4 rounded bg-white/5 animate-pulse" />
-                      <div className="h-3.5 w-1/3 rounded bg-white/5 animate-pulse" />
+                      <div className="h-3.5 sm:h-4 w-3/4 rounded bg-white/5 animate-pulse" />
+                      <div className="h-3 sm:h-3.5 w-1/3 rounded bg-white/5 animate-pulse" />
                     </div>
                   </div>
                 ))
@@ -675,12 +724,12 @@ export function Rankings() {
                     <div
                       key={`placeholder-${idx}`}
                       aria-hidden="true"
-                      className="flex flex-col gap-2 h-full min-h-0 w-full invisible pointer-events-none select-none"
+                      className="flex flex-col gap-1.5 sm:gap-2 h-full min-h-0 w-full invisible pointer-events-none select-none"
                     >
                       <div className="w-full flex-1 min-h-0" />
                       <div className="flex flex-col px-1 shrink-0">
-                        <span className="text-sm sm:text-base leading-tight">&nbsp;</span>
-                        <span className="text-xs sm:text-sm mt-0.5 leading-tight">&nbsp;</span>
+                        <span className="text-xs sm:text-base leading-tight">&nbsp;</span>
+                        <span className="text-[11px] sm:text-sm mt-0.5 leading-tight">&nbsp;</span>
                       </div>
                     </div>
                   ))}

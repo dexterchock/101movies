@@ -30,16 +30,23 @@ const TV_CATEGORIES: MediaCategoryOption[] = [
   { id: "9648", label: "Mystery" },
 ];
 
-const CATEGORY_PILL_WIDTH = 84;
+const CATEGORY_PILL_WIDTH_DESKTOP = 84;
+const CATEGORY_PILL_WIDTH_MOBILE = 72;
 const CATEGORY_PILL_GAP = 4;
 
 const cachedMoviesByCat = new Map<string, MediaItem[]>();
 const cachedTVByCat = new Map<string, MediaItem[]>();
 
 function getColsForWidth(width: number): number {
+  if (width >= 1280) return 8; // 8 columns on modern wide screens (proper 2:3 vertical poster)
   if (width >= 768) return 6;
   if (width >= 640) return 3;
   return 2;
+}
+
+function getRowsForHeight(height: number): number {
+  // On short landscape viewports (e.g. iPhone landscape ~390px), 1 row prevents card squishing
+  return height < 500 ? 1 : 2;
 }
 
 export function Home() {
@@ -90,6 +97,9 @@ export function Home() {
   const [colsPerRow, setColsPerRow] = useState(() =>
     typeof window !== "undefined" ? getColsForWidth(window.innerWidth) : 6
   );
+  const [rowsPerPage, setRowsPerPage] = useState(() =>
+    typeof window !== "undefined" ? getRowsForHeight(window.innerHeight) : 2
+  );
   const [isMobileView, setIsMobileView] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 640 : false
   );
@@ -97,6 +107,7 @@ export function Home() {
   useEffect(() => {
     const handleResize = () => {
       setColsPerRow(getColsForWidth(window.innerWidth));
+      setRowsPerPage(getRowsForHeight(window.innerHeight));
       setIsMobileView(window.innerWidth < 640);
     };
     window.addEventListener("resize", handleResize);
@@ -214,8 +225,8 @@ export function Home() {
   );
   const mediaTypeTabWidth = isMobileView
     ? history.length > 0
-      ? 68
-      : 78
+      ? 62
+      : 72
     : 88;
 
   const activeCategories =
@@ -255,7 +266,7 @@ export function Home() {
     setPage(Number.isNaN(parsed) ? 0 : parsed);
   }, [storageKey]);
 
-  const itemsPerPage = colsPerRow * 2;
+  const itemsPerPage = colsPerRow * rowsPerPage;
   const totalPages = Math.ceil(activeItems.length / itemsPerPage);
 
   useEffect(() => {
@@ -314,6 +325,10 @@ export function Home() {
     activeCategories.findIndex((c) => c.id === activeCategory)
   );
 
+  const categoryPillWidth = isMobileView
+    ? CATEGORY_PILL_WIDTH_MOBILE
+    : CATEGORY_PILL_WIDTH_DESKTOP;
+
   const updateCatScrollButtons = useCallback(() => {
     const el = categoryTrackRef.current;
     if (!el) return;
@@ -325,7 +340,7 @@ export function Home() {
     (smooth: boolean) => {
       const el = categoryTrackRef.current;
       if (!el || activeCategories.length === 0) return;
-      const stride = CATEGORY_PILL_WIDTH + CATEGORY_PILL_GAP;
+      const stride = categoryPillWidth + CATEGORY_PILL_GAP;
       const visiblePills = Math.max(1, Math.round(el.clientWidth / stride));
       const half = Math.floor(visiblePills / 2);
       const startIdx = Math.max(
@@ -336,7 +351,7 @@ export function Home() {
       safeScrollTo(el, targetScroll, smooth);
       updateCatScrollButtons();
     },
-    [activeCategories.length, activeCategoryIndex, updateCatScrollButtons]
+    [activeCategories.length, activeCategoryIndex, categoryPillWidth, updateCatScrollButtons]
   );
 
   useEffect(() => {
@@ -404,7 +419,7 @@ export function Home() {
   const scrollCategoriesBy = (direction: -1 | 1) => {
     const el = categoryTrackRef.current;
     if (!el) return;
-    const stride = CATEGORY_PILL_WIDTH + CATEGORY_PILL_GAP;
+    const stride = categoryPillWidth + CATEGORY_PILL_GAP;
     const visiblePills = Math.max(1, Math.round(el.clientWidth / stride));
     if (visiblePills <= 1) {
       const nextIndex = Math.max(
@@ -427,21 +442,46 @@ export function Home() {
     safeScrollTo(el, targetLeft, true);
   };
 
+  // Touch swipe handling for effortless page navigation on mobile
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+      if (deltaX < 0) {
+        nextPage();
+      } else {
+        prevPage();
+      }
+    }
+  };
+
   const displayCategories =
     activeCategories.length > 0 ? activeCategories : MOVIE_CATEGORIES;
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-black select-none">
-      {/* Locked Top Control Bar (Identical Placements to Rankings) */}
-      <div className="shrink-0 relative flex flex-wrap lg:flex-nowrap items-center justify-between gap-y-2.5 w-full px-6 md:px-8 pt-5 md:pt-6 pb-4 md:pb-5 z-40">
+      {/* Responsive Top Control Bar (Cleanly fits mobile portrait & landscape) */}
+      <div className="shrink-0 relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-y-2 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-6 pb-2.5 sm:pb-3 md:pb-5 z-40">
         {/* Left: Movies / Shows (and History) Capsule Toggle */}
         <div
           role="tablist"
           aria-label="Content Type"
-          className="order-1 relative flex items-center gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
+          className="order-1 relative flex items-center gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
         >
           <div
-            className="absolute top-1 bottom-1 left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
+            className="absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 left-0.5 sm:left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
             style={{
               width: `${mediaTypeTabWidth}px`,
               transform: `translate3d(${activeMediaTypeIndex * (mediaTypeTabWidth + 4)}px, 0, 0)`,
@@ -459,7 +499,7 @@ export function Home() {
                 tabIndex={0}
                 style={{ width: `${mediaTypeTabWidth}px` }}
                 className={cn(
-                  "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
+                  "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
                   "focus:outline-none focus-visible:outline-none select-none",
                   isActive
                     ? "text-black"
@@ -474,21 +514,21 @@ export function Home() {
           })}
         </div>
 
-        {/* Center on Desktop / Row 2 on Mobile: Sliding Category Switcher Capsule */}
+        {/* Center on Desktop/Landscape / Row 2 on Portrait Mobile: Sliding Category Switcher Capsule */}
         <div
           className={cn(
-            "order-3 lg:order-2 w-full lg:w-auto flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2",
+            "order-3 sm:order-2 w-full sm:w-auto flex justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2",
             effectiveMediaType === "history" && "invisible pointer-events-none"
           )}
         >
-          <div className="flex items-center justify-between gap-1 p-1 h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+          <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
             <button
               type="button"
               onClick={() => scrollCategoriesBy(-1)}
               disabled={!canScrollCatLeft}
               aria-label="Scroll categories left"
               className={cn(
-                "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+                "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollCatLeft
                   ? "hover:bg-white/15 cursor-pointer text-white"
                   : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
@@ -496,7 +536,7 @@ export function Home() {
             >
               <ChevronLeft
                 className={cn(
-                  "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
                   canScrollCatLeft
                     ? "group-hover:scale-125 text-white"
                     : "text-white/25"
@@ -511,16 +551,16 @@ export function Home() {
               onMouseUp={stopCatDragging}
               onMouseLeave={stopCatDragging}
               onWheel={handleCatWheel}
-              className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[172px] min-[400px]:w-[260px] sm:w-[348px] lg:w-[260px] xl:w-[436px] h-[36px] rounded-full"
+              className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[160px] min-[400px]:w-[230px] sm:w-[260px] md:w-[320px] lg:w-[280px] xl:w-[436px] h-[30px] sm:h-[36px] rounded-full"
             >
-              <div className="relative flex items-center gap-1 w-max h-[36px]">
+              <div className="relative flex items-center gap-1 w-max h-[30px] sm:h-[36px]">
                 <div
                   className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
                   style={{
-                    width: `${CATEGORY_PILL_WIDTH}px`,
+                    width: `${categoryPillWidth}px`,
                     transform: `translate3d(${
                       activeCategoryIndex *
-                      (CATEGORY_PILL_WIDTH + CATEGORY_PILL_GAP)
+                      (categoryPillWidth + CATEGORY_PILL_GAP)
                     }px, 0, 0)`,
                   }}
                 />
@@ -538,9 +578,9 @@ export function Home() {
                         }
                       }}
                       tabIndex={0}
-                      style={{ width: `${CATEGORY_PILL_WIDTH}px` }}
+                      style={{ width: `${categoryPillWidth}px` }}
                       className={cn(
-                        "group relative z-10 flex items-center justify-center h-[36px] text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
+                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
                         "focus:outline-none focus-visible:outline-none select-none",
                         isSelected
                           ? "text-black"
@@ -562,7 +602,7 @@ export function Home() {
               disabled={!canScrollCatRight}
               aria-label="Scroll categories right"
               className={cn(
-                "group flex items-center justify-center w-[34px] sm:w-[36px] h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+                "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollCatRight
                   ? "hover:bg-white/15 cursor-pointer text-white"
                   : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
@@ -570,7 +610,7 @@ export function Home() {
             >
               <ChevronRight
                 className={cn(
-                  "w-5 h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
                   canScrollCatRight
                     ? "group-hover:scale-125 text-white"
                     : "text-white/25"
@@ -581,15 +621,15 @@ export function Home() {
         </div>
 
         {/* Right: Page Navigation Buttons (+ Clear when History is active) */}
-        <div className="order-2 lg:order-3 flex gap-2 items-center h-[46px] shrink-0">
+        <div className="order-2 sm:order-3 flex gap-1.5 sm:gap-2 items-center h-[38px] sm:h-[46px] shrink-0">
           {effectiveMediaType === "history" && (
             <button
               onClick={handleClearHistory}
-              className="group relative mr-1 flex items-center justify-center h-[46px] px-4 text-sm font-medium text-red-400/85 hover:text-red-300 rounded-full bg-red-500/[0.08] hover:bg-red-500/18 border border-red-500/25 hover:border-red-500/40 shadow-[inset_0_1px_0_0_rgba(255,120,120,0.18),0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+              className="group relative mr-1 flex items-center justify-center h-[38px] sm:h-[46px] px-3 sm:px-4 text-xs sm:text-sm font-medium text-red-400/85 hover:text-red-300 rounded-full bg-red-500/[0.08] hover:bg-red-500/18 border border-red-500/25 hover:border-red-500/40 shadow-[inset_0_1px_0_0_rgba(255,120,120,0.18),0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
               title="Clear History"
             >
               <div className="relative z-10 flex items-center gap-1.5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105 will-change-transform transform-gpu">
-                <X className="w-4 h-4 stroke-[2]" />
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2]" />
                 <span>Clear</span>
               </div>
             </button>
@@ -598,7 +638,7 @@ export function Home() {
             onClick={prevPage}
             disabled={!showLeft}
             className={cn(
-              "group flex items-center justify-center w-[46px] h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showLeft
                 ? "hover:bg-white/15 cursor-pointer text-white"
                 : "text-white/25 cursor-not-allowed pointer-events-none"
@@ -607,7 +647,7 @@ export function Home() {
           >
             <ChevronLeft
               className={cn(
-                "w-7 h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
                 showLeft ? "group-hover:scale-125 text-white" : "text-white/25"
               )}
             />
@@ -616,7 +656,7 @@ export function Home() {
             onClick={nextPage}
             disabled={!showRight}
             className={cn(
-              "group flex items-center justify-center w-[46px] h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showRight
                 ? "hover:bg-white/15 cursor-pointer text-white"
                 : "text-white/25 cursor-not-allowed pointer-events-none"
@@ -625,7 +665,7 @@ export function Home() {
           >
             <ChevronRight
               className={cn(
-                "w-7 h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
+                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
                 showRight ? "group-hover:scale-125 text-white" : "text-white/25"
               )}
             />
@@ -633,16 +673,27 @@ export function Home() {
         </div>
       </div>
 
-      {/* Locked 2-Row Viewport Grid (Zero Scroll, Clears Bottom Nav Pill) */}
-      <div className="flex-1 min-h-0 w-full px-6 md:px-8 pb-[78px] sm:pb-[88px] md:pb-[96px] relative z-10">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 grid-rows-2 gap-x-5 sm:gap-x-6 md:gap-x-7 gap-y-3.5 sm:gap-y-4 md:gap-y-5 w-full h-full md:max-h-[calc((100vw-64px)*0.54)] min-h-0">
+      {/* Viewport Grid (Clears Bottom Nav Pill, Supports Touch Swipe, Adapts to Orientation & Wide Screens) */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[74px] sm:pb-[88px] md:pb-[96px] relative z-10"
+      >
+        <div
+          className={cn(
+            "grid gap-x-3 sm:gap-x-5 md:gap-x-7 gap-y-2.5 sm:gap-y-4 md:gap-y-5 w-full h-full min-h-0",
+            rowsPerPage === 1 ? "grid-rows-1" : "grid-rows-2",
+            "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 xl:grid-cols-8",
+            "md:max-h-[calc((100vw-64px)*0.54)] xl:max-h-[calc((100vw-64px)*0.45)]"
+          )}
+        >
           {loading
             ? Array.from({ length: itemsPerPage }).map((_, idx) => (
-                <div key={idx} className="flex flex-col gap-2 h-full min-h-0 w-full">
-                  <div className="w-full flex-1 min-h-0 rounded-2xl bg-white/5 border border-white/5 animate-pulse" />
+                <div key={idx} className="flex flex-col gap-1.5 sm:gap-2 h-full min-h-0 w-full">
+                  <div className="w-full flex-1 min-h-0 rounded-xl sm:rounded-2xl bg-white/5 border border-white/5 animate-pulse" />
                   <div className="flex flex-col px-1 shrink-0 gap-1">
-                    <div className="h-4 w-3/4 rounded bg-white/5 animate-pulse" />
-                    <div className="h-3.5 w-1/3 rounded bg-white/5 animate-pulse" />
+                    <div className="h-3.5 sm:h-4 w-3/4 rounded bg-white/5 animate-pulse" />
+                    <div className="h-3 sm:h-3.5 w-1/3 rounded bg-white/5 animate-pulse" />
                   </div>
                 </div>
               ))
@@ -664,12 +715,12 @@ export function Home() {
                   <div
                     key={`placeholder-${idx}`}
                     aria-hidden="true"
-                    className="flex flex-col gap-2 h-full min-h-0 w-full invisible pointer-events-none select-none"
+                    className="flex flex-col gap-1.5 sm:gap-2 h-full min-h-0 w-full invisible pointer-events-none select-none"
                   >
                     <div className="w-full flex-1 min-h-0" />
                     <div className="flex flex-col px-1 shrink-0">
-                      <span className="text-sm sm:text-base leading-tight">&nbsp;</span>
-                      <span className="text-xs sm:text-sm mt-0.5 leading-tight">&nbsp;</span>
+                      <span className="text-xs sm:text-base leading-tight">&nbsp;</span>
+                      <span className="text-[11px] sm:text-sm mt-0.5 leading-tight">&nbsp;</span>
                     </div>
                   </div>
                 ))}

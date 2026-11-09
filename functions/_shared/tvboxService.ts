@@ -217,10 +217,29 @@ export async function checkMediaHasPlayableStreams(
     };
   }
 
-  const primaryZhTitle =
+  let primaryZhTitle =
     item.zh_title && /[\u4e00-\u9fff]/.test(item.zh_title)
       ? toSimplifiedChinese(item.zh_title.trim())
       : undefined;
+
+  const tracker = budgetTracker || { used: 0, max: 44 };
+
+  if (!primaryZhTitle && _tmdbApiKey && tracker.used < tracker.max - 2) {
+    tracker.used++;
+    try {
+      const metaRes = await fetch(
+        `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&api_key=${_tmdbApiKey}`,
+        { signal: AbortSignal.timeout(2000) }
+      );
+      if (metaRes.ok) {
+        const metaData: any = await metaRes.json();
+        const zh = metaData.title || metaData.name;
+        if (zh && /[\u4e00-\u9fff]/.test(zh)) {
+          primaryZhTitle = toSimplifiedChinese(String(zh).trim());
+        }
+      }
+    } catch {}
+  }
 
   const candidateTitles: string[] = [];
   const addTitle = (t?: string) => {
@@ -229,7 +248,13 @@ export async function checkMediaHasPlayableStreams(
     if (clean && !candidateTitles.includes(clean)) candidateTitles.push(clean);
   };
 
-  if (primaryZhTitle) addTitle(primaryZhTitle);
+  if (primaryZhTitle) {
+    addTitle(primaryZhTitle);
+    const beforeColon = primaryZhTitle.split(/[:：\s]/)[0].trim();
+    if (beforeColon && beforeColon !== primaryZhTitle) {
+      addTitle(beforeColon);
+    }
+  }
   addTitle(item.title);
   addTitle(item.name);
   addTitle(item.original_title);
@@ -246,7 +271,6 @@ export async function checkMediaHasPlayableStreams(
   const primaryQuery = cleanZh || item.title || item.name || candidateTitles[0];
 
   let available = false;
-  const tracker = budgetTracker || { used: 0, max: 44 };
 
   for (const site of FAST_PROBE_SITES) {
     if (tracker.used >= tracker.max) break;

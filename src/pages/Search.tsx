@@ -229,7 +229,7 @@ export function Search() {
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[74px] sm:pb-[88px] md:pb-[96px] relative z-10"
+        className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[82px] sm:pb-[92px] md:pb-[98px] pb-[max(5.75rem,calc(5rem+env(safe-area-inset-bottom)))] relative z-10"
       >
         {loading ? (
           <div

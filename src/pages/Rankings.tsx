@@ -440,7 +440,7 @@ export function Rankings() {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-black select-none">
       {/* Responsive Top Control Bar */}
-      <div className="shrink-0 relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-y-2 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-6 pb-2.5 sm:pb-3 md:pb-5 z-40">
+      <div className="shrink-0 relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 sm:gap-x-3 gap-y-2 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-6 pb-2.5 sm:pb-3 md:pb-5 z-40">
         {/* Left: Movies / Shows Capsule Toggle */}
         <div
           role="tablist"
@@ -481,8 +481,8 @@ export function Rankings() {
           })}
         </div>
 
-        {/* Center on Desktop/Landscape / Row 2 on Portrait Mobile: Genre Switcher Capsule */}
-        <div className="order-3 sm:order-2 w-full sm:w-auto flex justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2">
+        {/* Center on Desktop / Row 2 on Portrait Mobile: Genre Switcher Capsule */}
+        <div className="order-3 sm:order-2 w-full sm:w-auto sm:flex-1 lg:flex-none flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2 min-w-0">
           <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
             <button
               type="button"
@@ -513,7 +513,7 @@ export function Rankings() {
               onMouseUp={stopGenreDragging}
               onMouseLeave={stopGenreDragging}
               onWheel={handleGenreWheel}
-              className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[160px] min-[400px]:w-[230px] sm:w-[260px] md:w-[320px] lg:w-[280px] xl:w-[436px] h-[30px] sm:h-[36px] rounded-full"
+              className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[160px] min-[400px]:w-[210px] sm:w-[230px] md:w-[280px] lg:w-[280px] xl:w-[436px] h-[30px] sm:h-[36px] rounded-full"
             >
               <div className="relative flex items-center gap-1 w-max h-[30px] sm:h-[36px]">
                 <div
@@ -680,7 +680,7 @@ export function Rankings() {
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[74px] sm:pb-[88px] md:pb-[96px] relative z-10"
+        className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[82px] sm:pb-[92px] md:pb-[98px] pb-[max(5.75rem,calc(5rem+env(safe-area-inset-bottom)))] relative z-10"
       >
         {!loading && displayedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">

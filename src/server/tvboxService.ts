@@ -778,7 +778,7 @@ async function searchSingleVodSite(
     });
 
     if (!res.ok) return [];
-    const data = await res.json();
+    const data: any = await res.json();
     const list = Array.isArray(data?.list) ? data.list : [];
     if (list.length === 0) return [];
 

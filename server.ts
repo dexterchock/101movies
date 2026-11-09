@@ -127,7 +127,7 @@ async function startServer() {
       const urlPage1 = `${TMDB_BASE_URL}${endpoint}${separator}page=1&api_key=${TMDB_API_KEY}`;
       const urlPage2 = `${TMDB_BASE_URL}${endpoint}${separator}page=2&api_key=${TMDB_API_KEY}`;
 
-      const [res1, res2] = await Promise.allSettled([
+      const [res1, res2] = await Promise.allSettled<any>([
         fetch(urlPage1).then((r) => r.json()),
         fetch(urlPage2).then((r) => r.json()),
       ]);
@@ -135,8 +135,8 @@ async function startServer() {
       const rawCombined: any[] = [];
       const seenIds = new Set<number>();
       for (const settled of [res1, res2]) {
-        if (settled.status === "fulfilled" && Array.isArray(settled.value?.results)) {
-          for (const item of settled.value.results) {
+        if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
+          for (const item of (settled.value as any).results) {
             if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
               seenIds.add(item.id);
               rawCombined.push({ ...item, media_type: item.media_type || defaultType });
@@ -176,7 +176,7 @@ async function startServer() {
       try {
         const recentYear = new Date().getFullYear() - 3;
         const recentDate = `${recentYear}-01-01`;
-        const [recentRes, popRes] = await Promise.allSettled([
+        const [recentRes, popRes] = await Promise.allSettled<any>([
           fetch(
             `${TMDB_BASE_URL}/discover/movie?sort_by=popularity.desc&with_origin_country=HK&primary_release_date.gte=${recentDate}&vote_count.gte=1&api_key=${TMDB_API_KEY}`
           ).then((r) => r.json()),
@@ -188,8 +188,8 @@ async function startServer() {
         const combined: any[] = [];
         const seenIds = new Set<number>();
         for (const settled of [recentRes, popRes]) {
-          if (settled.status === "fulfilled" && Array.isArray(settled.value?.results)) {
-            for (const item of settled.value.results) {
+          if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
+            for (const item of (settled.value as any).results) {
               if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
                 seenIds.add(item.id);
                 combined.push({ ...item, media_type: "movie" });
@@ -235,7 +235,7 @@ async function startServer() {
       try {
         const recentYear = new Date().getFullYear() - 3;
         const recentDate = `${recentYear}-01-01`;
-        const [recentRes, popRes] = await Promise.allSettled([
+        const [recentRes, popRes] = await Promise.allSettled<any>([
           fetch(
             `${TMDB_BASE_URL}/discover/tv?sort_by=popularity.desc&with_origin_country=HK&first_air_date.gte=${recentDate}&vote_count.gte=1&api_key=${TMDB_API_KEY}`
           ).then((r) => r.json()),
@@ -247,8 +247,8 @@ async function startServer() {
         const combined: any[] = [];
         const seenIds = new Set<number>();
         for (const settled of [recentRes, popRes]) {
-          if (settled.status === "fulfilled" && Array.isArray(settled.value?.results)) {
-            for (const item of settled.value.results) {
+          if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
+            for (const item of (settled.value as any).results) {
               if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
                 seenIds.add(item.id);
                 combined.push({ ...item, media_type: "tv" });
@@ -289,7 +289,7 @@ async function startServer() {
     try {
       const url = `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&api_key=${TMDB_API_KEY}`;
       const response = await fetch(url);
-      const data = await response.json();
+      const data: any = await response.json();
       const releasedCandidates = filterReleasedMedia(
         Array.isArray(data.results)
           ? data.results.filter(
@@ -315,7 +315,7 @@ async function startServer() {
       return res.json({});
     }
     try {
-      const [enRes, zhRes] = await Promise.allSettled([
+      const [enRes, zhRes] = await Promise.allSettled<any>([
         fetch(
           `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits&api_key=${TMDB_API_KEY}`
         ).then((r) => r.json()),
@@ -324,8 +324,8 @@ async function startServer() {
         ).then((r) => r.json()),
       ]);
 
-      const enData = enRes.status === "fulfilled" && enRes.value ? enRes.value : {};
-      const zhData = zhRes.status === "fulfilled" && zhRes.value ? zhRes.value : {};
+      const enData: any = enRes.status === "fulfilled" && enRes.value ? enRes.value : {};
+      const zhData: any = zhRes.status === "fulfilled" && zhRes.value ? zhRes.value : {};
 
       let rawZhTitle = "";
 

@@ -11,7 +11,7 @@ export const api = {
     const query =
       genre && genre !== "all" ? `?genre=${encodeURIComponent(genre)}` : "";
     const res = await fetch(`/api/tmdb/trending/movie${query}`);
-    const data = await res.json();
+    const data: any = await res.json();
     return (data.results || []).map((item: MediaItem) => ({
       ...item,
       media_type: "movie" as const,
@@ -21,7 +21,7 @@ export const api = {
     const query =
       genre && genre !== "all" ? `?genre=${encodeURIComponent(genre)}` : "";
     const res = await fetch(`/api/tmdb/trending/tv${query}`);
-    const data = await res.json();
+    const data: any = await res.json();
     return (data.results || []).map((item: MediaItem) => ({
       ...item,
       media_type: "tv" as const,
@@ -29,13 +29,13 @@ export const api = {
   },
   search: async (query: string): Promise<MediaItem[]> => {
     const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
-    const data = await res.json();
+    const data: any = await res.json();
     return data.results || [];
   },
   getDetails: async (type: "movie" | "tv", id: string): Promise<MediaDetails> => {
     const res = await fetch(`/api/tmdb/${type}/${id}`);
-    const data = await res.json();
-    return data;
+    const data: any = await res.json();
+    return data as MediaDetails;
   },
   getRankings: async (
     type: "movie" | "tv",
@@ -45,7 +45,7 @@ export const api = {
     const genreQuery =
       genre && genre !== "all" ? `&genre=${encodeURIComponent(genre)}` : "";
     const res = await fetch(`/api/tmdb/discover/${type}?year=${year}${genreQuery}`);
-    const data = await res.json();
+    const data: any = await res.json();
     return data.results || [];
   },
   getTvboxConfigs: async (): Promise<{

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://101movies.pages.dev/sitemap.xml

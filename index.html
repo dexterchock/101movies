@@ -2,13 +2,84 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>101Movies</title>
-    <meta name="description" content="A sleek, dark-mode movie streaming web app optimized for Smart TVs." />
-    <meta property="og:title" content="101Movies" />
-    <meta property="og:description" content="A sleek, dark-mode movie streaming web app optimized for Smart TVs." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    
+    <!-- Primary SEO Meta Tags -->
+    <title>101Movies - Stream Trending Movies & TV Shows</title>
+    <meta name="title" content="101Movies - Stream Trending Movies & TV Shows" />
+    <meta name="description" content="Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation, real-time TMDB integration, and watch history." />
+    <meta name="keywords" content="101movies, 101 movies, stream movies online, watch tv shows, trending movies, free streaming, tmdb, smart tv movies, hls player" />
+    <meta name="author" content="101Movies" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://101movies.pages.dev/" />
+
+    <!-- Favicon & Touch Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#050505" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Mobile / Smart TV App Capabilities -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="101Movies" />
+    <meta name="application-name" content="101Movies" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://101movies.pages.dev/" />
+    <meta property="og:site_name" content="101Movies" />
+    <meta property="og:title" content="101Movies - Stream Trending Movies & TV Shows" />
+    <meta property="og:description" content="Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation and real-time TMDB integration." />
+    <meta property="og:image" content="https://101movies.pages.dev/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="101Movies - Cinematic Streaming Platform" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://101movies.pages.dev/" />
+    <meta name="twitter:title" content="101Movies - Stream Trending Movies & TV Shows" />
+    <meta name="twitter:description" content="Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation." />
+    <meta name="twitter:image" content="https://101movies.pages.dev/og-image.png" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://101movies.pages.dev/#website",
+            "url": "https://101movies.pages.dev/",
+            "name": "101Movies",
+            "description": "Stream trending movies and TV shows online",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": {
+                "@type": "EntryPoint",
+                "urlTemplate": "https://101movies.pages.dev/search?q={search_term_string}"
+              },
+              "query-input": "required name=search_term_string"
+            }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://101movies.pages.dev/#organization",
+            "name": "101Movies",
+            "url": "https://101movies.pages.dev/",
+            "logo": "https://101movies.pages.dev/android-chrome-512x512.png"
+          }
+        ]
+      }
+    </script>
   </head>
-  <body>
+  <body class="bg-black text-white antialiased overflow-hidden select-none">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

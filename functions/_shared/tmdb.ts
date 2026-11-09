@@ -60,6 +60,7 @@ export function normalizeMediaItemTitles(item: any): any {
   const isZhOrigin = isChineseOriginItem(item);
   const enTitle = String(item.title || item.name || "").trim();
   const rawOrigTitle = String(item.original_title || item.original_name || "").trim();
+  const existingZh = item.zh_title;
 
   if (isZhOrigin && hasChineseChars(rawOrigTitle)) {
     const simpTitle = toSimplifiedChinese(rawOrigTitle);
@@ -76,6 +77,7 @@ export function normalizeMediaItemTitles(item: any): any {
   return {
     ...item,
     en_title: enTitle || undefined,
+    zh_title: existingZh,
     is_chinese_origin: isZhOrigin,
   };
 }
@@ -117,11 +119,29 @@ export async function fetchTmdb(
   const separator = endpoint.includes("?") ? "&" : "?";
   const urlPage1 = `${TMDB_BASE_URL}${endpoint}${separator}page=1&api_key=${apiKey}`;
   const urlPage2 = `${TMDB_BASE_URL}${endpoint}${separator}page=2&api_key=${apiKey}`;
+  const urlPage1Zh = `${TMDB_BASE_URL}${endpoint}${separator}page=1&language=zh-CN&api_key=${apiKey}`;
+  const urlPage2Zh = `${TMDB_BASE_URL}${endpoint}${separator}page=2&language=zh-CN&api_key=${apiKey}`;
 
-  const [res1, res2] = await Promise.allSettled<any>([
+  const [res1, res2, zhRes1, zhRes2] = await Promise.allSettled<any>([
     fetch(urlPage1).then((r) => r.json()),
     fetch(urlPage2).then((r) => r.json()),
+    fetch(urlPage1Zh).then((r) => r.json()),
+    fetch(urlPage2Zh).then((r) => r.json()),
   ]);
+
+  const zhMap = new Map<number, string>();
+  for (const settled of [zhRes1, zhRes2]) {
+    if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
+      for (const item of (settled.value as any).results) {
+        if (item && typeof item.id === "number") {
+          const t = item.title || item.name;
+          if (t && hasChineseChars(t)) {
+            zhMap.set(item.id, toSimplifiedChinese(t.trim()));
+          }
+        }
+      }
+    }
+  }
 
   const rawCombined: any[] = [];
   const seenIds = new Set<number>();
@@ -130,7 +150,12 @@ export async function fetchTmdb(
       for (const item of (settled.value as any).results) {
         if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
           seenIds.add(item.id);
-          rawCombined.push({ ...item, media_type: item.media_type || defaultType });
+          const zhTitle = zhMap.get(item.id);
+          rawCombined.push({
+            ...item,
+            media_type: item.media_type || defaultType,
+            zh_title: zhTitle || item.zh_title,
+          });
         }
       }
     }

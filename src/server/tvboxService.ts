@@ -685,7 +685,8 @@ export function generateZhTitleVariants(rawZh?: string): {
     const num = colonMatch[2] ? colonMatch[2].trim() : "";
     const sub = colonMatch[3].trim();
 
-    probeKeyword = base; // e.g. "生化危机" or "蜘蛛侠"
+    // Prefer clean base + subtitle (e.g. "蜘蛛侠：英雄无归" or "生化危机：终章") for exact VOD matching
+    probeKeyword = base + "：" + sub; // e.g. "生化危机" or "蜘蛛侠"
 
     variants.add(base + "：" + sub);
     variants.add(base + " " + sub);
@@ -806,6 +807,15 @@ function computeTitleMatchScore(
     if (normAliases.includes(target) || normAliases.includes(normFullTarget)) {
       bestScore = Math.max(bestScore, 210);
       continue;
+    }
+
+    for (const alias of normAliases) {
+      if (alias.includes(target) || alias.includes(normFullTarget)) {
+        const extraLen = alias.length - target.length;
+        if (target.length >= 8 || extraLen <= 25) {
+          bestScore = Math.max(bestScore, 185);
+        }
+      }
     }
 
     const targetNumbers = extractNumbers(target);
@@ -1249,13 +1259,9 @@ async function getTmdbCandidateMetadata(
           isUnreleased = true;
         }
 
+        const allFoundZh = new Set<string>();
         if (zhTitle && /[\u4e00-\u9fff]/.test(zhTitle)) {
-          primaryZhTitle = toSimplifiedChinese(String(zhTitle).trim());
-          addCandidateTitle(zhTitle);
-          const { variants } = generateZhTitleVariants(primaryZhTitle);
-          for (const v of variants) {
-            addCandidateTitle(v);
-          }
+          allFoundZh.add(zhTitle.trim());
         }
 
         // Extract Chinese titles from translations (CN, SG, TW, HK)
@@ -1268,10 +1274,7 @@ async function getTmdbCandidateMetadata(
             if (tr?.iso_639_1 === "zh" && tr?.iso_3166_1 === region) {
               const trTitle = tr?.data?.title || tr?.data?.name;
               if (trTitle && /[\u4e00-\u9fff]/.test(trTitle)) {
-                if (!primaryZhTitle) {
-                  primaryZhTitle = toSimplifiedChinese(String(trTitle).trim());
-                }
-                addCandidateTitle(trTitle);
+                allFoundZh.add(trTitle.trim());
               }
             }
           }
@@ -1286,10 +1289,18 @@ async function getTmdbCandidateMetadata(
         for (const alt of altList) {
           const altTitle = alt?.title || alt?.name;
           if (altTitle && /[\u4e00-\u9fff]/.test(altTitle)) {
-            if (!primaryZhTitle) {
-              primaryZhTitle = toSimplifiedChinese(String(altTitle).trim());
-            }
-            addCandidateTitle(altTitle);
+            allFoundZh.add(altTitle.trim());
+          }
+        }
+
+        for (const t of allFoundZh) {
+          if (!primaryZhTitle) {
+            primaryZhTitle = toSimplifiedChinese(t);
+          }
+          addCandidateTitle(t);
+          const { variants } = generateZhTitleVariants(t);
+          for (const v of variants) {
+            addCandidateTitle(v);
           }
         }
 

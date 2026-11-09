@@ -107,8 +107,11 @@ function computeTitleMatchScore(
     }
 
     for (const alias of normAliases) {
-      if (alias.includes(normTarget) && alias.length - normTarget.length <= 4) {
-        bestScore = Math.max(bestScore, 160);
+      if (alias.includes(normTarget)) {
+        const extraLen = alias.length - normTarget.length;
+        if (normTarget.length >= 8 || extraLen <= 25) {
+          bestScore = Math.max(bestScore, 170);
+        }
       }
     }
   }
@@ -221,7 +224,8 @@ export function generateZhTitleVariants(rawZh?: string): {
     const num = colonMatch[2] ? colonMatch[2].trim() : "";
     const sub = colonMatch[3].trim();
 
-    probeKeyword = base; // e.g. "生化危机" or "蜘蛛侠"
+    // Prefer clean base + subtitle (e.g. "蜘蛛侠：英雄无归" or "生化危机：终章") for exact VOD matching
+    probeKeyword = base + "：" + sub;
 
     variants.add(base + "：" + sub);
     variants.add(base + " " + sub);
@@ -275,23 +279,6 @@ export async function checkMediaHasPlayableStreams(
 
   const tracker = budgetTracker || { used: 0, max: 44 };
 
-  if (!primaryZhTitle && _tmdbApiKey && tracker.used < tracker.max - 2) {
-    tracker.used++;
-    try {
-      const metaRes = await fetch(
-        `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&api_key=${_tmdbApiKey}`,
-        { signal: AbortSignal.timeout(2000) }
-      );
-      if (metaRes.ok) {
-        const metaData: any = await metaRes.json();
-        const zh = metaData.title || metaData.name;
-        if (zh && /[\u4e00-\u9fff]/.test(zh)) {
-          primaryZhTitle = toSimplifiedChinese(String(zh).trim());
-        }
-      }
-    } catch {}
-  }
-
   const candidateTitles: string[] = [];
   const addTitle = (t?: string) => {
     if (!t) return;
@@ -300,13 +287,62 @@ export async function checkMediaHasPlayableStreams(
   };
 
   let probeQuery = "";
-  if (primaryZhTitle) {
+
+  if (!primaryZhTitle && _tmdbApiKey && tracker.used < tracker.max - 2) {
+    tracker.used++;
+    try {
+      const metaRes = await fetch(
+        `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${_tmdbApiKey}`,
+        { signal: AbortSignal.timeout(2500) }
+      );
+      if (metaRes.ok) {
+        const metaData: any = await metaRes.json();
+        const allZhTitles = new Set<string>();
+
+        const zh = metaData.title || metaData.name;
+        if (zh && /[\u4e00-\u9fff]/.test(zh)) allZhTitles.add(zh.trim());
+
+        if (Array.isArray(metaData?.translations?.translations)) {
+          for (const region of ["CN", "SG", "TW", "HK"]) {
+            for (const tr of metaData.translations.translations) {
+              if (tr?.iso_639_1 === "zh" && tr?.iso_3166_1 === region) {
+                const t = tr?.data?.title || tr?.data?.name;
+                if (t && /[\u4e00-\u9fff]/.test(t)) {
+                  allZhTitles.add(t.trim());
+                }
+              }
+            }
+          }
+        }
+
+        const altList = Array.isArray(metaData?.alternative_titles?.titles)
+          ? metaData.alternative_titles.titles
+          : Array.isArray(metaData?.alternative_titles?.results)
+          ? metaData.alternative_titles.results
+          : [];
+        for (const alt of altList) {
+          const t = alt.title || alt.name;
+          if (t && /[\u4e00-\u9fff]/.test(t)) {
+            allZhTitles.add(t.trim());
+          }
+        }
+
+        for (const t of allZhTitles) {
+          if (!primaryZhTitle) primaryZhTitle = toSimplifiedChinese(t);
+          const { variants, probeKeyword } = generateZhTitleVariants(t);
+          if (!probeQuery) probeQuery = probeKeyword;
+          for (const v of variants) addTitle(v);
+        }
+      }
+    } catch {}
+  } else if (primaryZhTitle) {
     const { variants, probeKeyword } = generateZhTitleVariants(primaryZhTitle);
+    probeQuery = probeKeyword;
     for (const v of variants) {
       addTitle(v);
     }
-    probeQuery = probeKeyword;
   }
+
   addTitle(item.title);
   addTitle(item.name);
   addTitle(item.original_title);
@@ -318,7 +354,7 @@ export async function checkMediaHasPlayableStreams(
 
   const releaseYear = (item.release_date || item.first_air_date || "").slice(0, 4);
 
-  // Search keyword: prefer base/franchise Chinese keyword for wide sequel coverage, fallback to clean title
+  // Search keyword: prefer specific clean title + subtitle (e.g. 蜘蛛侠：英雄无归 / 生化危机：终章), fallback to clean title
   const cleanZh = primaryZhTitle ? primaryZhTitle.split(/[:：\s]/)[0].trim() : "";
   const primaryQuery = probeQuery || cleanZh || item.title || item.name || candidateTitles[0];
 
@@ -375,16 +411,13 @@ export async function filterItemsByServerAvailability(
           const cached = availabilityCache.get(
             `${item.media_type || defaultType}:${item.id}`
           );
-          if (cached?.available) {
-            results[idx] =
-              item.is_chinese_origin && cached.primaryZhTitle
-                ? {
-                    ...item,
-                    title: item.title !== undefined ? cached.primaryZhTitle : undefined,
-                    name: item.name !== undefined ? cached.primaryZhTitle : undefined,
-                    zh_title: cached.primaryZhTitle,
-                  }
-                : item;
+          if (cached?.available !== false) {
+            results[idx] = cached?.primaryZhTitle
+              ? {
+                  ...item,
+                  zh_title: cached.primaryZhTitle,
+                }
+              : item;
           }
           continue;
         }
@@ -397,15 +430,18 @@ export async function filterItemsByServerAvailability(
         );
 
         if (available) {
-          results[idx] =
-            item.is_chinese_origin && primaryZhTitle
-              ? {
-                  ...item,
-                  title: item.title !== undefined ? primaryZhTitle : undefined,
-                  name: item.name !== undefined ? primaryZhTitle : undefined,
-                  zh_title: primaryZhTitle,
-                }
-              : item;
+          results[idx] = {
+            ...item,
+            title:
+              item.is_chinese_origin && primaryZhTitle
+                ? primaryZhTitle
+                : item.title,
+            name:
+              item.is_chinese_origin && primaryZhTitle
+                ? primaryZhTitle
+                : item.name,
+            zh_title: primaryZhTitle || item.zh_title,
+          };
         }
       }
     }

@@ -44,11 +44,13 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
     score += 600;
   } else if (containsQuery) {
     score += 400;
+  } else if (item.fromZhSearch) {
+    score += 450;
   } else if (
     item.overview &&
     (item.overview.includes(q) || (cleanQ && item.overview.includes(cleanQ)))
   ) {
-    score += 100;
+    score += 150;
   }
 
   score += (Number(item.popularity) || 0) * 1.5;
@@ -76,42 +78,64 @@ export const onRequestGet: PagesFunction = async (context) => {
     const cleanQuery = query.replace(/[:：]+$/, "").trim();
     const compactQuery = query.replace(/[:：\s]+/g, "").trim();
 
-    const fetchUrls: string[] = [
-      `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=1&api_key=${apiKey}`,
-      `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=2&api_key=${apiKey}`,
-      `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=1&language=zh-CN&api_key=${apiKey}`,
-      `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=2&language=zh-CN&api_key=${apiKey}`,
+    const fetchConfigs: { url: string; isZh: boolean }[] = [
+      {
+        url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=1&api_key=${apiKey}`,
+        isZh: false,
+      },
+      {
+        url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=2&api_key=${apiKey}`,
+        isZh: false,
+      },
+      {
+        url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=1&language=zh-CN&api_key=${apiKey}`,
+        isZh: true,
+      },
+      {
+        url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=2&language=zh-CN&api_key=${apiKey}`,
+        isZh: true,
+      },
     ];
 
     if (isZhQuery) {
-      fetchUrls.push(
-        `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=3&language=zh-CN&api_key=${apiKey}`
-      );
+      fetchConfigs.push({
+        url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=3&language=zh-CN&api_key=${apiKey}`,
+        isZh: true,
+      });
     }
 
     if (cleanQuery && cleanQuery !== query) {
-      fetchUrls.push(
-        `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(cleanQuery)}&page=1&api_key=${apiKey}`,
-        `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(cleanQuery)}&page=1&language=zh-CN&api_key=${apiKey}`
+      fetchConfigs.push(
+        {
+          url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(cleanQuery)}&page=1&api_key=${apiKey}`,
+          isZh: false,
+        },
+        {
+          url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(cleanQuery)}&page=1&language=zh-CN&api_key=${apiKey}`,
+          isZh: true,
+        }
       );
     }
 
     if (compactQuery && compactQuery !== query && compactQuery !== cleanQuery) {
-      fetchUrls.push(
-        `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(compactQuery)}&page=1&language=zh-CN&api_key=${apiKey}`
-      );
+      fetchConfigs.push({
+        url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(compactQuery)}&page=1&language=zh-CN&api_key=${apiKey}`,
+        isZh: true,
+      });
     }
 
     const responses = await Promise.allSettled<any>(
-      fetchUrls.map((u) => fetch(u).then((r) => r.json()))
+      fetchConfigs.map((cfg) => fetch(cfg.url).then((r) => r.json()))
     );
 
     const zhMap = new Map<number, string>();
     const enMap = new Map<number, string>();
     const rawCandidateMap = new Map<number, any>();
 
-    for (const res of responses) {
-      if (res.status !== "fulfilled" || !Array.isArray(res.value?.results)) continue;
+    responses.forEach((res, i) => {
+      if (res.status !== "fulfilled" || !Array.isArray(res.value?.results)) return;
+      const isFromZhEndpoint = fetchConfigs[i].isZh;
+
       for (const item of res.value.results) {
         if (!item || typeof item.id !== "number") continue;
         if (item.media_type !== "movie" && item.media_type !== "tv") continue;
@@ -126,10 +150,15 @@ export const onRequestGet: PagesFunction = async (context) => {
         }
 
         if (!rawCandidateMap.has(item.id)) {
-          rawCandidateMap.set(item.id, item);
+          rawCandidateMap.set(item.id, {
+            ...item,
+            fromZhSearch: isFromZhEndpoint,
+          });
+        } else if (isFromZhEndpoint) {
+          rawCandidateMap.get(item.id).fromZhSearch = true;
         }
       }
-    }
+    });
 
     const rawResults: any[] = [];
     for (const item of rawCandidateMap.values()) {
@@ -160,7 +189,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         computeSearchRelevance(a, query, cleanQuery)
     );
 
-    const releasedCandidates = filterReleasedMedia(rawResults, 1).slice(0, 32);
+    const releasedCandidates = filterReleasedMedia(rawResults, 1).slice(0, 36);
     const verified = await filterItemsByServerAvailability(
       releasedCandidates,
       "movie",

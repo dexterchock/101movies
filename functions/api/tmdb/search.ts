@@ -3,7 +3,6 @@ import {
   filterReleasedMedia,
   getTmdbKey,
 } from "../../_shared/tmdb";
-import { filterItemsByServerAvailability } from "../../_shared/tvboxService";
 
 export const onRequestGet: PagesFunction = async (context) => {
   const url = new URL(context.request.url);
@@ -20,7 +19,7 @@ export const onRequestGet: PagesFunction = async (context) => {
     )}&api_key=${apiKey}`;
     const response = await fetch(tmdbUrl);
     const data: any = await response.json();
-    const releasedCandidates = filterReleasedMedia(
+    const results = filterReleasedMedia(
       Array.isArray(data.results)
         ? data.results.filter(
             (item: any) => item.media_type === "movie" || item.media_type === "tv"
@@ -28,12 +27,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         : [],
       1
     );
-    const verified = await filterItemsByServerAvailability(
-      releasedCandidates,
-      "movie",
-      apiKey
-    );
-    return Response.json({ ...data, results: verified });
+    return Response.json({ ...data, results });
   } catch (err: any) {
     console.error(err);
     return Response.json({ error: "Failed to fetch from TMDB" }, { status: 500 });

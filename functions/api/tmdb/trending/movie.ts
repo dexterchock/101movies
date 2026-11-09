@@ -5,7 +5,6 @@ import {
   getTmdbKey,
   tmdbListCache,
 } from "../../../_shared/tmdb";
-import { filterItemsByServerAvailability } from "../../../_shared/tvboxService";
 
 export const onRequestGet: PagesFunction = async (context) => {
   const url = new URL(context.request.url);
@@ -52,12 +51,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         }
       }
 
-      const releasedCandidates = filterReleasedMedia(combined, 1).slice(0, 28);
-      const results = await filterItemsByServerAvailability(
-        releasedCandidates,
-        "movie",
-        apiKey
-      );
+      const results = filterReleasedMedia(combined, 1).slice(0, 28);
 
       tmdbListCache.set(hkCacheKey, {
         results,

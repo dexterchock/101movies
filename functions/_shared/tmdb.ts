@@ -9,7 +9,7 @@ export function getTmdbKey(env?: Record<string, any>): string {
   if (env && typeof env.TMDB_API_KEY === "string" && env.TMDB_API_KEY.trim()) {
     return env.TMDB_API_KEY.trim();
   }
-  if (typeof process !== "undefined" && process.env?.TMDB_API_KEY) {
+  if (typeof process !== "undefined" && process.env?.TMDB_API_KEY && process.env.TMDB_API_KEY.trim()) {
     return process.env.TMDB_API_KEY.trim();
   }
   return "";
@@ -80,7 +80,7 @@ export function normalizeMediaItemTitles(item: any): any {
   };
 }
 
-export function filterReleasedMedia(items: any[], minVotes = 3): any[] {
+export function filterReleasedMedia(items: any[], minVotes = 1): any[] {
   if (!Array.isArray(items)) return [];
   const todayIso = new Date().toISOString().slice(0, 10);
   return items
@@ -103,7 +103,7 @@ export async function fetchTmdb(
   endpoint: string,
   defaultType: "movie" | "tv",
   apiKey: string,
-  minVotes = 3
+  minVotes = 1
 ): Promise<{ page: number; results: any[] }> {
   if (!apiKey) {
     console.warn("TMDB API Key not configured.");
@@ -137,18 +137,13 @@ export async function fetchTmdb(
   }
 
   const releasedCandidates = filterReleasedMedia(rawCombined, minVotes).slice(0, 28);
-  const verifiedResults = await filterItemsByServerAvailability(
-    releasedCandidates,
-    defaultType,
-    apiKey
-  );
 
   tmdbListCache.set(endpoint, {
-    results: verifiedResults,
+    results: releasedCandidates,
     expiresAt: Date.now() + 15 * 60 * 1000,
   });
 
-  return { page: 1, results: verifiedResults };
+  return { page: 1, results: releasedCandidates };
 }
 
 export async function fetchMediaDetails(

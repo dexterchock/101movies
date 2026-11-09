@@ -5,7 +5,7 @@
 <h1 align="center">101Movies</h1>
 
 <p align="center">
-  <strong>A sleek, cinematic web streaming application engineered for Smart TVs, desktop, and mobile browsers.</strong>
+  <strong>A cinematic web streaming application engineered for Smart TVs, desktop, and mobile browsers.</strong>
 </p>
 
 <p align="center">
@@ -23,92 +23,93 @@
 
 ---
 
-## 🌟 Highlights
-
-- 📺 **Smart TV First Design**: Zero-scroll locked 2x6 card viewport grid. Supports keyboard arrows, D-pad TV remotes, mouse, and touch swipe.
-- 🎬 **Real-Time Trending Feeds**: Dynamic feeds powered by TMDB for both Movies and TV Shows, categorized by genre (Action, Sci-Fi, HK, Drama, Comedy, Horror, Anime, etc.).
-- 🌐 **Intelligent Bilingual Resolution**: Automatically resolves English and Chinese (`zh-CN`) titles so media can match both Asian and Western VOD aggregators seamlessly.
-- ⚡ **Multi-Line VOD Aggregation**: High-speed concurrent probing across multiple TVBox-compatible API providers with fallback routing.
-- 🍿 **Modern Custom HLS Player**: Custom video playback engine powered by `hls.js`, with an episode selection drawer, video quality selector, full-screen mode, and keyboard shortcuts.
-- ⏱️ **Watch History & Auto-Resume**: Tracks your watch progress across movies and show episodes locally without requiring login accounts.
-- 🚀 **Cloudflare Edge Performance**: Cloudflare Pages Functions with subrequest concurrency pools and Edge Cache API (`caches.default`), serving repeat queries in under 50ms.
-- 🛡️ **Cross-Generation TV Compatibility**: Hardened with legacy JS polyfills (`@vitejs/plugin-legacy`), CSS `@layer` unwrapping, safe `scrollTo` fallbacks, and a React Error Boundary to run flawlessly on older TV browsers (Samsung Tizen, LG webOS).
-
----
-
-## 📸 Preview
+## Preview
 
 <p align="center">
-  <img src="public/og-image.png" width="800" alt="101Movies Preview Banner" />
+  <img src="public/preview.png" width="900" alt="101Movies Interface Screenshot" />
 </p>
 
 ---
 
-## 🛠️ Tech Stack
+## Features
 
-| Layer | Technology |
-|---|---|
-| **Frontend Framework** | [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) |
-| **Styling & Design** | [Tailwind CSS v4](https://tailwindcss.com/) + [Lucide Icons](https://lucide.dev/) |
-| **Media Player** | [HLS.js](https://github.com/video-dev/hls.js/) |
-| **Routing** | [React Router DOM v7](https://reactrouter.com/) |
-| **Build & Polyfills** | [Vite 6](https://vitejs.dev/) + [`@vitejs/plugin-legacy`](https://github.com/vitejs/vite/tree/main/packages/plugin-legacy) |
-| **Serverless Backend** | [Cloudflare Pages Functions](https://developers.cloudflare.com/pages/platform/functions/) |
-| **Edge Caching** | Cloudflare Cache API (`caches.default`) |
-| **Metadata API** | [The Movie Database (TMDB)](https://www.themoviedb.org/) |
+- **Smart TV Navigation**: Zero-scroll locked 2x6 card viewport grid. Operable with keyboard arrows, Smart TV remote D-pads, mouse, and touch swipe.
+- **Dynamic TMDB Feeds**: Real-time trending feeds for Movies and TV Shows, categorized by genre (Action, Sci-Fi, Hong Kong, Drama, Comedy, Horror, Anime, etc.).
+- **Bilingual Title Resolution**: Automatic translation and matching between English and Chinese (`zh-CN`) titles to maximize discovery across Asian and international VOD aggregators.
+- **Multi-Line VOD Aggregation**: Concurrent stream probing across multiple TVBox-compatible API providers with automatic line switching.
+- **Custom HLS Video Player**: Built with `hls.js`, featuring an episode drawer, stream line picker, video quality selector, full-screen playback, and keyboard controls.
+- **Watch History & Progress Resume**: Client-side watch state persistence across movies and show episodes via `localStorage` with zero account registration needed.
+- **Cloudflare Edge Middleware**: Serverless API routes on Cloudflare Pages Functions utilizing the Cache API (`caches.default`) to return sub-50ms repeat queries.
+- **Defensive TV Compatibility**: Hardened with legacy JS polyfills (`@vitejs/plugin-legacy`), CSS `@layer` unwrapping, safe `scrollTo` fallbacks, and a React Error Boundary for legacy Smart TV engines (Samsung Tizen, LG webOS).
 
 ---
 
-## 📁 Project Structure
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend Framework | [React 19](https://react.dev/) and [TypeScript](https://www.typescriptlang.org/) |
+| Styling | [Tailwind CSS v4](https://tailwindcss.com/) and [Lucide Icons](https://lucide.dev/) |
+| Media Engine | [HLS.js](https://github.com/video-dev/hls.js/) |
+| Routing | [React Router DOM v7](https://reactrouter.com/) |
+| Build Tool | [Vite 6](https://vitejs.dev/) with [`@vitejs/plugin-legacy`](https://github.com/vitejs/vite/tree/main/packages/plugin-legacy) |
+| Edge Runtime | [Cloudflare Pages Functions](https://developers.cloudflare.com/pages/platform/functions/) |
+| Caching | Cloudflare Cache API (`caches.default`) |
+| Metadata Source | [The Movie Database (TMDB)](https://www.themoviedb.org/) |
+
+---
+
+## Project Structure
 
 ```text
 101movies/
 ├── functions/                     # Cloudflare Pages Functions (Edge API)
 │   ├── _shared/
-│   │   └── tvboxService.ts        # Multi-provider VOD scraper & concurrency pool
+│   │   └── tvboxService.ts        # Multi-provider VOD scraper and concurrency pool
 │   └── api/
 │       ├── _middleware.ts         # Edge caching middleware (TTL: 1h - 24h)
 │       ├── tmdb/                  # Proxies TMDB with Chinese title batching
-│       │   ├── trending/          # Movies & TV trending endpoints
-│       │   ├── rankings/          # Yearly/genre rankings
-│       │   ├── search.ts          # Search with bilingual title enhancement
-│       │   └── details.ts         # Title & metadata resolution
-│       └── tvbox/                 # TVBox line scraping & episode extraction
-├── public/                        # Static assets & SEO files
-│   ├── favicon.svg                # Scalable 1M vector favicon
+│       │   ├── trending/          # Movies and TV trending endpoints
+│       │   ├── rankings/          # Yearly and genre rankings
+│       │   ├── search.ts          # Search with bilingual title resolution
+│       │   └── details.ts         # Title and metadata resolution
+│       └── tvbox/                 # TVBox stream scraping and episode extraction
+├── public/                        # Static assets, branding and SEO
+│   ├── favicon.svg                # 1M vector favicon
 │   ├── favicon.ico                # Multi-resolution ICO
+│   ├── preview.png                # Live application screenshot
+│   ├── og-image.png               # Social preview banner (1200x630)
 │   ├── apple-touch-icon.png       # iOS home screen icon (180x180)
 │   ├── android-chrome-192x192.png # PWA 192px icon
 │   ├── android-chrome-512x512.png # PWA 512px icon
-│   ├── og-image.png               # Social preview banner (1200x630)
-│   ├── robots.txt                 # Search engine crawler instructions
-│   ├── sitemap.xml                # SEO sitemap
+│   ├── robots.txt                 # Search engine crawler configuration
+│   ├── sitemap.xml                # XML sitemap
 │   └── site.webmanifest           # Progressive Web App manifest
 ├── src/
 │   ├── components/                # Reusable UI components
-│   │   ├── ErrorBoundary.tsx      # Crash protection for TV browsers
+│   │   ├── ErrorBoundary.tsx      # Crash protection for TV browser engines
 │   │   ├── HlsPlayer.tsx          # Custom HLS video player
-│   │   ├── Layout.tsx             # Responsive shell & capsule nav
-│   │   ├── MediaCard.tsx          # Poster card with hover/focus states
-│   │   └── TvboxModal.tsx         # Source provider & line switcher
+│   │   ├── Layout.tsx             # Responsive shell and capsule navigation
+│   │   ├── MediaCard.tsx          # Card with focus states and poster fallback
+│   │   └── TvboxModal.tsx         # Source provider and line switcher
 │   ├── pages/
-│   │   ├── Home.tsx               # Trending Movies, Shows & Watch History
-│   │   ├── Rankings.tsx           # Decade & Genre Rankings grid
-│   │   ├── Search.tsx             # Live instant search
+│   │   ├── Home.tsx               # Trending Movies, Shows and Watch History
+│   │   ├── Rankings.tsx           # Decade and Genre Rankings grid
+│   │   ├── Search.tsx             # Instant search
 │   │   └── Player.tsx             # Playback view with episode drawer
 │   ├── api.ts                     # Client-side API abstraction
-│   ├── index.css                  # Global styles & Flexbox fallbacks
-│   ├── main.tsx                   # Entry point with scrollTo polyfills
-│   ├── types.ts                   # TypeScript data definitions
-│   └── utils.ts                   # Utility functions & safeScrollTo helper
-├── index.html                     # HTML template with complete SEO meta & JSON-LD
-├── vite.config.ts                 # Vite config with legacy polyfills & CSS transforms
+│   ├── index.css                  # Global styles and Flexbox grid fallbacks
+│   ├── main.tsx                   # Application entry point with scrollTo polyfill
+│   ├── types.ts                   # TypeScript interfaces
+│   └── utils.ts                   # Helpers and safeScrollTo utility
+├── index.html                     # HTML shell with SEO metadata and JSON-LD
+├── vite.config.ts                 # Vite config with legacy polyfills and CSS transforms
 └── wrangler.jsonc                 # Cloudflare configuration
 ```
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -158,20 +159,18 @@ Open `http://localhost:5173` or `http://localhost:8788` in your browser.
 
 ---
 
-## 🚢 Deployment
+## Deployment
 
 ### Deploy to Cloudflare Pages
 
-This project is tailored for zero-config deployment on Cloudflare Pages:
-
 1. Connect your GitHub repository to Cloudflare Pages.
-2. Set the build settings:
+2. Configure build settings:
    - **Framework preset**: `None` / `Vite`
    - **Build command**: `npm run build`
    - **Build output directory**: `dist`
 3. Add the Environment Variable in your Cloudflare Pages dashboard:
    - `TMDB_READ_TOKEN`: *your TMDB API token*
-4. Deploy!
+4. Deploy.
 
 Or deploy directly via Wrangler CLI:
 
@@ -182,29 +181,29 @@ npx wrangler pages deploy dist --project-name 101movies
 
 ---
 
-## 📺 Smart TV Engineering
+## Smart TV Engineering
 
-Smart TV browsers (such as older Samsung Tizen and LG webOS models running Chromium 47–69) frequently lack modern web features or enforce strict memory/subrequest limits. This project implements several critical adaptations:
+Smart TV browsers (such as older Samsung Tizen and LG webOS models running Chromium 47–69) frequently lack modern ECMAScript features or enforce strict memory and subrequest limits. This project implements several critical adaptations:
 
-1. **JavaScript Polyfill Injection**: `@vitejs/plugin-legacy` transpiles code down to `chrome >= 60`, `safari >= 11`, and `edge >= 79`, supplying `regenerator-runtime` and `core-js` polyfills automatically.
-2. **CSS Compatibility Transform**: Custom Vite build plugins unwrap modern CSS `@layer` rules and replace modern `oklch()` color functions with universal HEX values.
-3. **Safe Horizontal Scrolling**: Legacy TV engines throw unhandled exceptions when `element.scrollTo({ left, behavior: 'smooth' })` is invoked with an options object. A global prototype polyfill and `safeScrollTo()` helper automatically fall back to `element.scrollLeft = value`.
-4. **CSS Grid Fallbacks**: Flexbox wrapping rules ensure cards remain in structured columns even if the TV engine cannot parse CSS subgrid or multi-track CSS Grid.
-5. **Subrequest Batching & Edge Caching**: Avoids Cloudflare's 50-subrequest limit by batching queries and persisting responses at the edge via Cloudflare Cache API.
+1. **JavaScript Polyfills**: `@vitejs/plugin-legacy` transpiles bundles to target `chrome >= 60`, `safari >= 11`, and `edge >= 79`, injecting `regenerator-runtime` and `core-js` polyfills automatically.
+2. **CSS Compatibility Transforms**: Vite build plugins unwrap modern CSS `@layer` rules and map `oklch()` color functions to standard HEX values.
+3. **Safe Horizontal Scrolling**: Legacy TV engines throw unhandled exceptions when `element.scrollTo({ left, behavior: 'smooth' })` is passed an options dictionary. A runtime prototype polyfill and `safeScrollTo()` helper fall back to `element.scrollLeft = value`.
+4. **Grid Fallbacks**: Flexbox wrapping rules ensure cards remain in structured columns even if the TV engine cannot parse CSS subgrid or multi-track CSS Grid.
+5. **Subrequest Batching & Edge Caching**: Avoids Cloudflare's 50-subrequest ceiling by batching queries and persisting responses at the edge via the Cloudflare Cache API.
 
 ---
 
-## ⚖️ Disclaimer
+## Disclaimer
 
-**101Movies** is an open-source educational project developed for pair-programming and web technology research.
+101Movies is an open-source educational project developed for pair-programming and web technology research.
 
-- 101Movies does **not** host, upload, or store any video files or media streams on any servers.
+- 101Movies does not host, upload, or store video files or media streams on any servers.
 - All media metadata is provided by [The Movie Database (TMDB)](https://www.themoviedb.org/).
 - All video streams and playlist URLs are indexed dynamically from third-party public API endpoints.
 - Users are responsible for complying with the copyright and intellectual property laws of their respective jurisdictions.
 
 ---
 
-## 📄 License
+## License
 
 This project is open-source under the [MIT License](LICENSE).

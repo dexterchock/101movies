@@ -3,7 +3,7 @@ import { api } from "../api";
 import { MediaItem, MediaCategoryOption } from "../types";
 import { MediaCard } from "../components/MediaCard";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { cn } from "../utils";
+import { cn, safeScrollTo } from "../utils";
 
 const MOVIE_CATEGORIES: MediaCategoryOption[] = [
   { id: "all", label: "All" },
@@ -104,11 +104,15 @@ export function Home() {
   }, []);
 
   useEffect(() => {
-    sessionStorage.setItem("trending_media_type", effectiveMediaType);
+    try {
+      sessionStorage.setItem("trending_media_type", effectiveMediaType);
+    } catch {}
   }, [effectiveMediaType]);
 
   useEffect(() => {
-    sessionStorage.setItem("home_movie_category", movieCategory);
+    try {
+      sessionStorage.setItem("home_movie_category", movieCategory);
+    } catch {}
     const cached = cachedMoviesByCat.get(movieCategory);
     if (cached) {
       setTrendingMovies(cached);
@@ -135,7 +139,9 @@ export function Home() {
   }, [movieCategory]);
 
   useEffect(() => {
-    sessionStorage.setItem("home_tv_category", tvCategory);
+    try {
+      sessionStorage.setItem("home_tv_category", tvCategory);
+    } catch {}
     const cached = cachedTVByCat.get(tvCategory);
     if (cached) {
       setTrendingTV(cached);
@@ -256,7 +262,9 @@ export function Home() {
     if (page >= totalPages && totalPages > 0) {
       const clamped = Math.max(0, totalPages - 1);
       setPage(clamped);
-      sessionStorage.setItem(storageKey, String(clamped));
+      try {
+        sessionStorage.setItem(storageKey, String(clamped));
+      } catch {}
     }
   }, [activeItems.length, totalPages, page, storageKey]);
 
@@ -275,7 +283,9 @@ export function Home() {
     if (page > 0) {
       const next = page - 1;
       setPage(next);
-      sessionStorage.setItem(storageKey, String(next));
+      try {
+        sessionStorage.setItem(storageKey, String(next));
+      } catch {}
     }
   };
 
@@ -283,7 +293,9 @@ export function Home() {
     if (page < totalPages - 1) {
       const next = page + 1;
       setPage(next);
-      sessionStorage.setItem(storageKey, String(next));
+      try {
+        sessionStorage.setItem(storageKey, String(next));
+      } catch {}
     }
   };
 
@@ -321,11 +333,7 @@ export function Home() {
         Math.min(activeCategories.length - visiblePills, activeCategoryIndex - half)
       );
       const targetScroll = startIdx * stride;
-      if (smooth) {
-        el.scrollTo({ left: targetScroll, behavior: "smooth" });
-      } else {
-        el.scrollLeft = targetScroll;
-      }
+      safeScrollTo(el, targetScroll, smooth);
       updateCatScrollButtons();
     },
     [activeCategories.length, activeCategoryIndex, updateCatScrollButtons]
@@ -347,11 +355,15 @@ export function Home() {
   const isInitialCatMountRef = useRef(true);
 
   useLayoutEffect(() => {
-    if (isInitialCatMountRef.current) {
-      isInitialCatMountRef.current = false;
-      centerCatTrack(false);
-    } else {
-      centerCatTrack(true);
+    try {
+      if (isInitialCatMountRef.current) {
+        isInitialCatMountRef.current = false;
+        centerCatTrack(false);
+      } else {
+        centerCatTrack(true);
+      }
+    } catch (err) {
+      console.warn("centerCatTrack failed in useLayoutEffect:", err);
     }
   }, [centerCatTrack]);
 
@@ -412,7 +424,7 @@ export function Home() {
         : nextIdx <= 0
           ? 0
           : nextIdx * stride;
-    el.scrollTo({ left: targetLeft, behavior: "smooth" });
+    safeScrollTo(el, targetLeft, true);
   };
 
   const displayCategories =

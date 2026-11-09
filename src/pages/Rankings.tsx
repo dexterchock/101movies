@@ -3,7 +3,7 @@ import { api } from "../api";
 import { MediaItem, MediaCategoryOption } from "../types";
 import { MediaCard } from "../components/MediaCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "../utils";
+import { cn, safeScrollTo } from "../utils";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const START_YEAR = 1970;
@@ -159,11 +159,7 @@ export function Rankings() {
           ? Math.max(0, Math.min(ALL_YEARS.length - 3, activeYearIndex - 1))
           : activeYearIndex;
       const targetScroll = startIdx * stride;
-      if (smooth) {
-        el.scrollTo({ left: targetScroll, behavior: "smooth" });
-      } else {
-        el.scrollLeft = targetScroll;
-      }
+      safeScrollTo(el, targetScroll, smooth);
       updateScrollButtons();
     },
     [activeYearIndex, updateScrollButtons]
@@ -194,11 +190,7 @@ export function Rankings() {
         Math.min(activeGenreList.length - visiblePills, activeGenreIndex - half)
       );
       const targetScroll = startIdx * stride;
-      if (smooth) {
-        el.scrollTo({ left: targetScroll, behavior: "smooth" });
-      } else {
-        el.scrollLeft = targetScroll;
-      }
+      safeScrollTo(el, targetScroll, smooth);
       updateGenreScrollButtons();
     },
     [activeGenreList.length, activeGenreIndex, updateGenreScrollButtons]
@@ -222,28 +214,38 @@ export function Rankings() {
 
   // Center the active year pill (instant on initial mount, smooth on user change)
   useLayoutEffect(() => {
-    if (isInitialYearMountRef.current) {
-      isInitialYearMountRef.current = false;
-      centerYearTrack(false);
-    } else {
-      centerYearTrack(true);
+    try {
+      if (isInitialYearMountRef.current) {
+        isInitialYearMountRef.current = false;
+        centerYearTrack(false);
+      } else {
+        centerYearTrack(true);
+      }
+    } catch (err) {
+      console.warn("centerYearTrack failed in useLayoutEffect:", err);
     }
   }, [centerYearTrack]);
 
   // Center the active genre pill (instant on initial mount, smooth on user change)
   useLayoutEffect(() => {
-    if (isInitialGenreMountRef.current) {
-      isInitialGenreMountRef.current = false;
-      centerGenreTrack(false);
-    } else {
-      centerGenreTrack(true);
+    try {
+      if (isInitialGenreMountRef.current) {
+        isInitialGenreMountRef.current = false;
+        centerGenreTrack(false);
+      } else {
+        centerGenreTrack(true);
+      }
+    } catch (err) {
+      console.warn("centerGenreTrack failed in useLayoutEffect:", err);
     }
   }, [centerGenreTrack]);
 
   useEffect(() => {
-    sessionStorage.setItem("rankings_media_type", mediaType);
-    sessionStorage.setItem("rankings_year", String(year));
-    sessionStorage.setItem("rankings_genre", validGenre);
+    try {
+      sessionStorage.setItem("rankings_media_type", mediaType);
+      sessionStorage.setItem("rankings_year", String(year));
+      sessionStorage.setItem("rankings_genre", validGenre);
+    } catch {}
 
     const key = `${mediaType}_${year}_${validGenre}`;
     if (cachedRankingsKey === key && cachedRankingsItems) {
@@ -327,7 +329,7 @@ export function Rankings() {
         : nextIdx <= 0
           ? 0
           : nextIdx * stride;
-    el.scrollTo({ left: targetLeft, behavior: "smooth" });
+    safeScrollTo(el, targetLeft, true);
   };
 
   const handleGenreMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -387,7 +389,7 @@ export function Rankings() {
         : nextIdx <= 0
           ? 0
           : nextIdx * stride;
-    el.scrollTo({ left: targetLeft, behavior: "smooth" });
+    safeScrollTo(el, targetLeft, true);
   };
 
   const itemsPerPage = colsPerRow * 2;

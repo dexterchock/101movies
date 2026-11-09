@@ -20,10 +20,12 @@ export function Layout() {
 
   useLayoutEffect(() => {
     if (!isPlayerPage) {
-      sessionStorage.setItem(
-        "last_browse_path",
-        `${location.pathname}${location.search || ""}`
-      );
+      try {
+        sessionStorage.setItem(
+          "last_browse_path",
+          `${location.pathname}${location.search || ""}`
+        );
+      } catch {}
     }
   }, [location.pathname, location.search, isPlayerPage]);
 

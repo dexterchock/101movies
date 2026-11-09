@@ -68,7 +68,13 @@ export function Search() {
   // Auto-focus input when entering empty search without scrolling container
   useEffect(() => {
     if (cachedSearchResults.length === 0) {
-      inputRef.current?.focus({ preventScroll: true });
+      try {
+        inputRef.current?.focus({ preventScroll: true });
+      } catch {
+        try {
+          inputRef.current?.focus();
+        } catch {}
+      }
     }
   }, []);
 
@@ -78,7 +84,13 @@ export function Search() {
     setQuery("");
     setResults([]);
     setPage(0);
-    inputRef.current?.focus({ preventScroll: true });
+    try {
+      inputRef.current?.focus({ preventScroll: true });
+    } catch {
+      try {
+        inputRef.current?.focus();
+      } catch {}
+    }
   };
 
   const itemsPerPage = colsPerRow * 2;

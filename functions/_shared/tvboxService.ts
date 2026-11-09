@@ -302,55 +302,63 @@ export async function filterItemsByServerAvailability(
   items: any[],
   defaultType: "movie" | "tv",
   tmdbApiKey?: string,
-  _concurrency = 4
+  concurrency = 6
 ): Promise<any[]> {
   if (!Array.isArray(items) || items.length === 0) return [];
 
-  const results: any[] = [];
+  const results: (any | null)[] = new Array(items.length).fill(null);
   // Strict Cloudflare subrequest budget: max 44 out of 50 to guarantee zero subrequest errors
   const budgetTracker = { used: 0, max: 44 };
+  let cursor = 0;
 
-  for (const item of items) {
-    if (budgetTracker.used >= budgetTracker.max) {
-      // If subrequest limit is reached, check if already in cache
-      const cached = availabilityCache.get(
-        `${item.media_type || defaultType}:${item.id}`
-      );
-      if (cached?.available) {
-        results.push(
-          item.is_chinese_origin && cached.primaryZhTitle
-            ? {
-                ...item,
-                title: item.title !== undefined ? cached.primaryZhTitle : undefined,
-                name: item.name !== undefined ? cached.primaryZhTitle : undefined,
-                zh_title: cached.primaryZhTitle,
-              }
-            : item
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    async () => {
+      while (true) {
+        const idx = cursor++;
+        if (idx >= items.length) break;
+        const item = items[idx];
+
+        if (budgetTracker.used >= budgetTracker.max) {
+          const cached = availabilityCache.get(
+            `${item.media_type || defaultType}:${item.id}`
+          );
+          if (cached?.available) {
+            results[idx] =
+              item.is_chinese_origin && cached.primaryZhTitle
+                ? {
+                    ...item,
+                    title: item.title !== undefined ? cached.primaryZhTitle : undefined,
+                    name: item.name !== undefined ? cached.primaryZhTitle : undefined,
+                    zh_title: cached.primaryZhTitle,
+                  }
+                : item;
+          }
+          continue;
+        }
+
+        const { available, primaryZhTitle } = await checkMediaHasPlayableStreams(
+          item,
+          defaultType,
+          tmdbApiKey,
+          budgetTracker
         );
-      }
-      continue;
-    }
 
-    const { available, primaryZhTitle } = await checkMediaHasPlayableStreams(
-      item,
-      defaultType,
-      tmdbApiKey,
-      budgetTracker
-    );
-
-    if (available) {
-      if (item.is_chinese_origin && primaryZhTitle) {
-        results.push({
-          ...item,
-          title: item.title !== undefined ? primaryZhTitle : undefined,
-          name: item.name !== undefined ? primaryZhTitle : undefined,
-          zh_title: primaryZhTitle,
-        });
-      } else {
-        results.push(item);
+        if (available) {
+          results[idx] =
+            item.is_chinese_origin && primaryZhTitle
+              ? {
+                  ...item,
+                  title: item.title !== undefined ? primaryZhTitle : undefined,
+                  name: item.name !== undefined ? primaryZhTitle : undefined,
+                  zh_title: primaryZhTitle,
+                }
+              : item;
+        }
       }
     }
-  }
+  );
 
-  return results;
+  await Promise.all(workers);
+  return results.filter(Boolean);
 }

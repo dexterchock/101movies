@@ -78,16 +78,21 @@ function cleanDisplayZhTitle(rawVodName?: string): string | undefined {
     .trim();
 }
 
-function estimatePillSlotWidth(src: ResolvedStreamSource): number {
+function estimatePillSlotWidth(
+  src: ResolvedStreamSource,
+  overrideQuality?: string
+): number {
   const label = `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""}`;
   let textWidth = 0;
   for (const ch of label) {
     textWidth += /[\u4e00-\u9fff]/.test(ch) ? 14.5 : 8;
   }
+  const qStr = overrideQuality || src.quality || "1080P";
+  const qWidth = qStr === "4K" || qStr === "2K" ? 22 : 36;
   const latencyStr = `${src.latencyMs}ms`;
   const latencyWidth = latencyStr.length * 7;
-  // 34px padding+border + textWidth + 8px inner gap + latencyWidth + 10px flex gap + 8px buffer
-  return Math.ceil(34 + textWidth + 8 + latencyWidth + 18);
+  // 34px padding+border + textWidth + 6px gap + qWidth + 6px gap + latencyWidth + 10px flex gap + 8px buffer
+  return Math.ceil(34 + textWidth + 6 + qWidth + 6 + latencyWidth + 18);
 }
 
 interface ServerPageGroup {
@@ -96,12 +101,13 @@ interface ServerPageGroup {
 
 function buildServerPages(
   sources: ResolvedStreamSource[],
-  availableWidth: number
+  availableWidth: number,
+  qualities: Record<string, string> = {}
 ): ServerPageGroup[] {
   if (sources.length === 0) return [];
 
   const totalWidthAll = sources.reduce(
-    (sum, s) => sum + estimatePillSlotWidth(s),
+    (sum, s) => sum + estimatePillSlotWidth(s, qualities[s.sourceId]),
     0
   );
   if (totalWidthAll <= availableWidth - 8) {
@@ -119,7 +125,7 @@ function buildServerPages(
   let currentWidth = 0;
 
   sources.forEach((src, absoluteIndex) => {
-    const w = estimatePillSlotWidth(src);
+    const w = estimatePillSlotWidth(src, qualities[src.sourceId]);
     if (
       currentItems.length > 0 &&
       (currentWidth + w > maxRowWidth || currentItems.length >= 7)
@@ -177,6 +183,7 @@ export function Player() {
 
   const [savedProgress, setSavedProgress] = useState<WatchProgress | null>(null);
   const [initialSeekTime, setInitialSeekTime] = useState<number>(0);
+  const [detectedQualities, setDetectedQualities] = useState<Record<string, string>>({});
   const lastSaveTimeRef = useRef<number>(0);
   const currentVideoTimeRef = useRef<number>(0);
 
@@ -187,6 +194,41 @@ export function Player() {
   );
 
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Fast background probe of first few stream manifests for explicit RESOLUTION tags
+  useEffect(() => {
+    if (!sources || sources.length === 0) return;
+    const ac = new AbortController();
+
+    sources.slice(0, 6).forEach(async (src) => {
+      if (src.quality === "4K") return;
+      const firstEp = src.episodes?.[0]?.url;
+      if (!firstEp || !firstEp.includes(".m3u8")) return;
+
+      try {
+        const res = await fetch(firstEp, {
+          signal: AbortSignal.timeout(2200),
+        });
+        if (!res.ok) return;
+        const text = await res.text();
+        const resMatch = text.match(/RESOLUTION=(\d+)x(\d+)/i);
+        if (resMatch) {
+          const w = parseInt(resMatch[1], 10);
+          const h = parseInt(resMatch[2], 10);
+          let q = "1080P";
+          if (w >= 3800 || h >= 2000) q = "4K";
+          else if (w >= 2400 || h >= 1400) q = "2K";
+          else if (w >= 1800 || h >= 800) q = "1080P";
+          else if (w >= 1200 || h >= 600) q = "720P";
+          setDetectedQualities((prev) => ({ ...prev, [src.sourceId]: q }));
+        }
+      } catch {
+        // Silently fallback to metadata quality tag
+      }
+    });
+
+    return () => ac.abort();
+  }, [sources]);
 
   useEffect(() => {
     const el = serverBarRef.current;
@@ -212,7 +254,7 @@ export function Player() {
     }
   }, [details, resolving, sources.length, savedProgress, isPlaying]);
 
-  const serverPages = buildServerPages(sources, serverBarWidth);
+  const serverPages = buildServerPages(sources, serverBarWidth, detectedQualities);
   const totalServerPages = serverPages.length;
 
   useEffect(() => {
@@ -709,6 +751,14 @@ export function Player() {
             initialTime={initialSeekTime}
             onTimeUpdate={handleTimeUpdate}
             onError={handleStreamError}
+            onQualityDetected={(q) => {
+              if (activeServer) {
+                setDetectedQualities((prev) => ({
+                  ...prev,
+                  [activeServer.sourceId]: q,
+                }));
+              }
+            }}
           />
         </div>
       ) : (
@@ -825,6 +875,8 @@ export function Player() {
                 {visiblePageItems.map(({ src, absoluteIndex }) => {
                   const isSelected = isPlaying && activeServerIndex === absoluteIndex;
                   const isHighPing = src.latencyMs >= HIGH_PING_THRESHOLD_MS;
+                  const effectiveQuality =
+                    detectedQualities[src.sourceId] || src.quality || "1080P";
 
                   return (
                     <button
@@ -854,14 +906,32 @@ export function Player() {
                       )}
                       title={
                         isHighPing
-                          ? `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""} (${src.latencyMs}ms - High Ping)`
-                          : `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""} (${src.latencyMs}ms)`
+                          ? `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""} (${effectiveQuality} · ${src.latencyMs}ms - High Ping)`
+                          : `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""} (${effectiveQuality} · ${src.latencyMs}ms)`
                       }
                     >
                       <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
                         <span>
                           {src.sourceName}
                           {src.audioLang ? ` · ${src.audioLang}` : ""}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded leading-none tabular-nums tracking-wide shrink-0",
+                            effectiveQuality === "4K"
+                              ? isSelected
+                                ? "bg-black text-amber-300 border border-amber-400/40"
+                                : "bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
+                              : effectiveQuality === "2K"
+                              ? isSelected
+                                ? "bg-black text-sky-300 border border-sky-400/40"
+                                : "bg-sky-400/20 text-sky-300 border border-sky-400/35"
+                              : isSelected
+                              ? "bg-black/15 text-black/80 border border-black/10"
+                              : "bg-white/[0.08] text-white/70 border border-white/10"
+                          )}
+                        >
+                          {effectiveQuality}
                         </span>
                         <span
                           className={cn(

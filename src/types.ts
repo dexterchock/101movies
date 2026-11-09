@@ -98,6 +98,7 @@ export interface ResolvedStreamSource {
   vodRemarks?: string;
   vodPic?: string;
   latencyMs: number;
+  quality?: '4K' | '2K' | '1080P' | 'HD' | 'CAM' | string;
   playGroups: VodPlayGroup[];
   episodes: VodEpisode[];
   seasons?: VodSeasonGroup[];

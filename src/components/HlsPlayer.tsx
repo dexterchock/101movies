@@ -6,6 +6,7 @@ interface HlsPlayerProps {
   initialTime?: number;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: () => void;
+  onQualityDetected?: (quality: string) => void;
 }
 
 export function HlsPlayer({
@@ -13,15 +14,21 @@ export function HlsPlayer({
   initialTime = 0,
   onTimeUpdate,
   onError,
+  onQualityDetected,
 }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [useProxy, setUseProxy] = useState(false);
   const pendingSeekRef = useRef<number>(initialTime);
   const onTimeUpdateRef = useRef(onTimeUpdate);
+  const onQualityDetectedRef = useRef(onQualityDetected);
 
   useEffect(() => {
     onTimeUpdateRef.current = onTimeUpdate;
   }, [onTimeUpdate]);
+
+  useEffect(() => {
+    onQualityDetectedRef.current = onQualityDetected;
+  }, [onQualityDetected]);
 
   useEffect(() => {
     pendingSeekRef.current = initialTime;
@@ -59,13 +66,32 @@ export function HlsPlayer({
       video.play().catch(() => {});
     };
 
+    const checkResolution = (w: number, h: number) => {
+      if (w <= 0 && h <= 0) return;
+      if (w >= 3800 || h >= 2000) onQualityDetectedRef.current?.("4K");
+      else if (w >= 2400 || h >= 1400) onQualityDetectedRef.current?.("2K");
+      else if (w >= 1800 || h >= 800) onQualityDetectedRef.current?.("1080P");
+      else if (w >= 1200 || h >= 600) onQualityDetectedRef.current?.("720P");
+      else onQualityDetectedRef.current?.("SD");
+    };
+
+    const handleVideoDims = () => {
+      checkResolution(video.videoWidth, video.videoHeight);
+    };
+
+    video.addEventListener("loadedmetadata", handleVideoDims);
+    video.addEventListener("resize", handleVideoDims);
+
     if (isMp4) {
       video.src = effectiveSrc;
       const handleLoaded = () => {
         applyInitialSeekAndPlay();
+        handleVideoDims();
       };
       video.addEventListener("loadedmetadata", handleLoaded, { once: true });
       return () => {
+        video.removeEventListener("loadedmetadata", handleVideoDims);
+        video.removeEventListener("resize", handleVideoDims);
         video.removeEventListener("loadedmetadata", handleLoaded);
       };
     }
@@ -77,8 +103,13 @@ export function HlsPlayer({
       });
       hls.loadSource(effectiveSrc);
       hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         applyInitialSeekAndPlay();
+        if (Array.isArray(data.levels) && data.levels.length > 0) {
+          const maxW = Math.max(...data.levels.map((l) => l.width || 0));
+          const maxH = Math.max(...data.levels.map((l) => l.height || 0));
+          checkResolution(maxW, maxH);
+        }
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -98,16 +129,21 @@ export function HlsPlayer({
       video.src = effectiveSrc;
       const handleNativeLoaded = () => {
         applyInitialSeekAndPlay();
+        handleVideoDims();
       };
       video.addEventListener("loadedmetadata", handleNativeLoaded, {
         once: true,
       });
       return () => {
+        video.removeEventListener("loadedmetadata", handleVideoDims);
+        video.removeEventListener("resize", handleVideoDims);
         video.removeEventListener("loadedmetadata", handleNativeLoaded);
       };
     }
 
     return () => {
+      video.removeEventListener("loadedmetadata", handleVideoDims);
+      video.removeEventListener("resize", handleVideoDims);
       if (hls) {
         hls.destroy();
       }

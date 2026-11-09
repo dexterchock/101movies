@@ -565,6 +565,21 @@ export function extractAudioLangFromText(
   return undefined;
 }
 
+export function detectSourceQuality(
+  vodRemarks = "",
+  vodName = "",
+  firstEpName = "",
+  groupName = ""
+): "4K" | "2K" | "1080P" | "HD" | "CAM" {
+  const combined = `${vodRemarks} ${vodName} ${firstEpName} ${groupName}`.toLowerCase();
+  if (/(?:4k|2160p|uhd|4k超清|4k原画|4k高码)/i.test(combined)) return "4K";
+  if (/(?:2k|1440p|qhd)/i.test(combined)) return "2K";
+  if (/(?:1080p|fhd|蓝光|bd|1080高清)/i.test(combined)) return "1080P";
+  if (/(?:tc|ts|cam|抢先)/i.test(combined)) return "CAM";
+  if (/(?:720p|hd|超清|高清)/i.test(combined)) return "1080P";
+  return "1080P";
+}
+
 function stripLanguageAndStatusTags(input: string): string {
   let clean = input.trim();
   // Strip bracketed tags like [美剧], (粤语), (国语版), 【更新至16集】
@@ -941,6 +956,13 @@ async function searchSingleVodSite(
           episodes: sc.episodes,
         }));
 
+        const tvQuality = detectSourceQuality(
+          primaryCand.item.vod_remarks,
+          primaryCand.item.vod_name,
+          primaryCand.episodes[0]?.name,
+          primaryCand.playGroups[0]?.groupName
+        );
+
         return {
           sourceId,
           sourceName: site.name,
@@ -958,6 +980,7 @@ async function searchSingleVodSite(
             ? String(primaryCand.item.vod_pic)
             : undefined,
           latencyMs,
+          quality: tvQuality,
           playGroups: primaryCand.playGroups,
           episodes: primaryCand.episodes,
           seasons,
@@ -966,6 +989,13 @@ async function searchSingleVodSite(
 
       const sorted = [...cands].sort((a, b) => b.score - a.score);
       const bestCandidate = sorted[0];
+
+      const movieQuality = detectSourceQuality(
+        bestCandidate.item.vod_remarks,
+        bestCandidate.item.vod_name,
+        bestCandidate.episodes[0]?.name,
+        bestCandidate.playGroups[0]?.groupName
+      );
 
       return {
         sourceId,
@@ -984,6 +1014,7 @@ async function searchSingleVodSite(
           ? String(bestCandidate.item.vod_pic)
           : undefined,
         latencyMs,
+        quality: movieQuality,
         playGroups: bestCandidate.playGroups,
         episodes: bestCandidate.episodes,
       };

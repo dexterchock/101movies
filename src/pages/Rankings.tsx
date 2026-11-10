@@ -1,6 +1,11 @@
 import React, { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
 import { api } from "../api";
-import { MediaItem, MediaCategoryOption } from "../types";
+import {
+  MediaItem,
+  MediaCategoryOption,
+  MEDIA_CATEGORIES,
+  normalizeCategoryId,
+} from "../types";
 import { MediaCard } from "../components/MediaCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn, safeScrollTo } from "../utils";
@@ -17,28 +22,8 @@ const MEDIA_TYPES: { id: "movie" | "tv"; label: string }[] = [
   { id: "tv", label: "Shows" },
 ];
 
-const MOVIE_CATEGORIES: MediaCategoryOption[] = [
-  { id: "all", label: "All" },
-  { id: "28", label: "Action" },
-  { id: "878", label: "Sci-Fi" },
-  { id: "35", label: "Comedy" },
-  { id: "18", label: "Drama" },
-  { id: "53", label: "Thriller" },
-  { id: "16", label: "Animation" },
-  { id: "27", label: "Horror" },
-  { id: "12", label: "Adventure" },
-];
-
-const TV_CATEGORIES: MediaCategoryOption[] = [
-  { id: "all", label: "All" },
-  { id: "18", label: "Drama" },
-  { id: "10765", label: "Sci-Fi" },
-  { id: "10759", label: "Action" },
-  { id: "35", label: "Comedy" },
-  { id: "80", label: "Crime" },
-  { id: "9648", label: "Mystery" },
-  { id: "16", label: "Animation" },
-];
+const MOVIE_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
+const TV_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
 
 const YEAR_PILL_WIDTH_DESKTOP = 64;
 const YEAR_PILL_WIDTH_MOBILE = 54;
@@ -68,7 +53,7 @@ export function Rankings() {
     return saved === "tv" ? "tv" : "movie";
   });
   const [genre, setGenre] = useState<string>(() => {
-    return sessionStorage.getItem("rankings_genre") || "all";
+    return normalizeCategoryId(sessionStorage.getItem("rankings_genre")) || "all";
   });
   const [year, setYear] = useState<number>(() => {
     const saved = sessionStorage.getItem("rankings_year");

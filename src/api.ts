@@ -4,12 +4,16 @@ import {
   TvboxConfigItem,
   VodSite,
   VodResolveResponse,
+  resolveGenreId,
 } from "./types";
 
 export const api = {
   getTrendingMovies: async (genre?: string): Promise<MediaItem[]> => {
+    const resolved = resolveGenreId("movie", genre);
     const query =
-      genre && genre !== "all" ? `?genre=${encodeURIComponent(genre)}` : "";
+      resolved && resolved !== "all"
+        ? `?genre=${encodeURIComponent(resolved)}`
+        : "";
     const res = await fetch(`/api/tmdb/trending/movie${query}`);
     const data: any = await res.json();
     return (data.results || []).map((item: MediaItem) => ({
@@ -18,8 +22,11 @@ export const api = {
     }));
   },
   getTrendingTV: async (genre?: string): Promise<MediaItem[]> => {
+    const resolved = resolveGenreId("tv", genre);
     const query =
-      genre && genre !== "all" ? `?genre=${encodeURIComponent(genre)}` : "";
+      resolved && resolved !== "all"
+        ? `?genre=${encodeURIComponent(resolved)}`
+        : "";
     const res = await fetch(`/api/tmdb/trending/tv${query}`);
     const data: any = await res.json();
     return (data.results || []).map((item: MediaItem) => ({
@@ -42,8 +49,11 @@ export const api = {
     year: number,
     genre?: string
   ): Promise<MediaItem[]> => {
+    const resolved = resolveGenreId(type, genre);
     const genreQuery =
-      genre && genre !== "all" ? `&genre=${encodeURIComponent(genre)}` : "";
+      resolved && resolved !== "all"
+        ? `&genre=${encodeURIComponent(resolved)}`
+        : "";
     const res = await fetch(`/api/tmdb/discover/${type}?year=${year}${genreQuery}`);
     const data: any = await res.json();
     return data.results || [];

@@ -262,3 +262,48 @@ export async function fetchMediaDetails(
     cast,
   };
 }
+
+export function resolveTmdbGenre(type: "movie" | "tv", genre?: string): string {
+  if (!genre || genre === "all") return "";
+  const g = genre.toLowerCase().trim();
+  switch (g) {
+    case "action":
+    case "28":
+    case "10759":
+      return type === "tv" ? "10759" : "28";
+    case "scifi":
+    case "sci-fi":
+    case "878":
+    case "10765":
+      return type === "tv" ? "10765" : "878";
+    case "comedy":
+    case "35":
+      return "35";
+    case "drama":
+    case "18":
+      return "18";
+    case "animation":
+    case "16":
+      return "16";
+    case "thriller":
+    case "53":
+      return type === "tv" ? "80,9648" : "53";
+    case "crime":
+    case "80":
+      return "80";
+    case "mystery":
+    case "9648":
+      return "9648";
+    case "horror":
+    case "27":
+      return type === "tv" ? "9648" : "27";
+    case "romance":
+    case "10749":
+      return type === "tv" ? "18" : "10749";
+    case "adventure":
+    case "12":
+      return type === "tv" ? "10759" : "12";
+    default:
+      return genre;
+  }
+}

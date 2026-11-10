@@ -22,6 +22,51 @@ function hasChineseChars(str: string): boolean {
   return /[\u4e00-\u9fff]/.test(str);
 }
 
+function resolveTmdbGenre(type: "movie" | "tv", genre?: string): string {
+  if (!genre || genre === "all") return "";
+  const g = genre.toLowerCase().trim();
+  switch (g) {
+    case "action":
+    case "28":
+    case "10759":
+      return type === "tv" ? "10759" : "28";
+    case "scifi":
+    case "sci-fi":
+    case "878":
+    case "10765":
+      return type === "tv" ? "10765" : "878";
+    case "comedy":
+    case "35":
+      return "35";
+    case "drama":
+    case "18":
+      return "18";
+    case "animation":
+    case "16":
+      return "16";
+    case "thriller":
+    case "53":
+      return type === "tv" ? "80,9648" : "53";
+    case "crime":
+    case "80":
+      return "80";
+    case "mystery":
+    case "9648":
+      return "9648";
+    case "horror":
+    case "27":
+      return type === "tv" ? "9648" : "27";
+    case "romance":
+    case "10749":
+      return type === "tv" ? "18" : "10749";
+    case "adventure":
+    case "12":
+      return type === "tv" ? "10759" : "12";
+    default:
+      return genre;
+  }
+}
+
 function isChineseOriginItem(item: any): boolean {
   if (!item) return false;
   const origLang = String(item.original_language || "").toLowerCase().trim();
@@ -214,8 +259,9 @@ async function startServer() {
       }
     }
     if (genre && genre !== "all") {
+      const resolvedGenre = resolveTmdbGenre("movie", genre);
       fetchTmdb(
-        `/discover/movie?sort_by=popularity.desc&vote_count.gte=10&with_genres=${encodeURIComponent(genre)}`,
+        `/discover/movie?sort_by=popularity.desc&vote_count.gte=10&with_genres=${encodeURIComponent(resolvedGenre)}`,
         res,
         "movie"
       );
@@ -273,8 +319,9 @@ async function startServer() {
       }
     }
     if (genre && genre !== "all") {
+      const resolvedGenre = resolveTmdbGenre("tv", genre);
       fetchTmdb(
-        `/discover/tv?sort_by=popularity.desc&vote_count.gte=10&with_genres=${encodeURIComponent(genre)}`,
+        `/discover/tv?sort_by=popularity.desc&vote_count.gte=10&with_genres=${encodeURIComponent(resolvedGenre)}`,
         res,
         "tv"
       );
@@ -574,8 +621,13 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
       type === "tv"
         ? `first_air_date_year=${year}`
         : `primary_release_year=${year}`;
-    const genreParam =
-      genre && genre !== "all" ? `&with_genres=${encodeURIComponent(genre)}` : "";
+    let genreParam = "";
+    if (genre.toLowerCase() === "hk") {
+      genreParam = "&with_origin_country=HK";
+    } else if (genre && genre !== "all") {
+      const resolvedGenre = resolveTmdbGenre(type, genre);
+      genreParam = `&with_genres=${encodeURIComponent(resolvedGenre)}`;
+    }
     fetchTmdb(
       `/discover/${type}?sort_by=popularity.desc&vote_count.gte=10&${yearParam}${genreParam}`,
       res,

@@ -1,34 +1,17 @@
 import React, { useEffect, useLayoutEffect, useState, useRef, useCallback } from "react";
 import { api } from "../api";
-import { MediaItem, MediaCategoryOption } from "../types";
+import {
+  MediaItem,
+  MediaCategoryOption,
+  MEDIA_CATEGORIES,
+  normalizeCategoryId,
+} from "../types";
 import { MediaCard } from "../components/MediaCard";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn, safeScrollTo } from "../utils";
 
-const MOVIE_CATEGORIES: MediaCategoryOption[] = [
-  { id: "all", label: "All" },
-  { id: "hk", label: "HK" },
-  { id: "28", label: "Action" },
-  { id: "878", label: "Sci-Fi" },
-  { id: "35", label: "Comedy" },
-  { id: "18", label: "Drama" },
-  { id: "53", label: "Thriller" },
-  { id: "16", label: "Animation" },
-  { id: "27", label: "Horror" },
-  { id: "10749", label: "Romance" },
-];
-
-const TV_CATEGORIES: MediaCategoryOption[] = [
-  { id: "all", label: "All" },
-  { id: "hk", label: "HK" },
-  { id: "18", label: "Drama" },
-  { id: "10765", label: "Sci-Fi" },
-  { id: "10759", label: "Action" },
-  { id: "35", label: "Comedy" },
-  { id: "16", label: "Animation" },
-  { id: "80", label: "Crime" },
-  { id: "9648", label: "Mystery" },
-];
+const MOVIE_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
+const TV_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
 
 const CATEGORY_PILL_WIDTH_DESKTOP = 84;
 const CATEGORY_PILL_WIDTH_MOBILE = 72;
@@ -77,10 +60,10 @@ export function Home() {
   }, [effectiveMediaType, mediaType]);
 
   const [movieCategory, setMovieCategory] = useState<string>(() => {
-    return sessionStorage.getItem("home_movie_category") || "all";
+    return normalizeCategoryId(sessionStorage.getItem("home_movie_category")) || "all";
   });
   const [tvCategory, setTvCategory] = useState<string>(() => {
-    return sessionStorage.getItem("home_tv_category") || "all";
+    return normalizeCategoryId(sessionStorage.getItem("home_tv_category")) || "all";
   });
 
   const [trendingMovies, setTrendingMovies] = useState<MediaItem[]>(

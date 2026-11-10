@@ -3,6 +3,84 @@ export interface MediaCategoryOption {
   label: string;
 }
 
+export const MEDIA_CATEGORIES: MediaCategoryOption[] = [
+  { id: "all", label: "All" },
+  { id: "hk", label: "HK" },
+  { id: "action", label: "Action" },
+  { id: "scifi", label: "Sci-Fi" },
+  { id: "comedy", label: "Comedy" },
+  { id: "drama", label: "Drama" },
+  { id: "animation", label: "Animation" },
+  { id: "thriller", label: "Thriller" },
+  { id: "crime", label: "Crime" },
+  { id: "mystery", label: "Mystery" },
+  { id: "horror", label: "Horror" },
+  { id: "romance", label: "Romance" },
+];
+
+export function resolveGenreId(type: "movie" | "tv", genre?: string): string {
+  if (!genre || genre === "all") return "";
+  const g = genre.toLowerCase().trim();
+  switch (g) {
+    case "action":
+    case "28":
+    case "10759":
+      return type === "tv" ? "10759" : "28";
+    case "scifi":
+    case "sci-fi":
+    case "878":
+    case "10765":
+      return type === "tv" ? "10765" : "878";
+    case "comedy":
+    case "35":
+      return "35";
+    case "drama":
+    case "18":
+      return "18";
+    case "animation":
+    case "16":
+      return "16";
+    case "thriller":
+    case "53":
+      return type === "tv" ? "80,9648" : "53";
+    case "crime":
+    case "80":
+      return "80";
+    case "mystery":
+    case "9648":
+      return "9648";
+    case "horror":
+    case "27":
+      return type === "tv" ? "9648" : "27";
+    case "romance":
+    case "10749":
+      return type === "tv" ? "18" : "10749";
+    case "adventure":
+    case "12":
+      return type === "tv" ? "10759" : "12";
+    default:
+      return genre;
+  }
+}
+
+export function normalizeCategoryId(cat?: string | null): string {
+  if (!cat || cat === "all") return "all";
+  const g = cat.toLowerCase().trim();
+  if (g === "hk") return "hk";
+  if (g === "28" || g === "10759" || g === "action") return "action";
+  if (g === "878" || g === "10765" || g === "scifi" || g === "sci-fi") return "scifi";
+  if (g === "35" || g === "comedy") return "comedy";
+  if (g === "18" || g === "drama") return "drama";
+  if (g === "16" || g === "animation") return "animation";
+  if (g === "53" || g === "thriller") return "thriller";
+  if (g === "80" || g === "crime") return "crime";
+  if (g === "9648" || g === "mystery") return "mystery";
+  if (g === "27" || g === "horror") return "horror";
+  if (g === "10749" || g === "romance") return "romance";
+  if (g === "12" || g === "adventure") return "action";
+  return cat;
+}
+
 export interface WatchProgress {
   sourceId?: string;
   seasonNumber?: number;

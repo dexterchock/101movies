@@ -1,4 +1,4 @@
-import { fetchTmdb, getTmdbKey } from "../../../_shared/tmdb";
+import { fetchTmdb, getTmdbKey, resolveTmdbGenre } from "../../../_shared/tmdb";
 
 export const onRequestGet: PagesFunction = async (context) => {
   const typeParam = String(context.params.type || "");
@@ -12,8 +12,14 @@ export const onRequestGet: PagesFunction = async (context) => {
     type === "tv"
       ? `first_air_date_year=${encodeURIComponent(year)}`
       : `primary_release_year=${encodeURIComponent(year)}`;
-  const genreParam =
-    genre && genre !== "all" ? `&with_genres=${encodeURIComponent(genre)}` : "";
+
+  let genreParam = "";
+  if (genre.toLowerCase() === "hk") {
+    genreParam = "&with_origin_country=HK";
+  } else if (genre && genre !== "all") {
+    const resolvedGenre = resolveTmdbGenre(type, genre);
+    genreParam = `&with_genres=${encodeURIComponent(resolvedGenre)}`;
+  }
 
   try {
     const data = await fetchTmdb(

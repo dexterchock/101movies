@@ -3,6 +3,7 @@ import {
   fetchTmdb,
   filterReleasedMedia,
   getTmdbKey,
+  resolveTmdbGenre,
   tmdbListCache,
 } from "../../../_shared/tmdb";
 import { filterItemsByServerAvailability } from "../../../_shared/tvboxService";
@@ -82,9 +83,10 @@ export const onRequestGet: PagesFunction = async (context) => {
   try {
     let data;
     if (genre && genre !== "all") {
+      const resolvedGenre = resolveTmdbGenre("tv", genre);
       data = await fetchTmdb(
         `/discover/tv?sort_by=popularity.desc&vote_count.gte=10&with_genres=${encodeURIComponent(
-          genre
+          resolvedGenre
         )}`,
         "tv",
         apiKey

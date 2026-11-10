@@ -158,7 +158,7 @@ export function Search() {
         <div className="flex-1 lg:flex-none lg:w-[440px] xl:w-[524px] lg:absolute lg:left-1/2 lg:-translate-x-1/2 h-[38px] sm:h-[46px]">
           <div className="relative flex items-center w-full h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] focus-within:border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300">
             <SearchIcon
-              className="absolute left-3.5 sm:left-4 text-white/50 pointer-events-none w-4 h-4 sm:w-[18px] sm:h-[18px]"
+              className="absolute left-3.5 sm:left-4 text-white opacity-50 pointer-events-none w-4 h-4 sm:w-[18px] sm:h-[18px]"
             />
             <input
               ref={inputRef}

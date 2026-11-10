@@ -150,6 +150,111 @@ export function HlsPlayer({
     };
   }, [src, useProxy]);
 
+  // Auto-release focus so Chromium/Edge native controls auto-hide cleanly in fullscreen and on idle
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const releaseFocus = () => {
+      try {
+        const active = document.activeElement;
+        if (active && active instanceof HTMLElement) {
+          if (active === video || video.contains(active)) {
+            active.blur();
+          }
+        }
+        video.blur();
+      } catch {}
+    };
+
+    const handlePointerMove = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        releaseFocus();
+      }, 2500);
+    };
+
+    const handlePointerLeave = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      releaseFocus();
+    };
+
+    const handleFullscreenChange = () => {
+      // Releasing focus after entering/exiting fullscreen allows native controls to auto-hide
+      setTimeout(releaseFocus, 100);
+      setTimeout(releaseFocus, 400);
+    };
+
+    const handlePointerDown = () => {
+      setTimeout(releaseFocus, 150);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (!video) return;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (video.paused) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        video.currentTime = Math.max(0, video.currentTime - 10);
+      } else if (e.code === "KeyF") {
+        e.preventDefault();
+        if (!document.fullscreenElement) {
+          if (video.requestFullscreen) {
+            video.requestFullscreen().catch(() => {});
+          } else if ((video as any).webkitRequestFullscreen) {
+            (video as any).webkitRequestFullscreen();
+          }
+        } else {
+          if (document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          } else if ((document as any).webkitExitFullscreen) {
+            (document as any).webkitExitFullscreen();
+          }
+        }
+      } else if (e.code === "KeyM") {
+        e.preventDefault();
+        video.muted = !video.muted;
+      }
+    };
+
+    video.addEventListener("pointermove", handlePointerMove);
+    video.addEventListener("pointerleave", handlePointerLeave);
+    video.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      video.removeEventListener("pointermove", handlePointerMove);
+      video.removeEventListener("pointerleave", handlePointerLeave);
+      video.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   return (
     <video
       ref={videoRef}
@@ -163,7 +268,6 @@ export function HlsPlayer({
         }
       }}
       className="w-full h-full object-contain bg-black outline-none focus:outline-none"
-      tabIndex={0}
     />
   );
 }

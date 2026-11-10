@@ -514,7 +514,7 @@ export function Home() {
                 "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollCatLeft
                   ? "hover:bg-white/15 cursor-pointer text-white"
-                  : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+                  : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
               )}
             >
               <ChevronLeft
@@ -522,7 +522,7 @@ export function Home() {
                   "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
                   canScrollCatLeft
                     ? "group-hover:scale-110 text-white"
-                    : "text-white/25"
+                    : "text-white opacity-25"
                 )}
               />
             </button>
@@ -588,7 +588,7 @@ export function Home() {
                 "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollCatRight
                   ? "hover:bg-white/15 cursor-pointer text-white"
-                  : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+                  : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
               )}
             >
               <ChevronRight
@@ -596,7 +596,7 @@ export function Home() {
                   "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
                   canScrollCatRight
                     ? "group-hover:scale-110 text-white"
-                    : "text-white/25"
+                    : "text-white opacity-25"
                 )}
               />
             </button>
@@ -608,10 +608,10 @@ export function Home() {
           {effectiveMediaType === "history" && (
             <button
               onClick={handleClearHistory}
-              className="group relative mr-1 flex items-center justify-center h-[38px] sm:h-[46px] px-3 sm:px-4 text-xs sm:text-sm font-medium text-red-400/85 hover:text-red-300 rounded-full bg-red-500/[0.08] hover:bg-red-500/18 border border-red-500/25 hover:border-red-500/40 shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+              className="group relative mr-1 flex items-center justify-center h-[38px] sm:h-[46px] px-3 sm:px-4 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 rounded-full bg-red-500/[0.08] hover:bg-red-500/18 border border-red-500/25 hover:border-red-500/40 shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
               title="Clear History"
             >
-              <div className="relative z-10 flex items-center gap-1.5">
+              <div className="relative z-10 flex items-center gap-1.5 opacity-85 group-hover:opacity-100 transition-opacity duration-300">
                 <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2]" />
                 <span>Clear</span>
               </div>
@@ -624,14 +624,14 @@ export function Home() {
               "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showLeft
                 ? "hover:bg-white/15 cursor-pointer text-white"
-                : "text-white/25 cursor-not-allowed pointer-events-none"
+                : "text-white opacity-25 cursor-not-allowed pointer-events-none"
             )}
             aria-label="Previous page"
           >
             <ChevronLeft
               className={cn(
                 "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
-                showLeft ? "group-hover:scale-110 text-white" : "text-white/25"
+                showLeft ? "group-hover:scale-110 text-white" : "text-white opacity-25"
               )}
             />
           </button>
@@ -642,14 +642,14 @@ export function Home() {
               "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showRight
                 ? "hover:bg-white/15 cursor-pointer text-white"
-                : "text-white/25 cursor-not-allowed pointer-events-none"
+                : "text-white opacity-25 cursor-not-allowed pointer-events-none"
             )}
             aria-label="Next page"
           >
             <ChevronRight
               className={cn(
                 "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
-                showRight ? "group-hover:scale-110 text-white" : "text-white/25"
+                showRight ? "group-hover:scale-110 text-white" : "text-white opacity-25"
               )}
             />
           </button>

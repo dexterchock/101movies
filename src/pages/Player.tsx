@@ -403,14 +403,14 @@ export function Player() {
             type="button"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={handleBack}
-            className="group relative flex items-center gap-2 px-4 h-[46px] rounded-full text-white/90 hover:text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+            className="group relative flex items-center gap-2 px-4 h-[46px] rounded-full text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
             aria-label="Go back"
           >
             <span
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
             />
-            <span className="relative z-10 flex items-center gap-2 transition-transform duration-300 group-hover:scale-105">
+            <span className="relative z-10 flex items-center gap-2 opacity-90 group-hover:opacity-100 transition-all duration-300 group-hover:scale-105">
               <ArrowLeft size={19} />
               <span className="font-medium text-sm">Back</span>
             </span>
@@ -729,14 +729,14 @@ export function Player() {
           type="button"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={handleBack}
-          className="group relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 h-[38px] sm:h-[46px] rounded-full text-white/90 hover:text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+          className="group relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 h-[38px] sm:h-[46px] rounded-full text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
           aria-label="Go back"
         >
           <span
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
           />
-          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 transition-transform duration-300 group-hover:scale-105">
+          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 opacity-90 group-hover:opacity-100 transition-all duration-300 group-hover:scale-105">
             <ArrowLeft className="w-4 h-4 sm:w-[19px] sm:h-[19px]" />
             <span className="font-medium text-xs sm:text-sm">Back</span>
           </span>
@@ -963,7 +963,7 @@ export function Player() {
                       "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
                       showServerPrev
                         ? "hover:bg-white/15 cursor-pointer text-white"
-                        : "text-white/25 cursor-not-allowed pointer-events-none"
+                        : "text-white opacity-25 cursor-not-allowed pointer-events-none"
                     )}
                     aria-label="Previous servers"
                   >
@@ -972,7 +972,7 @@ export function Player() {
                         "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
                         showServerPrev
                           ? "group-hover:scale-110 text-white"
-                          : "text-white/25"
+                          : "text-white opacity-25"
                       )}
                     />
                   </button>
@@ -986,7 +986,7 @@ export function Player() {
                       "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
                       showServerNext
                         ? "hover:bg-white/15 cursor-pointer text-white"
-                        : "text-white/25 cursor-not-allowed pointer-events-none"
+                        : "text-white opacity-25 cursor-not-allowed pointer-events-none"
                     )}
                     aria-label="Next servers"
                   >
@@ -995,7 +995,7 @@ export function Player() {
                         "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
                         showServerNext
                           ? "group-hover:scale-110 text-white"
-                          : "text-white/25"
+                          : "text-white opacity-25"
                       )}
                     />
                   </button>
@@ -1068,12 +1068,12 @@ export function Player() {
                     <button
                       type="button"
                       onClick={() => setIsEpisodePopoverOpen(false)}
-                      className="group flex items-center justify-center w-7 h-7 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      className="group flex items-center justify-center w-7 h-7 rounded-full text-white hover:bg-white/10 transition-colors cursor-pointer"
                       aria-label="Close episodes"
                     >
                       <X
                         size={15}
-                        className="transition-transform duration-500 group-hover:scale-110"
+                        className="opacity-60 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110"
                       />
                     </button>
                   </div>

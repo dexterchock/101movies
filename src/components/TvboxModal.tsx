@@ -242,11 +242,11 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
               type="button"
               onClick={onClose}
               aria-label="Close settings"
-              className="group flex items-center justify-center w-10 h-10 rounded-full bg-black border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer focus:outline-none select-none"
+              className="group flex items-center justify-center w-10 h-10 rounded-full bg-black border border-white/10 text-white hover:bg-white/10 transition-colors cursor-pointer focus:outline-none select-none"
             >
               <X
                 size={18}
-                className="transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110"
+                className="opacity-70 group-hover:opacity-100 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110"
               />
             </button>
           </div>
@@ -371,7 +371,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                 className="p-4 rounded-2xl bg-black/60 border border-white/10 space-y-3"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-white/80 flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-white opacity-80 flex items-center gap-1.5">
                     <Plus size={14} />
                     Add Custom TVBox Config URL (Single or Multi-Repo JSON)
                   </span>
@@ -379,7 +379,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                     href="https://github.com/laoma528/awesome-zhuiju-free"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-white/50 hover:text-white flex items-center gap-1 transition-colors"
+                    className="text-xs text-white opacity-50 hover:opacity-100 flex items-center gap-1 transition-opacity"
                   >
                     <FolderGit2 size={13} />
                     <span>awesome-zhuiju-free</span>
@@ -458,7 +458,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                           <button
                             type="button"
                             onClick={() => handleCopyUrl(cfg.id, cfg.url)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#121212] border border-white/10 text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#121212] border border-white/10 text-white opacity-80 hover:opacity-100 hover:bg-white/10 transition-all cursor-pointer"
                           >
                             {copiedId === cfg.id ? (
                               <>
@@ -492,8 +492,8 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
 
                       <p className="text-xs text-white/55">{cfg.description}</p>
 
-                      <div className="flex items-center gap-2 text-xs font-mono text-white/40 bg-[#121212] px-3 py-1.5 rounded-xl border border-white/5 truncate">
-                        <Link2 size={13} className="shrink-0 text-white/40" />
+                      <div className="flex items-center gap-2 text-xs font-mono text-white opacity-40 bg-[#121212] px-3 py-1.5 rounded-xl border border-white/5 truncate">
+                        <Link2 size={13} className="shrink-0 text-white" />
                         <span className="truncate">{cfg.url}</span>
                       </div>
 

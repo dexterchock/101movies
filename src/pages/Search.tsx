@@ -174,11 +174,11 @@ export function Search() {
                 type="button"
                 onClick={handleClear}
                 aria-label="Clear search"
-                className="group absolute right-1 sm:right-1.5 flex items-center justify-center w-[30px] sm:w-[34px] h-[30px] sm:h-[34px] rounded-full text-white/60 hover:text-white hover:bg-white/15 transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+                className="group absolute right-1 sm:right-1.5 flex items-center justify-center w-[30px] sm:w-[34px] h-[30px] sm:h-[34px] rounded-full text-white hover:bg-white/15 transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
               >
                 <X
                   size={15}
-                  className="transition-transform duration-300 group-hover:scale-110"
+                  className="opacity-60 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110"
                 />
               </button>
             )}
@@ -193,14 +193,14 @@ export function Search() {
               "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showLeft
                 ? "hover:bg-white/15 cursor-pointer text-white"
-                : "text-white/25 cursor-not-allowed pointer-events-none"
+                : "text-white opacity-25 cursor-not-allowed pointer-events-none"
             )}
             aria-label="Previous page"
           >
             <ChevronLeft
               className={cn(
                 "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
-                showLeft ? "group-hover:scale-110 text-white" : "text-white/25"
+                showLeft ? "group-hover:scale-110 text-white" : "text-white opacity-25"
               )}
             />
           </button>
@@ -211,14 +211,14 @@ export function Search() {
               "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showRight
                 ? "hover:bg-white/15 cursor-pointer text-white"
-                : "text-white/25 cursor-not-allowed pointer-events-none"
+                : "text-white opacity-25 cursor-not-allowed pointer-events-none"
             )}
             aria-label="Next page"
           >
             <ChevronRight
               className={cn(
                 "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
-                showRight ? "group-hover:scale-110 text-white" : "text-white/25"
+                showRight ? "group-hover:scale-110 text-white" : "text-white opacity-25"
               )}
             />
           </button>

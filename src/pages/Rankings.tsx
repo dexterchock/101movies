@@ -478,13 +478,13 @@ export function Rankings() {
                 "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollGenreLeft
                   ? "hover:bg-white/15 cursor-pointer text-white"
-                  : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+                  : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
               )}
             >
               <ChevronLeft
                 className={cn(
                   "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
-                  canScrollGenreLeft ? "group-hover:scale-110 text-white" : "text-white/25"
+                  canScrollGenreLeft ? "group-hover:scale-110 text-white" : "text-white opacity-25"
                 )}
               />
             </button>
@@ -549,13 +549,13 @@ export function Rankings() {
                 "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollGenreRight
                   ? "hover:bg-white/15 cursor-pointer text-white"
-                  : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+                  : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
               )}
             >
               <ChevronRight
                 className={cn(
                   "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
-                  canScrollGenreRight ? "group-hover:scale-110 text-white" : "text-white/25"
+                  canScrollGenreRight ? "group-hover:scale-110 text-white" : "text-white opacity-25"
                 )}
               />
             </button>
@@ -573,13 +573,13 @@ export function Rankings() {
               "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
               canScrollLeft
                 ? "hover:bg-white/15 cursor-pointer text-white"
-                : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+                : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
             )}
           >
             <ChevronLeft
               className={cn(
                 "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
-                canScrollLeft ? "group-hover:scale-110 text-white" : "text-white/25"
+                canScrollLeft ? "group-hover:scale-110 text-white" : "text-white opacity-25"
               )}
             />
           </button>
@@ -644,13 +644,13 @@ export function Rankings() {
               "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
               canScrollRight
                 ? "hover:bg-white/15 cursor-pointer text-white"
-                : "bg-transparent text-white/25 cursor-not-allowed pointer-events-none"
+                : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
             )}
           >
             <ChevronRight
               className={cn(
                 "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
-                canScrollRight ? "group-hover:scale-110 text-white" : "text-white/25"
+                canScrollRight ? "group-hover:scale-110 text-white" : "text-white opacity-25"
               )}
             />
           </button>

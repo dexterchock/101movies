@@ -47,7 +47,7 @@ export function Layout() {
       {/* Floating Bottom Navigation */}
       {!isPlayerPage && (
         <div className="fixed bottom-2 sm:bottom-2.5 md:bottom-5 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none pb-[env(safe-area-inset-bottom)]">
-          <nav className="relative flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] pointer-events-auto max-w-full">
+          <nav className="relative flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] backdrop-blur-xl pointer-events-auto max-w-full">
             {/* Sliding Highlight Track */}
             <div
               className={cn(
@@ -70,12 +70,12 @@ export function Layout() {
                   aria-label={item.name}
                   style={{ width: `${navTabWidth}px` }}
                   className={cn(
-                    "group relative z-10 flex items-center justify-center py-2 sm:py-2.5 text-xs sm:text-base rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide shrink-0",
+                    "group relative z-10 flex items-center justify-center py-2 sm:py-2.5 text-xs sm:text-base rounded-full transition-colors duration-300 outline-none font-medium tracking-wide shrink-0",
                     "focus:outline-none focus-visible:outline-none select-none",
                     isActive ? "text-black" : "text-white/75 hover:text-white"
                   )}
                 >
-                  <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110 will-change-transform transform-gpu">
+                  <span className="flex items-center gap-1.5 sm:gap-2">
                     {item.icon}
                     <span>{item.name}</span>
                   </span>

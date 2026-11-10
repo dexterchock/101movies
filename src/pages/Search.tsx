@@ -156,7 +156,7 @@ export function Search() {
         <div className="hidden lg:block w-[1px] h-[38px] sm:h-[46px]" />
 
         <div className="flex-1 lg:flex-none lg:w-[440px] xl:w-[524px] lg:absolute lg:left-1/2 lg:-translate-x-1/2 h-[38px] sm:h-[46px]">
-          <div className="relative flex items-center w-full h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] focus-within:border-white/30 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300">
+          <div className="relative flex items-center w-full h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] focus-within:border-white/30 shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300">
             <SearchIcon
               className="absolute left-3.5 sm:left-4 text-white/50 pointer-events-none w-4 h-4 sm:w-[18px] sm:h-[18px]"
             />
@@ -178,7 +178,7 @@ export function Search() {
               >
                 <X
                   size={15}
-                  className="transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-125 will-change-transform transform-gpu backface-hidden"
+                  className="transition-transform duration-300 group-hover:scale-110"
                 />
               </button>
             )}
@@ -190,7 +190,7 @@ export function Search() {
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={!showLeft}
             className={cn(
-              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showLeft
                 ? "hover:bg-white/15 cursor-pointer text-white"
                 : "text-white/25 cursor-not-allowed pointer-events-none"
@@ -199,8 +199,8 @@ export function Search() {
           >
             <ChevronLeft
               className={cn(
-                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                showLeft ? "group-hover:scale-125 text-white" : "text-white/25"
+                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
+                showLeft ? "group-hover:scale-110 text-white" : "text-white/25"
               )}
             />
           </button>
@@ -208,7 +208,7 @@ export function Search() {
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={!showRight}
             className={cn(
-              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showRight
                 ? "hover:bg-white/15 cursor-pointer text-white"
                 : "text-white/25 cursor-not-allowed pointer-events-none"
@@ -217,8 +217,8 @@ export function Search() {
           >
             <ChevronRight
               className={cn(
-                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                showRight ? "group-hover:scale-125 text-white" : "text-white/25"
+                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
+                showRight ? "group-hover:scale-110 text-white" : "text-white/25"
               )}
             />
           </button>

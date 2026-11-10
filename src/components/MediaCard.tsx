@@ -44,11 +44,11 @@ export function MediaCard({ item, rank, className, onRemove }: MediaCardProps) {
             alt={title}
             referrerPolicy="no-referrer"
             onError={() => setImgError(true)}
-            className="w-full h-full object-cover transform group-hover:scale-110 group-focus:scale-110 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu backface-hidden"
+            className="w-full h-full object-cover transform group-hover:scale-105 group-focus:scale-105 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-5 text-center bg-neutral-900/90 transform group-hover:scale-110 group-focus:scale-110 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu backface-hidden">
+          <div className="w-full h-full flex flex-col items-center justify-center p-3 sm:p-5 text-center bg-neutral-900/90 transform group-hover:scale-105 group-focus:scale-105 transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]">
             {type === "tv" ? (
               <Tv className="w-8 h-8 sm:w-10 sm:h-10 text-neutral-600 mb-2 sm:mb-3" />
             ) : (

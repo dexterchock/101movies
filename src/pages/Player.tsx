@@ -408,9 +408,9 @@ export function Player() {
           >
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
+              className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
             />
-            <span className="relative z-10 flex items-center gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
+            <span className="relative z-10 flex items-center gap-2 transition-transform duration-300 group-hover:scale-105">
               <ArrowLeft size={19} />
               <span className="font-medium text-sm">Back</span>
             </span>
@@ -734,9 +734,9 @@ export function Player() {
         >
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
+            className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
           />
-          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
+          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 transition-transform duration-300 group-hover:scale-105">
             <ArrowLeft className="w-4 h-4 sm:w-[19px] sm:h-[19px]" />
             <span className="font-medium text-xs sm:text-sm">Back</span>
           </span>
@@ -898,11 +898,11 @@ export function Player() {
                         "group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 transition-colors duration-300 outline-none cursor-pointer border select-none",
                         isSelected
                           ? isHighPing
-                            ? "bg-red-500/25 text-red-200 border-red-400/50 shadow-[inset_0_1px_0_0_rgba(255,150,150,0.25),0_8px_24px_rgba(0,0,0,0.65)] font-bold"
+                            ? "bg-red-500/25 text-red-200 border-red-400/50 shadow-[0_8px_24px_rgba(0,0,0,0.65)] font-bold"
                             : "bg-white text-black border-white shadow-[0_8px_24px_rgba(255,255,255,0.18)] font-bold"
                           : isHighPing
-                          ? "text-red-400/85 hover:text-red-300 bg-red-500/[0.08] hover:bg-red-500/18 border-red-500/25 hover:border-red-500/40 shadow-[inset_0_1px_0_0_rgba(255,120,120,0.16),0_8px_24px_rgba(0,0,0,0.65)]"
-                          : "bg-white/[0.07] text-white/85 border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.14] hover:border-white/25 hover:text-white"
+                          ? "text-red-400/85 hover:text-red-300 bg-red-500/[0.08] hover:bg-red-500/18 border-red-500/25 hover:border-red-500/40 shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
+                          : "bg-white/[0.07] text-white/85 border-white/[0.14] shadow-[0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.14] hover:border-white/25 hover:text-white"
                       )}
                       title={
                         isHighPing
@@ -910,7 +910,7 @@ export function Player() {
                           : `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""} (${effectiveQuality} · ${src.latencyMs}ms)`
                       }
                     >
-                      <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
+                      <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-300 group-hover:scale-105">
                         <span>
                           {src.sourceName}
                           {src.audioLang ? ` · ${src.audioLang}` : ""}
@@ -960,7 +960,7 @@ export function Player() {
                     onClick={() => setServerPage((p) => Math.max(0, p - 1))}
                     disabled={!showServerPrev}
                     className={cn(
-                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
+                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
                       showServerPrev
                         ? "hover:bg-white/15 cursor-pointer text-white"
                         : "text-white/25 cursor-not-allowed pointer-events-none"
@@ -969,9 +969,9 @@ export function Player() {
                   >
                     <ChevronLeft
                       className={cn(
-                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
                         showServerPrev
-                          ? "group-hover:scale-125 text-white"
+                          ? "group-hover:scale-110 text-white"
                           : "text-white/25"
                       )}
                     />
@@ -983,7 +983,7 @@ export function Player() {
                     }
                     disabled={!showServerNext}
                     className={cn(
-                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
+                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
                       showServerNext
                         ? "hover:bg-white/15 cursor-pointer text-white"
                         : "text-white/25 cursor-not-allowed pointer-events-none"
@@ -992,9 +992,9 @@ export function Player() {
                   >
                     <ChevronRight
                       className={cn(
-                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
                         showServerNext
-                          ? "group-hover:scale-125 text-white"
+                          ? "group-hover:scale-110 text-white"
                           : "text-white/25"
                       )}
                     />
@@ -1011,9 +1011,9 @@ export function Player() {
             <button
               type="button"
               onClick={handleResumeClick}
-              className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 bg-white/[0.09] text-white border border-white/[0.18] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.16] hover:border-white/30 transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums"
+              className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 bg-white/[0.09] text-white border border-white/[0.18] shadow-[0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.16] hover:border-white/30 transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums"
             >
-              <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
+              <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-300 group-hover:scale-105">
                 <Play size={13} className="fill-white text-white shrink-0" />
                 <span>{resumeLabel}</span>
               </span>
@@ -1032,7 +1032,7 @@ export function Player() {
                 onClick={() => setIsEpisodePopoverOpen((prev) => !prev)}
                 className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-bold whitespace-nowrap shrink-0 bg-white text-black border border-white shadow-[0_8px_32px_rgba(255,255,255,0.14)] hover:bg-white/90 transition-colors duration-300 cursor-pointer focus:outline-none select-none"
               >
-                <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
+                <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-300 group-hover:scale-105">
                   <Layers size={14} />
                   <span>
                     {hasMultipleSeasons && currentSeasonGroup
@@ -1053,7 +1053,7 @@ export function Player() {
               </button>
 
               {isEpisodePopoverOpen && (
-                <div className="absolute bottom-full right-0 mb-3 w-[min(380px,calc(100vw-32px))] max-h-[60vh] rounded-3xl bg-black/85 backdrop-blur-xl border border-white/[0.16] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.18),0_16px_48px_rgba(0,0,0,0.92)] p-3.5 sm:p-4 z-50 flex flex-col">
+                <div className="absolute bottom-full right-0 mb-3 w-[min(380px,calc(100vw-32px))] max-h-[60vh] rounded-3xl bg-black/85 backdrop-blur-xl border border-white/[0.16] shadow-[0_16px_48px_rgba(0,0,0,0.92)] p-3.5 sm:p-4 z-50 flex flex-col">
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm font-bold text-white truncate">

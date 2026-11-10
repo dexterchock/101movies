@@ -19,6 +19,13 @@ body {
   overscroll-behavior: none; 
 }
 
+/* Prevent iOS Safari SVG stroke double-rendering / ghosting bug */
+svg {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  shape-rendering: geometricPrecision;
+}
+
 /* Smart TV Flexbox fallback for browsers lacking native CSS Grid */
 .grid {
   display: flex;

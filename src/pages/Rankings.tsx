@@ -430,7 +430,7 @@ export function Rankings() {
         <div
           role="tablist"
           aria-label="Content Type"
-          className="order-1 relative flex items-center gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
+          className="order-1 relative flex items-center gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
         >
           <div
             className="absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 left-0.5 sm:left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
@@ -451,14 +451,14 @@ export function Rankings() {
                 tabIndex={0}
                 style={{ width: `${mediaTypeTabWidth}px` }}
                 className={cn(
-                  "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
+                  "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full transition-colors duration-300 outline-none font-medium tracking-wide cursor-pointer",
                   "focus:outline-none focus-visible:outline-none select-none",
                   isActive
                     ? "text-black"
                     : "text-white/75 hover:text-white focus:text-white"
                 )}
               >
-                <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110 will-change-transform transform-gpu">
+                <span className="inline-block">
                   {cat.label}
                 </span>
               </button>
@@ -468,7 +468,7 @@ export function Rankings() {
 
         {/* Center on Desktop / Row 2 on Portrait Mobile: Genre Switcher Capsule */}
         <div className="order-3 sm:order-2 w-full sm:w-auto sm:flex-1 lg:flex-none flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2 min-w-0">
-          <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+          <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
             <button
               type="button"
               onClick={() => scrollGenresBy(-1)}
@@ -483,10 +483,8 @@ export function Rankings() {
             >
               <ChevronLeft
                 className={cn(
-                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                  canScrollGenreLeft
-                    ? "group-hover:scale-125 text-white"
-                    : "text-white/25"
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
+                  canScrollGenreLeft ? "group-hover:scale-110 text-white" : "text-white/25"
                 )}
               />
             </button>
@@ -526,14 +524,14 @@ export function Rankings() {
                       tabIndex={0}
                       style={{ width: `${genrePillWidth}px` }}
                       className={cn(
-                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
+                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-300 cursor-pointer",
                         "focus:outline-none focus-visible:outline-none select-none",
                         isSelected
                           ? "text-black"
                           : "text-white/75 hover:text-white focus:text-white"
                       )}
                     >
-                      <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110 will-change-transform transform-gpu">
+                      <span className="inline-block">
                         {cat.label}
                       </span>
                     </button>
@@ -556,10 +554,8 @@ export function Rankings() {
             >
               <ChevronRight
                 className={cn(
-                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                  canScrollGenreRight
-                    ? "group-hover:scale-125 text-white"
-                    : "text-white/25"
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
+                  canScrollGenreRight ? "group-hover:scale-110 text-white" : "text-white/25"
                 )}
               />
             </button>
@@ -567,7 +563,7 @@ export function Rankings() {
         </div>
 
         {/* Right: Year Switcher Capsule */}
-        <div className="order-2 sm:order-3 flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.16),0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+        <div className="order-2 sm:order-3 flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
           <button
             type="button"
             onClick={() => scrollYearsBy(-1)}
@@ -582,8 +578,8 @@ export function Rankings() {
           >
             <ChevronLeft
               className={cn(
-                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                canScrollLeft ? "group-hover:scale-125 text-white" : "text-white/25"
+                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
+                canScrollLeft ? "group-hover:scale-110 text-white" : "text-white/25"
               )}
             />
           </button>
@@ -623,14 +619,14 @@ export function Rankings() {
                     tabIndex={0}
                     style={{ width: `${yearPillWidth}px` }}
                     className={cn(
-                      "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
+                      "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-300 cursor-pointer",
                       "focus:outline-none focus-visible:outline-none select-none",
                       isSelected
                         ? "text-black"
                         : "text-white/75 hover:text-white focus:text-white"
                     )}
                   >
-                    <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110 will-change-transform transform-gpu">
+                    <span className="inline-block">
                       {y}
                     </span>
                   </button>
@@ -653,8 +649,8 @@ export function Rankings() {
           >
             <ChevronRight
               className={cn(
-                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform transform-gpu",
-                canScrollRight ? "group-hover:scale-125 text-white" : "text-white/25"
+                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
+                canScrollRight ? "group-hover:scale-110 text-white" : "text-white/25"
               )}
             />
           </button>

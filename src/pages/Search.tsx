@@ -178,7 +178,7 @@ export function Search() {
               >
                 <X
                   size={15}
-                  className="opacity-60 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110"
+                  className="opacity-60 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-125"
                 />
               </button>
             )}
@@ -199,8 +199,8 @@ export function Search() {
           >
             <ChevronLeft
               className={cn(
-                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
-                showLeft ? "group-hover:scale-110 text-white" : "text-white opacity-25"
+                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                showLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
               )}
             />
           </button>
@@ -217,8 +217,8 @@ export function Search() {
           >
             <ChevronRight
               className={cn(
-                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
-                showRight ? "group-hover:scale-110 text-white" : "text-white opacity-25"
+                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                showRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
               )}
             />
           </button>

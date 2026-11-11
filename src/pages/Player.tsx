@@ -477,7 +477,7 @@ export function Player() {
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
             />
-            <span className="relative z-10 flex items-center gap-2 opacity-90 group-hover:opacity-100 transition-all duration-300 group-hover:scale-105">
+            <span className="relative z-10 flex items-center gap-2 opacity-90 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
               <ArrowLeft size={19} />
               <span className="font-medium text-sm">Back</span>
             </span>
@@ -803,7 +803,7 @@ export function Player() {
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
           />
-          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 opacity-90 group-hover:opacity-100 transition-all duration-300 group-hover:scale-105">
+          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 opacity-90 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
             <ArrowLeft className="w-4 h-4 sm:w-[19px] sm:h-[19px]" />
             <span className="font-medium text-xs sm:text-sm">Back</span>
           </span>
@@ -977,7 +977,7 @@ export function Player() {
                           : `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""} (${effectiveQuality} · ${src.latencyMs}ms)`
                       }
                     >
-                      <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-300 group-hover:scale-105">
+                      <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
                         <span>
                           {src.sourceName}
                           {src.audioLang ? ` · ${src.audioLang}` : ""}
@@ -1036,9 +1036,9 @@ export function Player() {
                   >
                     <ChevronLeft
                       className={cn(
-                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
+                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                         showServerPrev
-                          ? "group-hover:scale-110 text-white"
+                          ? "group-hover:scale-125 text-white"
                           : "text-white opacity-25"
                       )}
                     />
@@ -1059,9 +1059,9 @@ export function Player() {
                   >
                     <ChevronRight
                       className={cn(
-                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
+                        "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                         showServerNext
-                          ? "group-hover:scale-110 text-white"
+                          ? "group-hover:scale-125 text-white"
                           : "text-white opacity-25"
                       )}
                     />
@@ -1080,7 +1080,7 @@ export function Player() {
               onClick={handleResumeClick}
               className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 bg-white/[0.09] text-white border border-white/[0.18] shadow-[0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.16] hover:border-white/30 transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums"
             >
-              <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-300 group-hover:scale-105">
+              <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
                 <Play size={13} className="fill-white text-white shrink-0" />
                 <span>{resumeLabel}</span>
               </span>
@@ -1099,7 +1099,7 @@ export function Player() {
                 onClick={() => setIsEpisodePopoverOpen((prev) => !prev)}
                 className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-bold whitespace-nowrap shrink-0 bg-white text-black border border-white shadow-[0_8px_32px_rgba(255,255,255,0.14)] hover:bg-white/90 transition-colors duration-300 cursor-pointer focus:outline-none select-none"
               >
-                <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-300 group-hover:scale-105">
+                <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
                   <Layers size={14} />
                   <span>
                     {hasMultipleSeasons && currentSeasonGroup
@@ -1140,7 +1140,7 @@ export function Player() {
                     >
                       <X
                         size={15}
-                        className="opacity-60 group-hover:opacity-100 transition-all duration-300 group-hover:scale-110"
+                        className="opacity-60 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-125"
                       />
                     </button>
                   </div>

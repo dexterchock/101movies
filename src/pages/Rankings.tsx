@@ -451,14 +451,14 @@ export function Rankings() {
                 tabIndex={0}
                 style={{ width: `${mediaTypeTabWidth}px` }}
                 className={cn(
-                  "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full transition-colors duration-300 outline-none font-medium tracking-wide cursor-pointer",
+                  "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
                   "focus:outline-none focus-visible:outline-none select-none",
                   isActive
                     ? "text-black"
                     : "text-white/75 hover:text-white focus:text-white"
                 )}
               >
-                <span className="inline-block">
+                <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
                   {cat.label}
                 </span>
               </button>
@@ -483,8 +483,8 @@ export function Rankings() {
             >
               <ChevronLeft
                 className={cn(
-                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
-                  canScrollGenreLeft ? "group-hover:scale-110 text-white" : "text-white opacity-25"
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                  canScrollGenreLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
                 )}
               />
             </button>
@@ -524,14 +524,14 @@ export function Rankings() {
                       tabIndex={0}
                       style={{ width: `${genrePillWidth}px` }}
                       className={cn(
-                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-300 cursor-pointer",
+                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
                         "focus:outline-none focus-visible:outline-none select-none",
                         isSelected
                           ? "text-black"
                           : "text-white/75 hover:text-white focus:text-white"
                       )}
                     >
-                      <span className="inline-block">
+                      <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
                         {cat.label}
                       </span>
                     </button>
@@ -554,8 +554,8 @@ export function Rankings() {
             >
               <ChevronRight
                 className={cn(
-                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
-                  canScrollGenreRight ? "group-hover:scale-110 text-white" : "text-white opacity-25"
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                  canScrollGenreRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
                 )}
               />
             </button>
@@ -578,8 +578,8 @@ export function Rankings() {
           >
             <ChevronLeft
               className={cn(
-                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
-                canScrollLeft ? "group-hover:scale-110 text-white" : "text-white opacity-25"
+                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                canScrollLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
               )}
             />
           </button>
@@ -619,14 +619,14 @@ export function Rankings() {
                     tabIndex={0}
                     style={{ width: `${yearPillWidth}px` }}
                     className={cn(
-                      "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-300 cursor-pointer",
+                      "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
                       "focus:outline-none focus-visible:outline-none select-none",
                       isSelected
                         ? "text-black"
                         : "text-white/75 hover:text-white focus:text-white"
                     )}
                   >
-                    <span className="inline-block">
+                    <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
                       {y}
                     </span>
                   </button>
@@ -649,8 +649,8 @@ export function Rankings() {
           >
             <ChevronRight
               className={cn(
-                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
-                canScrollRight ? "group-hover:scale-110 text-white" : "text-white opacity-25"
+                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                canScrollRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
               )}
             />
           </button>

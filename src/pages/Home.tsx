@@ -482,14 +482,14 @@ export function Home() {
                 tabIndex={0}
                 style={{ width: `${mediaTypeTabWidth}px` }}
                 className={cn(
-                  "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full transition-colors duration-300 outline-none font-medium tracking-wide cursor-pointer",
+                  "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide cursor-pointer",
                   "focus:outline-none focus-visible:outline-none select-none",
                   isActive
                     ? "text-black"
                     : "text-white/75 hover:text-white focus:text-white"
                 )}
               >
-                <span className="inline-block">
+                <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
                   {cat.label}
                 </span>
               </button>
@@ -519,9 +519,9 @@ export function Home() {
             >
               <ChevronLeft
                 className={cn(
-                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                   canScrollCatLeft
-                    ? "group-hover:scale-110 text-white"
+                    ? "group-hover:scale-125 text-white"
                     : "text-white opacity-25"
                 )}
               />
@@ -563,14 +563,14 @@ export function Home() {
                       tabIndex={0}
                       style={{ width: `${categoryPillWidth}px` }}
                       className={cn(
-                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-300 cursor-pointer",
+                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
                         "focus:outline-none focus-visible:outline-none select-none",
                         isSelected
                           ? "text-black"
                           : "text-white/75 hover:text-white focus:text-white"
                       )}
                     >
-                      <span className="inline-block">
+                      <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
                         {cat.label}
                       </span>
                     </button>
@@ -593,9 +593,9 @@ export function Home() {
             >
               <ChevronRight
                 className={cn(
-                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300",
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                   canScrollCatRight
-                    ? "group-hover:scale-110 text-white"
+                    ? "group-hover:scale-125 text-white"
                     : "text-white opacity-25"
                 )}
               />
@@ -611,7 +611,7 @@ export function Home() {
               className="group relative mr-1 flex items-center justify-center h-[38px] sm:h-[46px] px-3 sm:px-4 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 rounded-full bg-red-500/[0.08] hover:bg-red-500/18 border border-red-500/25 hover:border-red-500/40 shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
               title="Clear History"
             >
-              <div className="relative z-10 flex items-center gap-1.5 opacity-85 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="relative z-10 flex items-center gap-1.5 opacity-85 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
                 <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2]" />
                 <span>Clear</span>
               </div>
@@ -630,8 +630,8 @@ export function Home() {
           >
             <ChevronLeft
               className={cn(
-                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
-                showLeft ? "group-hover:scale-110 text-white" : "text-white opacity-25"
+                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                showLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
               )}
             />
           </button>
@@ -648,8 +648,8 @@ export function Home() {
           >
             <ChevronRight
               className={cn(
-                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-300",
-                showRight ? "group-hover:scale-110 text-white" : "text-white opacity-25"
+                "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                showRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
               )}
             />
           </button>

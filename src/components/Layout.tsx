@@ -70,14 +70,14 @@ export function Layout() {
                   aria-label={item.name}
                   style={{ width: `${navTabWidth}px` }}
                   className={cn(
-                    "group relative z-10 flex items-center justify-center py-2 sm:py-2.5 text-xs sm:text-base rounded-full transition-all duration-300 outline-none font-medium tracking-wide shrink-0",
+                    "group relative z-10 flex items-center justify-center py-2 sm:py-2.5 text-xs sm:text-base rounded-full transition-[color,opacity] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] outline-none font-medium tracking-wide shrink-0",
                     "focus:outline-none focus-visible:outline-none select-none",
                     isActive
                       ? "text-black opacity-100"
                       : "text-white opacity-75 hover:opacity-100 focus:opacity-100"
                   )}
                 >
-                  <span className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
                     {item.icon}
                     <span>{item.name}</span>
                   </span>

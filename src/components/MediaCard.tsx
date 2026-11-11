@@ -37,7 +37,7 @@ export function MediaCard({ item, rank, className, onRemove }: MediaCardProps) {
         className
       )}
     >
-      <div className="w-full flex-1 min-h-0 relative isolate [transform:translateZ(0)] rounded-xl sm:rounded-2xl overflow-hidden bg-[#111] border border-white/10 group-focus:ring-4 group-focus:ring-white/80 group-focus:border-transparent group-hover:border-white/30 transition-[border-color,box-shadow] duration-300 ease-out shadow-lg group-hover:shadow-[0_16px_40px_rgba(0,0,0,0.8)]">
+      <div className="w-full flex-1 min-h-0 relative isolate [transform:translateZ(0)] rounded-xl sm:rounded-2xl overflow-hidden bg-[#111] border border-white/10 group-focus:ring-4 group-focus:ring-white/80 group-focus:border-transparent group-hover:border-white/30 transition-colors duration-300 ease-out">
         {hasPoster ? (
           <img
             src={imageUrl}
@@ -62,7 +62,7 @@ export function MediaCard({ item, rank, className, onRemove }: MediaCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-300 ease-out pointer-events-none" />
 
         {rank && (
-          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-white text-black font-bold text-[10px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 min-w-[20px] sm:min-w-[24px] rounded-full shadow-lg z-10 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex items-center justify-center tabular-nums">
+          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-neutral-900/75 text-white border border-white/20 font-bold text-[10px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 min-w-[20px] sm:min-w-[24px] rounded-full z-10 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex items-center justify-center tabular-nums">
             <span>{rank}</span>
           </div>
         )}
@@ -77,15 +77,15 @@ export function MediaCard({ item, rank, className, onRemove }: MediaCardProps) {
             }}
             aria-label={`Remove ${title} from history`}
             title="Remove from history"
-            className="absolute top-2 right-2 sm:top-3 sm:right-3 w-5 h-5 sm:w-6 sm:h-6 bg-white text-black rounded-full shadow-lg z-20 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-all duration-300 flex items-center justify-center hover:scale-110 active:scale-95 cursor-pointer focus:outline-none"
+            className="absolute top-2 right-2 sm:top-3 sm:right-3 w-5 h-5 sm:w-6 sm:h-6 bg-neutral-900/75 hover:bg-neutral-800/90 text-white border border-white/20 rounded-full z-20 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-[opacity,transform,background-color] duration-300 flex items-center justify-center hover:scale-110 active:scale-95 cursor-pointer focus:outline-none"
           >
-            <X className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-black stroke-[2.5]" />
+            <X className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white stroke-[2.5]" />
           </button>
         )}
 
         {item.vote_average ? (
-          <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 bg-white text-black font-bold text-[10px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shadow-lg z-10 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex items-center gap-1 tabular-nums">
-            <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-black fill-black" />
+          <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 bg-neutral-900/75 text-white border border-white/20 font-bold text-[10px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full z-10 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex items-center gap-1 tabular-nums">
+            <Star className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white fill-white" />
             <span>{item.vote_average.toFixed(1)}</span>
           </div>
         ) : null}

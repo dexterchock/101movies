@@ -48,7 +48,7 @@ export function Layout() {
       {/* Floating Bottom Navigation */}
       {!isPlayerPage && (
         <div className="fixed bottom-2 sm:bottom-2.5 md:bottom-5 left-0 right-0 z-50 flex justify-center px-2 sm:px-4 pointer-events-none pb-[env(safe-area-inset-bottom)]">
-          <nav className="relative flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] backdrop-blur-xl pointer-events-auto max-w-full">
+          <nav className="relative flex items-center gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-full bg-neutral-900/70 border border-white/[0.14] pointer-events-auto max-w-full">
             {/* Sliding Highlight Track */}
             <div
               className={cn(

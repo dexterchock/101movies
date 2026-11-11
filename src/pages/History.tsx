@@ -176,7 +176,7 @@ export function History() {
         <div
           role="tablist"
           aria-label="History Filter"
-          className="relative flex items-center gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
+          className="relative flex items-center gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-neutral-900/70 border border-white/[0.14] shrink-0"
         >
           <div
             className="absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 left-0.5 sm:left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
@@ -217,7 +217,7 @@ export function History() {
           {history.length > 0 && (
             <button
               onClick={handleClearHistory}
-              className="group relative sm:mr-1 flex items-center justify-center h-[38px] sm:h-[46px] px-2.5 sm:px-4 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 rounded-full bg-red-500/[0.08] hover:bg-red-500/18 border border-red-500/25 hover:border-red-500/40 shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+              className="group relative sm:mr-1 flex items-center justify-center h-[38px] sm:h-[46px] px-2.5 sm:px-4 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 rounded-full bg-red-950/60 hover:bg-red-900/70 border border-red-500/30 hover:border-red-400/45 transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
               title="Clear History"
             >
               <div className="relative z-10 flex items-center gap-1 sm:gap-1.5 opacity-85 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
@@ -230,17 +230,17 @@ export function History() {
             onClick={prevPage}
             disabled={!showLeft}
             className={cn(
-              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full border transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showLeft
-                ? "hover:bg-white/15 cursor-pointer text-white"
-                : "text-white opacity-25 cursor-not-allowed pointer-events-none"
+                ? "bg-neutral-900/70 border-white/[0.14] hover:bg-neutral-800/80 cursor-pointer text-white"
+                : "bg-neutral-900/45 border-white/[0.08] text-white cursor-not-allowed pointer-events-none"
             )}
             aria-label="Previous page"
           >
             <ChevronLeft
               className={cn(
                 "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                showLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                showLeft ? "group-hover:scale-125 text-white" : "text-white opacity-45"
               )}
             />
           </button>
@@ -248,17 +248,17 @@ export function History() {
             onClick={nextPage}
             disabled={!showRight}
             className={cn(
-              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full border transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showRight
-                ? "hover:bg-white/15 cursor-pointer text-white"
-                : "text-white opacity-25 cursor-not-allowed pointer-events-none"
+                ? "bg-neutral-900/70 border-white/[0.14] hover:bg-neutral-800/80 cursor-pointer text-white"
+                : "bg-neutral-900/45 border-white/[0.08] text-white cursor-not-allowed pointer-events-none"
             )}
             aria-label="Next page"
           >
             <ChevronRight
               className={cn(
                 "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                showRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                showRight ? "group-hover:scale-125 text-white" : "text-white opacity-45"
               )}
             />
           </button>

@@ -378,7 +378,7 @@ export function Home() {
         <div
           role="tablist"
           aria-label="Content Type"
-          className="order-1 relative flex items-center gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0"
+          className="order-1 relative flex items-center gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-neutral-900/70 border border-white/[0.14] shrink-0"
         >
           <div
             className="absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 left-0.5 sm:left-1 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
@@ -416,7 +416,7 @@ export function Home() {
 
         {/* Center on Desktop/Landscape / Row 2 on Portrait Mobile: Sliding Category Switcher Capsule */}
         <div className="order-3 sm:order-2 w-full sm:w-auto sm:flex-1 lg:flex-none flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2 min-w-0">
-          <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+          <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-neutral-900/70 border border-white/[0.14] shrink-0">
             <button
               type="button"
               onClick={() => scrollCategoriesBy(-1)}
@@ -425,8 +425,8 @@ export function Home() {
               className={cn(
                 "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollCatLeft
-                  ? "hover:bg-white/15 cursor-pointer text-white"
-                  : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
+                  ? "hover:bg-neutral-800/80 cursor-pointer text-white"
+                  : "bg-transparent text-white cursor-not-allowed pointer-events-none"
               )}
             >
               <ChevronLeft
@@ -434,7 +434,7 @@ export function Home() {
                   "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                   canScrollCatLeft
                     ? "group-hover:scale-125 text-white"
-                    : "text-white opacity-25"
+                    : "text-white opacity-45"
                 )}
               />
             </button>
@@ -499,8 +499,8 @@ export function Home() {
               className={cn(
                 "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
                 canScrollCatRight
-                  ? "hover:bg-white/15 cursor-pointer text-white"
-                  : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
+                  ? "hover:bg-neutral-800/80 cursor-pointer text-white"
+                  : "bg-transparent text-white cursor-not-allowed pointer-events-none"
               )}
             >
               <ChevronRight
@@ -508,7 +508,7 @@ export function Home() {
                   "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                   canScrollCatRight
                     ? "group-hover:scale-125 text-white"
-                    : "text-white opacity-25"
+                    : "text-white opacity-45"
                 )}
               />
             </button>
@@ -521,17 +521,17 @@ export function Home() {
             onClick={prevPage}
             disabled={!showLeft}
             className={cn(
-              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full border transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showLeft
-                ? "hover:bg-white/15 cursor-pointer text-white"
-                : "text-white opacity-25 cursor-not-allowed pointer-events-none"
+                ? "bg-neutral-900/70 border-white/[0.14] hover:bg-neutral-800/80 cursor-pointer text-white"
+                : "bg-neutral-900/45 border-white/[0.08] text-white cursor-not-allowed pointer-events-none"
             )}
             aria-label="Previous page"
           >
             <ChevronLeft
               className={cn(
                 "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                showLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                showLeft ? "group-hover:scale-125 text-white" : "text-white opacity-45"
               )}
             />
           </button>
@@ -539,17 +539,17 @@ export function Home() {
             onClick={nextPage}
             disabled={!showRight}
             className={cn(
-              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+              "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full border transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
               showRight
-                ? "hover:bg-white/15 cursor-pointer text-white"
-                : "text-white opacity-25 cursor-not-allowed pointer-events-none"
+                ? "bg-neutral-900/70 border-white/[0.14] hover:bg-neutral-800/80 cursor-pointer text-white"
+                : "bg-neutral-900/45 border-white/[0.08] text-white cursor-not-allowed pointer-events-none"
             )}
             aria-label="Next page"
           >
             <ChevronRight
               className={cn(
                 "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                showRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                showRight ? "group-hover:scale-125 text-white" : "text-white opacity-45"
               )}
             />
           </button>

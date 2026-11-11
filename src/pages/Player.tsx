@@ -470,16 +470,12 @@ export function Player() {
             type="button"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={handleBack}
-            className="group relative flex items-center gap-2 px-4 h-[46px] rounded-full text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+            className="group relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 h-[38px] sm:h-[46px] rounded-full bg-neutral-900/70 hover:bg-neutral-800/80 border border-white/[0.16] hover:border-white/30 text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
             aria-label="Go back"
           >
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
-            />
-            <span className="relative z-10 flex items-center gap-2 opacity-90 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
-              <ArrowLeft size={19} />
-              <span className="font-medium text-sm">Back</span>
+            <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
+              <ArrowLeft className="w-4 h-4 sm:w-[19px] sm:h-[19px]" />
+              <span className="font-medium text-xs sm:text-sm">Back</span>
             </span>
           </button>
         </div>
@@ -790,20 +786,16 @@ export function Player() {
 
   return (
     <div className="min-h-[100dvh] h-[100dvh] w-full overflow-hidden flex flex-col bg-black relative select-none">
-      {/* Top Left Back Button with Apple Liquid Glass Blur */}
+      {/* Top Left Back Button */}
       <div className="fixed top-3 left-4 sm:top-5 sm:left-6 md:top-6 md:left-8 z-[100] pt-[env(safe-area-inset-top)] pointer-events-auto">
         <button
           type="button"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={handleBack}
-          className="group relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 h-[38px] sm:h-[46px] rounded-full text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+          className="group relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 h-[38px] sm:h-[46px] rounded-full bg-neutral-900/70 hover:bg-neutral-800/80 border border-white/[0.16] hover:border-white/30 text-white transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
           aria-label="Go back"
         >
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.07] group-hover:bg-white/[0.12] backdrop-blur-md border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300"
-          />
-          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 opacity-90 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
+          <span className="relative z-10 flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
             <ArrowLeft className="w-4 h-4 sm:w-[19px] sm:h-[19px]" />
             <span className="font-medium text-xs sm:text-sm">Back</span>
           </span>
@@ -916,7 +908,7 @@ export function Player() {
         </div>
       )}
 
-      {/* Seamless Pure-Black Bottom Controls with Apple Liquid Glass Buttons */}
+      {/* Seamless Pure-Black Bottom Controls */}
       <div className="shrink-0 w-full bg-black px-4 sm:px-6 md:px-8 pt-2 sm:pt-3 pb-3 sm:pb-5 md:pb-6 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-6 relative z-30">
         {/* Left & Center: Single-Row Paginated Server Pills + Prev/Next Buttons */}
         <div
@@ -965,11 +957,11 @@ export function Player() {
                         "group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 transition-colors duration-300 outline-none cursor-pointer border select-none",
                         isSelected
                           ? isHighPing
-                            ? "bg-red-500/25 text-red-200 border-red-400/50 shadow-[0_8px_24px_rgba(0,0,0,0.65)] font-bold"
-                            : "bg-white text-black border-white shadow-[0_8px_24px_rgba(255,255,255,0.18)] font-bold"
+                            ? "bg-red-900/80 text-red-100 border-red-400/55 font-bold"
+                            : "bg-white text-black border-white font-bold"
                           : isHighPing
-                          ? "text-red-400/85 hover:text-red-300 bg-red-500/[0.08] hover:bg-red-500/18 border-red-500/25 hover:border-red-500/40 shadow-[0_8px_24px_rgba(0,0,0,0.65)]"
-                          : "bg-white/[0.07] text-white/85 border-white/[0.14] shadow-[0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.14] hover:border-white/25 hover:text-white"
+                          ? "text-red-300 hover:text-red-200 bg-red-950/60 hover:bg-red-900/70 border-red-500/35 hover:border-red-400/50"
+                          : "bg-neutral-900/70 text-white/85 border-white/[0.14] hover:bg-neutral-800/80 hover:border-white/25 hover:text-white"
                       )}
                       title={
                         isHighPing
@@ -988,7 +980,7 @@ export function Player() {
                             effectiveQuality === "4K"
                               ? isSelected
                                 ? "bg-black text-amber-300 border border-amber-400/40"
-                                : "bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-[0_0_8px_rgba(251,191,36,0.25)]"
+                                : "bg-amber-400/20 text-amber-300 border border-amber-400/40"
                               : effectiveQuality === "2K"
                               ? isSelected
                                 ? "bg-black text-sky-300 border border-sky-400/40"
@@ -1027,10 +1019,10 @@ export function Player() {
                     onClick={() => setServerPage((p) => Math.max(0, p - 1))}
                     disabled={!showServerPrev}
                     className={cn(
-                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
+                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full border transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
                       showServerPrev
-                        ? "hover:bg-white/15 cursor-pointer text-white"
-                        : "text-white opacity-25 cursor-not-allowed pointer-events-none"
+                        ? "bg-neutral-900/70 border-white/[0.14] hover:bg-neutral-800/80 cursor-pointer text-white"
+                        : "bg-neutral-900/45 border-white/[0.08] text-white cursor-not-allowed pointer-events-none"
                     )}
                     aria-label="Previous servers"
                   >
@@ -1039,7 +1031,7 @@ export function Player() {
                         "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                         showServerPrev
                           ? "group-hover:scale-125 text-white"
-                          : "text-white opacity-25"
+                          : "text-white opacity-45"
                       )}
                     />
                   </button>
@@ -1050,10 +1042,10 @@ export function Player() {
                     }
                     disabled={!showServerNext}
                     className={cn(
-                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
+                      "group flex items-center justify-center w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] rounded-full border transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none select-none",
                       showServerNext
-                        ? "hover:bg-white/15 cursor-pointer text-white"
-                        : "text-white opacity-25 cursor-not-allowed pointer-events-none"
+                        ? "bg-neutral-900/70 border-white/[0.14] hover:bg-neutral-800/80 cursor-pointer text-white"
+                        : "bg-neutral-900/45 border-white/[0.08] text-white cursor-not-allowed pointer-events-none"
                     )}
                     aria-label="Next servers"
                   >
@@ -1062,7 +1054,7 @@ export function Player() {
                         "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
                         showServerNext
                           ? "group-hover:scale-125 text-white"
-                          : "text-white opacity-25"
+                          : "text-white opacity-45"
                       )}
                     />
                   </button>
@@ -1078,7 +1070,7 @@ export function Player() {
             <button
               type="button"
               onClick={handleResumeClick}
-              className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 bg-white/[0.09] text-white border border-white/[0.18] shadow-[0_8px_24px_rgba(0,0,0,0.65)] hover:bg-white/[0.16] hover:border-white/30 transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums"
+              className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-medium whitespace-nowrap shrink-0 bg-neutral-900/70 text-white border border-white/[0.16] hover:bg-neutral-800/80 hover:border-white/30 transition-colors duration-300 cursor-pointer focus:outline-none select-none tabular-nums"
             >
               <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
                 <Play size={13} className="fill-white text-white shrink-0" />
@@ -1097,7 +1089,7 @@ export function Player() {
               <button
                 type="button"
                 onClick={() => setIsEpisodePopoverOpen((prev) => !prev)}
-                className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-bold whitespace-nowrap shrink-0 bg-white text-black border border-white shadow-[0_8px_32px_rgba(255,255,255,0.14)] hover:bg-white/90 transition-colors duration-300 cursor-pointer focus:outline-none select-none"
+                className="group flex items-center h-[38px] sm:h-[42px] px-3.5 sm:px-4 rounded-full text-xs md:text-sm font-bold whitespace-nowrap shrink-0 bg-white text-black border border-white hover:bg-white/90 transition-colors duration-300 cursor-pointer focus:outline-none select-none"
               >
                 <span className="flex items-center gap-1.5 sm:gap-2 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
                   <Layers size={14} />
@@ -1120,7 +1112,7 @@ export function Player() {
               </button>
 
               {isEpisodePopoverOpen && (
-                <div className="absolute bottom-full right-0 mb-3 w-[min(380px,calc(100vw-32px))] max-h-[60vh] rounded-3xl bg-black/85 backdrop-blur-xl border border-white/[0.16] shadow-[0_16px_48px_rgba(0,0,0,0.92)] p-3.5 sm:p-4 z-50 flex flex-col">
+                <div className="absolute bottom-full right-0 mb-3 w-[min(380px,calc(100vw-32px))] max-h-[60vh] rounded-3xl bg-[#121212]/95 border border-white/[0.16] p-3.5 sm:p-4 z-50 flex flex-col">
                   <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-sm font-bold text-white truncate">
@@ -1135,13 +1127,12 @@ export function Player() {
                     <button
                       type="button"
                       onClick={() => setIsEpisodePopoverOpen(false)}
-                      className="group flex items-center justify-center w-7 h-7 rounded-full text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      className="group flex items-center justify-center w-7 h-7 rounded-full text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
                       aria-label="Close episodes"
                     >
-                      <X
-                        size={15}
-                        className="opacity-60 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-125"
-                      />
+                      <span className="inline-flex items-center justify-center opacity-65 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-125">
+                        <X size={15} />
+                      </span>
                     </button>
                   </div>
 
@@ -1162,7 +1153,7 @@ export function Player() {
                               "group px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-colors duration-200 cursor-pointer border focus:outline-none select-none",
                               isSeasonActive
                                 ? "bg-white text-black border-white font-bold"
-                                : "bg-white/[0.06] text-white/75 border-white/10 hover:bg-white/[0.14] hover:text-white"
+                                : "bg-neutral-900/70 text-white/80 border-white/15 hover:bg-neutral-800/80 hover:text-white"
                             )}
                           >
                             <span className="inline-block transition-transform duration-500 group-hover:scale-105">
@@ -1197,7 +1188,7 @@ export function Player() {
                             "group px-3 py-2 rounded-xl text-xs font-medium tabular-nums truncate transition-colors duration-200 cursor-pointer border focus:outline-none select-none",
                             isCurrentEp
                               ? "bg-white text-black border-white font-bold"
-                              : "bg-white/[0.06] text-white/80 border-white/10 hover:bg-white/[0.14] hover:border-white/25 hover:text-white"
+                              : "bg-neutral-900/70 text-white/80 border-white/15 hover:bg-neutral-800/80 hover:border-white/25 hover:text-white"
                           )}
                           title={label}
                         >

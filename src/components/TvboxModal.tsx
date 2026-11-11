@@ -183,11 +183,11 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-black/85 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col w-full max-w-4xl max-h-[85vh] rounded-3xl bg-[#121212] border border-white/10 shadow-[0_16px_64px_rgba(0,0,0,0.95)] overflow-hidden text-white"
+        className="relative flex flex-col w-full max-w-4xl max-h-[85vh] rounded-3xl bg-[#121212] border border-white/15 overflow-hidden text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
@@ -242,12 +242,11 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
               type="button"
               onClick={onClose}
               aria-label="Close settings"
-              className="group flex items-center justify-center w-10 h-10 rounded-full bg-black border border-white/10 text-white hover:bg-white/10 transition-colors cursor-pointer focus:outline-none select-none"
+              className="group flex items-center justify-center w-10 h-10 rounded-full bg-neutral-900/70 border border-white/[0.14] text-white hover:bg-neutral-800/80 transition-colors cursor-pointer focus:outline-none select-none"
             >
-              <X
-                size={18}
-                className="opacity-70 group-hover:opacity-100 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110"
-              />
+              <span className="inline-flex items-center justify-center opacity-70 group-hover:opacity-100 transition-all duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110">
+                <X size={18} />
+              </span>
             </button>
           </div>
         </div>
@@ -275,7 +274,7 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                     <button
                       type="button"
                       onClick={enableAllSites}
-                      className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-black border border-white/10 text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-neutral-900/70 border border-white/[0.14] text-white/80 hover:text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
                     >
                       Enable All
                     </button>
@@ -458,19 +457,21 @@ export function TvboxModal({ isOpen, onClose }: TvboxModalProps) {
                           <button
                             type="button"
                             onClick={() => handleCopyUrl(cfg.id, cfg.url)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#121212] border border-white/10 text-white opacity-80 hover:opacity-100 hover:bg-white/10 transition-all cursor-pointer"
+                            className="group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-neutral-900/70 border border-white/[0.14] text-white hover:bg-neutral-800/80 transition-colors cursor-pointer"
                           >
-                            {copiedId === cfg.id ? (
-                              <>
-                                <Check size={13} className="text-emerald-400" />
-                                <span>Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy size={13} />
-                                <span>Copy URL</span>
-                              </>
-                            )}
+                            <span className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                              {copiedId === cfg.id ? (
+                                <>
+                                  <Check size={13} className="text-emerald-400" />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={13} />
+                                  <span>Copy URL</span>
+                                </>
+                              )}
+                            </span>
                           </button>
 
                           <button

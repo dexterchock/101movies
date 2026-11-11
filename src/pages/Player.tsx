@@ -98,7 +98,7 @@ function estimatePillSlotWidth(
 const DEFAULT_SITE_TITLE = "101Movies";
 const DEFAULT_SITE_DESC =
   "Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation and real-time TMDB integration.";
-const DEFAULT_SITE_IMAGE = "https://101movies.pages.dev/og-image.png";
+const DEFAULT_SITE_IMAGE = "https://101movies.pages.dev/og-image.png?v=2";
 
 function setHeadMeta(selector: string, attr: string, value: string): void {
   if (typeof document === "undefined") return;

@@ -7,17 +7,21 @@ import {
   normalizeCategoryId,
 } from "../types";
 import { MediaCard } from "../components/MediaCard";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   cn,
   safeScrollTo,
-  loadWatchHistory,
-  clearWatchHistory,
-  removeFromWatchHistory,
+  getGridColsForWidth,
+  getGridRowsForHeight,
 } from "../utils";
 
 const MOVIE_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
 const TV_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
+
+const MEDIA_TYPES: { id: "movie" | "tv"; label: string }[] = [
+  { id: "movie", label: "Movies" },
+  { id: "tv", label: "Shows" },
+];
 
 const CATEGORY_PILL_WIDTH_DESKTOP = 84;
 const CATEGORY_PILL_WIDTH_MOBILE = 72;
@@ -26,37 +30,11 @@ const CATEGORY_PILL_GAP = 4;
 const cachedMoviesByCat = new Map<string, MediaItem[]>();
 const cachedTVByCat = new Map<string, MediaItem[]>();
 
-function getColsForWidth(width: number): number {
-  if (width >= 1280) return 8; // 8 columns on modern wide screens (proper 2:3 vertical poster)
-  if (width >= 768) return 6;
-  if (width >= 640) return 3;
-  return 2;
-}
-
-function getRowsForHeight(height: number): number {
-  // On short landscape viewports (e.g. iPhone landscape ~390px), 1 row prevents card squishing
-  return height < 500 ? 1 : 2;
-}
-
 export function Home() {
-  const [history, setHistory] = useState<MediaItem[]>(loadWatchHistory);
-
-  const [mediaType, setMediaType] = useState<"movie" | "tv" | "history">(() => {
+  const [mediaType, setMediaType] = useState<"movie" | "tv">(() => {
     const saved = sessionStorage.getItem("trending_media_type");
-    if (saved === "tv") return "tv";
-    if (saved === "history") return "history";
-    return "movie";
+    return saved === "tv" ? "tv" : "movie";
   });
-
-  // Fallback to "movie" if "history" was selected but history is now empty
-  const effectiveMediaType: "movie" | "tv" | "history" =
-    mediaType === "history" && history.length === 0 ? "movie" : mediaType;
-
-  useEffect(() => {
-    if (effectiveMediaType !== mediaType) {
-      setMediaType(effectiveMediaType);
-    }
-  }, [effectiveMediaType, mediaType]);
 
   const [movieCategory, setMovieCategory] = useState<string>(() => {
     return normalizeCategoryId(sessionStorage.getItem("home_movie_category")) || "all";
@@ -77,10 +55,10 @@ export function Home() {
   const [loadingTV, setLoadingTV] = useState(!cachedTVByCat.has(tvCategory));
 
   const [colsPerRow, setColsPerRow] = useState(() =>
-    typeof window !== "undefined" ? getColsForWidth(window.innerWidth) : 6
+    typeof window !== "undefined" ? getGridColsForWidth(window.innerWidth) : 6
   );
   const [rowsPerPage, setRowsPerPage] = useState(() =>
-    typeof window !== "undefined" ? getRowsForHeight(window.innerHeight) : 2
+    typeof window !== "undefined" ? getGridRowsForHeight(window.innerHeight) : 2
   );
   const [isMobileView, setIsMobileView] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 640 : false
@@ -88,8 +66,8 @@ export function Home() {
 
   useEffect(() => {
     const handleResize = () => {
-      setColsPerRow(getColsForWidth(window.innerWidth));
-      setRowsPerPage(getRowsForHeight(window.innerHeight));
+      setColsPerRow(getGridColsForWidth(window.innerWidth));
+      setRowsPerPage(getGridRowsForHeight(window.innerHeight));
       setIsMobileView(window.innerWidth < 640);
     };
     window.addEventListener("resize", handleResize);
@@ -98,9 +76,9 @@ export function Home() {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem("trending_media_type", effectiveMediaType);
+      sessionStorage.setItem("trending_media_type", mediaType);
     } catch {}
-  }, [effectiveMediaType]);
+  }, [mediaType]);
 
   useEffect(() => {
     try {
@@ -160,63 +138,23 @@ export function Home() {
     };
   }, [tvCategory]);
 
-  const handleClearHistory = () => {
-    clearWatchHistory();
-    setHistory([]);
-    setMediaType("movie");
-  };
-
-  const handleRemoveHistoryItem = (itemToRemove: MediaItem) => {
-    setHistory((prev) => removeFromWatchHistory(prev, itemToRemove));
-  };
-
-  const mediaTypesList: { id: "movie" | "tv" | "history"; label: string }[] =
-    history.length > 0
-      ? [
-          { id: "movie", label: "Movies" },
-          { id: "tv", label: "Shows" },
-          { id: "history", label: "History" },
-        ]
-      : [
-          { id: "movie", label: "Movies" },
-          { id: "tv", label: "Shows" },
-        ];
-
   const activeMediaTypeIndex = Math.max(
     0,
-    mediaTypesList.findIndex((c) => c.id === effectiveMediaType)
+    MEDIA_TYPES.findIndex((c) => c.id === mediaType)
   );
-  const mediaTypeTabWidth = isMobileView
-    ? history.length > 0
-      ? 62
-      : 72
-    : 88;
+  const mediaTypeTabWidth = isMobileView ? 72 : 88;
 
   const activeCategories =
-    effectiveMediaType === "movie"
-      ? MOVIE_CATEGORIES
-      : effectiveMediaType === "tv"
-      ? TV_CATEGORIES
-      : [];
+    mediaType === "movie" ? MOVIE_CATEGORIES : TV_CATEGORIES;
   const activeCategory =
-    effectiveMediaType === "movie" ? movieCategory : tvCategory;
+    mediaType === "movie" ? movieCategory : tvCategory;
   const setActiveCategory =
-    effectiveMediaType === "movie" ? setMovieCategory : setTvCategory;
+    mediaType === "movie" ? setMovieCategory : setTvCategory;
 
-  const activeItems =
-    effectiveMediaType === "movie"
-      ? trendingMovies
-      : effectiveMediaType === "tv"
-      ? trendingTV
-      : history;
-  const loading =
-    effectiveMediaType === "movie"
-      ? loadingMovies
-      : effectiveMediaType === "tv"
-      ? loadingTV
-      : false;
+  const activeItems = mediaType === "movie" ? trendingMovies : trendingTV;
+  const loading = mediaType === "movie" ? loadingMovies : loadingTV;
 
-  const storageKey = `trending_page_${effectiveMediaType}_${activeCategory}`;
+  const storageKey = `trending_page_${mediaType}_${activeCategory}`;
   const [page, setPage] = useState(() => {
     const saved = sessionStorage.getItem(storageKey);
     const parsed = saved ? parseInt(saved, 10) : 0;
@@ -328,7 +266,7 @@ export function Home() {
       el.removeEventListener("scroll", updateCatScrollButtons);
       window.removeEventListener("resize", onResize);
     };
-  }, [updateCatScrollButtons, centerCatTrack, effectiveMediaType]);
+  }, [updateCatScrollButtons, centerCatTrack, mediaType]);
 
   const isInitialCatMountRef = useRef(true);
 
@@ -430,14 +368,13 @@ export function Home() {
     }
   };
 
-  const displayCategories =
-    activeCategories.length > 0 ? activeCategories : MOVIE_CATEGORIES;
+  const displayCategories = activeCategories;
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-black select-none">
       {/* Responsive Top Control Bar (Cleanly fits mobile portrait & landscape) */}
       <div className="shrink-0 relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 sm:gap-x-3 gap-y-2 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-6 pb-2.5 sm:pb-3 md:pb-5 z-40">
-        {/* Left: Movies / Shows (and History) Capsule Toggle */}
+        {/* Left: Movies / Shows Capsule Toggle */}
         <div
           role="tablist"
           aria-label="Content Type"
@@ -450,8 +387,8 @@ export function Home() {
               transform: `translate3d(${activeMediaTypeIndex * (mediaTypeTabWidth + 4)}px, 0, 0)`,
             }}
           />
-          {mediaTypesList.map((cat) => {
-            const isActive = effectiveMediaType === cat.id;
+          {MEDIA_TYPES.map((cat) => {
+            const isActive = mediaType === cat.id;
             return (
               <button
                 key={cat.id}
@@ -478,12 +415,7 @@ export function Home() {
         </div>
 
         {/* Center on Desktop/Landscape / Row 2 on Portrait Mobile: Sliding Category Switcher Capsule */}
-        <div
-          className={cn(
-            "order-3 sm:order-2 w-full sm:w-auto sm:flex-1 lg:flex-none flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2 min-w-0",
-            effectiveMediaType === "history" && "invisible pointer-events-none"
-          )}
-        >
+        <div className="order-3 sm:order-2 w-full sm:w-auto sm:flex-1 lg:flex-none flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2 min-w-0">
           <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
             <button
               type="button"
@@ -583,20 +515,8 @@ export function Home() {
           </div>
         </div>
 
-        {/* Right: Page Navigation Buttons (+ Clear when History is active) */}
+        {/* Right: Page Navigation Buttons */}
         <div className="order-2 sm:order-3 flex gap-1.5 sm:gap-2 items-center h-[38px] sm:h-[46px] shrink-0">
-          {effectiveMediaType === "history" && (
-            <button
-              onClick={handleClearHistory}
-              className="group relative mr-1 flex items-center justify-center h-[38px] sm:h-[46px] px-3 sm:px-4 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 rounded-full bg-red-500/[0.08] hover:bg-red-500/18 border border-red-500/25 hover:border-red-500/40 shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
-              title="Clear History"
-            >
-              <div className="relative z-10 flex items-center gap-1.5 opacity-85 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
-                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2]" />
-                <span>Clear</span>
-              </div>
-            </button>
-          )}
           <button
             onClick={prevPage}
             disabled={!showLeft}
@@ -664,14 +584,9 @@ export function Home() {
               <>
                 {visibleItems.map((item) => (
                   <MediaCard
-                    key={`${item.media_type || effectiveMediaType}-${item.id}`}
+                    key={`${item.media_type || mediaType}-${item.id}`}
                     item={item}
                     className="w-full"
-                    onRemove={
-                      effectiveMediaType === "history"
-                        ? () => handleRemoveHistoryItem(item)
-                        : undefined
-                    }
                   />
                 ))}
                 {Array.from({ length: placeholderCount }).map((_, idx) => (

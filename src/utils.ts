@@ -24,10 +24,21 @@ export function clearWatchHistory(): void {
   } catch {}
 }
 
-function resolveMediaItemType(item: MediaItem): "movie" | "tv" {
+export function resolveMediaItemType(item: MediaItem): "movie" | "tv" {
   return item.media_type === "tv" || (!item.media_type && !item.title && item.name)
     ? "tv"
     : "movie";
+}
+
+export function getGridColsForWidth(width: number): number {
+  if (width >= 1280) return 8;
+  if (width >= 768) return 6;
+  if (width >= 640) return 3;
+  return 2;
+}
+
+export function getGridRowsForHeight(height: number): number {
+  return height < 500 ? 1 : 2;
 }
 
 export function removeFromWatchHistory(

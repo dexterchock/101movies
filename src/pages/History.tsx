@@ -8,8 +8,9 @@ import {
   clearWatchHistory,
   removeFromWatchHistory,
   resolveMediaItemType,
-  getGridColsForWidth,
-  getGridRowsForHeight,
+  useResponsiveGrid,
+  GRID_COLS_CLASS,
+  GRID_ROWS_CLASS,
 } from "../utils";
 
 type HistoryFilter = "all" | "movie" | "tv";
@@ -30,25 +31,7 @@ export function History() {
     return "all";
   });
 
-  const [colsPerRow, setColsPerRow] = useState(() =>
-    typeof window !== "undefined" ? getGridColsForWidth(window.innerWidth) : 6
-  );
-  const [rowsPerPage, setRowsPerPage] = useState(() =>
-    typeof window !== "undefined" ? getGridRowsForHeight(window.innerHeight) : 2
-  );
-  const [isMobileView, setIsMobileView] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth < 640 : false
-  );
-
-  useEffect(() => {
-    const onResize = () => {
-      setColsPerRow(getGridColsForWidth(window.innerWidth));
-      setRowsPerPage(getGridRowsForHeight(window.innerHeight));
-      setIsMobileView(window.innerWidth < 640);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const { colsPerRow, rowsPerPage, maxGridHeight, isMobileView } = useResponsiveGrid(false);
 
   useEffect(() => {
     try {
@@ -171,7 +154,7 @@ export function History() {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-black select-none">
       {/* Responsive Top Control Bar */}
-      <div className="shrink-0 relative flex items-center justify-between gap-2 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-6 pb-2.5 sm:pb-3 md:pb-5 z-40">
+      <div className="shrink-0 relative flex items-center justify-between gap-2 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-5 pb-0 z-40">
         {/* Left: All / Movies / Shows Filter Toggle */}
         <div
           role="tablist"
@@ -265,11 +248,11 @@ export function History() {
         </div>
       </div>
 
-      {/* Viewport Grid (Clears Bottom Nav Pill, Supports Touch Swipe, Adapts to Orientation & Wide Screens) */}
+      {/* Viewport Grid (Clears Bottom Nav Pill, Vertically Balanced Across Screen Ratios) */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[82px] sm:pb-[92px] md:pb-[98px] pb-[max(5.75rem,calc(5rem+env(safe-area-inset-bottom)))] relative z-10"
+        className="flex-1 min-h-0 w-full flex flex-col justify-center px-4 sm:px-6 md:px-8 browse-stage-padding relative z-10"
       >
         {filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
@@ -290,10 +273,10 @@ export function History() {
           <div
             className={cn(
               "grid gap-x-3 sm:gap-x-5 md:gap-x-7 gap-y-2.5 sm:gap-y-4 md:gap-y-5 w-full h-full min-h-0",
-              rowsPerPage === 1 ? "grid-rows-1" : "grid-rows-2",
-              "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 xl:grid-cols-8",
-              "md:max-h-[calc((100vw-64px)*0.54)] xl:max-h-[calc((100vw-64px)*0.45)]"
+              GRID_COLS_CLASS[colsPerRow] || "grid-cols-6",
+              GRID_ROWS_CLASS[rowsPerPage] || "grid-rows-2"
             )}
+            style={maxGridHeight ? { maxHeight: `${maxGridHeight}px` } : undefined}
           >
             {visibleItems.map((item) => (
               <MediaCard

@@ -3,21 +3,15 @@ import { api } from "../api";
 import { MediaItem } from "../types";
 import { MediaCard } from "../components/MediaCard";
 import { Search as SearchIcon, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "../utils";
+import {
+  cn,
+  useResponsiveGrid,
+  GRID_COLS_CLASS,
+  GRID_ROWS_CLASS,
+} from "../utils";
 
 let cachedSearchQuery = "";
 let cachedSearchResults: MediaItem[] = [];
-
-function getColsForWidth(width: number): number {
-  if (width >= 1280) return 8; // 8 columns on modern wide screens
-  if (width >= 768) return 6;
-  if (width >= 640) return 3;
-  return 2;
-}
-
-function getRowsForHeight(height: number): number {
-  return height < 500 ? 1 : 2;
-}
 
 export function Search() {
   const [query, setQuery] = useState(() => cachedSearchQuery);
@@ -26,21 +20,7 @@ export function Search() {
   const [page, setPage] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [colsPerRow, setColsPerRow] = useState(() =>
-    typeof window !== "undefined" ? getColsForWidth(window.innerWidth) : 6
-  );
-  const [rowsPerPage, setRowsPerPage] = useState(() =>
-    typeof window !== "undefined" ? getRowsForHeight(window.innerHeight) : 2
-  );
-
-  useEffect(() => {
-    const onResize = () => {
-      setColsPerRow(getColsForWidth(window.innerWidth));
-      setRowsPerPage(getRowsForHeight(window.innerHeight));
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+  const { colsPerRow, rowsPerPage, maxGridHeight } = useResponsiveGrid(false);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -152,7 +132,7 @@ export function Search() {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-black select-none">
       {/* Responsive Top Control Bar */}
-      <div className="shrink-0 relative flex items-center justify-between gap-2.5 sm:gap-4 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-6 pb-2.5 sm:pb-3 md:pb-5 z-40">
+      <div className="shrink-0 relative flex items-center justify-between gap-2.5 sm:gap-4 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-5 pb-0 z-40">
         <div className="hidden lg:block w-[1px] h-[38px] sm:h-[46px]" />
 
         <div className="flex-1 lg:flex-none lg:w-[440px] xl:w-[524px] lg:absolute lg:left-1/2 lg:-translate-x-1/2 h-[38px] sm:h-[46px]">
@@ -224,20 +204,20 @@ export function Search() {
         </div>
       </div>
 
-      {/* Viewport Grid (Clears Bottom Nav Pill, Supports Touch Swipe, Adapts to Orientation & Wide Screens) */}
+      {/* Viewport Grid (Clears Bottom Nav Pill, Vertically Balanced Across Screen Ratios) */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[82px] sm:pb-[92px] md:pb-[98px] pb-[max(5.75rem,calc(5rem+env(safe-area-inset-bottom)))] relative z-10"
+        className="flex-1 min-h-0 w-full flex flex-col justify-center px-4 sm:px-6 md:px-8 browse-stage-padding relative z-10"
       >
         {loading ? (
           <div
             className={cn(
               "grid gap-x-3 sm:gap-x-5 md:gap-x-7 gap-y-2.5 sm:gap-y-4 md:gap-y-5 w-full h-full min-h-0",
-              rowsPerPage === 1 ? "grid-rows-1" : "grid-rows-2",
-              "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 xl:grid-cols-8",
-              "md:max-h-[calc((100vw-64px)*0.54)] xl:max-h-[calc((100vw-64px)*0.45)]"
+              GRID_COLS_CLASS[colsPerRow] || "grid-cols-6",
+              GRID_ROWS_CLASS[rowsPerPage] || "grid-rows-2"
             )}
+            style={maxGridHeight ? { maxHeight: `${maxGridHeight}px` } : undefined}
           >
             {Array.from({ length: itemsPerPage }).map((_, idx) => (
               <div key={idx} className="flex flex-col gap-1.5 sm:gap-2 h-full min-h-0 w-full">
@@ -253,10 +233,10 @@ export function Search() {
           <div
             className={cn(
               "grid gap-x-3 sm:gap-x-5 md:gap-x-7 gap-y-2.5 sm:gap-y-4 md:gap-y-5 w-full h-full min-h-0",
-              rowsPerPage === 1 ? "grid-rows-1" : "grid-rows-2",
-              "grid-cols-2 sm:grid-cols-3 md:grid-cols-6 xl:grid-cols-8",
-              "md:max-h-[calc((100vw-64px)*0.54)] xl:max-h-[calc((100vw-64px)*0.45)]"
+              GRID_COLS_CLASS[colsPerRow] || "grid-cols-6",
+              GRID_ROWS_CLASS[rowsPerPage] || "grid-rows-2"
             )}
+            style={maxGridHeight ? { maxHeight: `${maxGridHeight}px` } : undefined}
           >
             {visibleResults.map((item) => (
               <MediaCard

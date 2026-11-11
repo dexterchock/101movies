@@ -12,6 +12,29 @@
   }
 }
 
+/* Uniform top/bottom browse stage clearance above the floating bottom nav */
+.browse-stage-padding {
+  padding-top: 12px;
+  padding-bottom: 66px;
+  padding-bottom: calc(66px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  .browse-stage-padding {
+    padding-top: 16px;
+    padding-bottom: 90px;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 768px) {
+  .browse-stage-padding {
+    padding-top: 20px;
+    padding-bottom: 98px;
+    padding-bottom: calc(98px + env(safe-area-inset-bottom));
+  }
+}
+
 body {
   background-color: #000000;
   color: #ffffff;
@@ -61,6 +84,30 @@ body {
   max-width: calc(33.333% - 8px);
 }
 
+.grid.grid-cols-4 > * {
+  width: calc(25% - 16px);
+  max-width: calc(25% - 16px);
+  margin-bottom: 16px;
+}
+
+.grid.grid-cols-5 > * {
+  width: calc(20% - 20px);
+  max-width: calc(20% - 20px);
+  margin-bottom: 18px;
+}
+
+.grid.grid-cols-6 > * {
+  width: calc(16.666% - 24px);
+  max-width: calc(16.666% - 24px);
+  margin-bottom: 20px;
+}
+
+.grid.grid-cols-8 > * {
+  width: calc(12.5% - 24px);
+  max-width: calc(12.5% - 24px);
+  margin-bottom: 20px;
+}
+
 @media (min-width: 640px) {
   .grid.sm\:grid-cols-4 > * {
     width: calc(25% - 8px);
@@ -78,6 +125,10 @@ body {
   .grid.sm\:grid-cols-3 > *,
   .grid.md\:grid-cols-6 > *,
   .grid.grid-cols-3 > *,
+  .grid.grid-cols-4 > *,
+  .grid.grid-cols-5 > *,
+  .grid.grid-cols-6 > *,
+  .grid.grid-cols-8 > *,
   .grid.sm\:grid-cols-4 > * {
     width: 100%;
     max-width: 100%;

@@ -95,6 +95,17 @@ function estimatePillSlotWidth(
   return Math.ceil(34 + textWidth + 6 + qWidth + 6 + latencyWidth + 18);
 }
 
+const DEFAULT_SITE_TITLE = "101Movies";
+const DEFAULT_SITE_DESC =
+  "Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation and real-time TMDB integration.";
+const DEFAULT_SITE_IMAGE = "https://101movies.pages.dev/og-image.png";
+
+function setHeadMeta(selector: string, attr: string, value: string): void {
+  if (typeof document === "undefined") return;
+  const el = document.querySelector(selector);
+  if (el) el.setAttribute(attr, value);
+}
+
 interface ServerPageGroup {
   items: { src: ResolvedStreamSource; absoluteIndex: number }[];
 }
@@ -351,6 +362,62 @@ export function Player() {
       fetchVodStreams();
     }
   }, [type, id, fetchVodStreams]);
+
+  // Keep document title & Open Graph meta tags synced during client navigation
+  useEffect(() => {
+    if (!details || (!details.title && !details.name)) return;
+    const raw = details.title || details.name || "";
+    const en = details.en_title || raw;
+    const zh = details.zh_title;
+    const shareTitle =
+      details.is_chinese_origin && zh ? zh : en || zh || raw;
+    if (!shareTitle) return;
+
+    const releaseYear = (details.release_date || details.first_air_date || "").slice(0, 4);
+    const metaParts = [
+      type === "tv" ? "TV Series" : "Movie",
+      releaseYear,
+      details.vote_average ? `★ ${details.vote_average.toFixed(1)}` : "",
+    ].filter(Boolean);
+    const cleanOverview = (details.overview || "").replace(/\s+/g, " ").trim();
+    const shareDesc = cleanOverview
+      ? `${metaParts.join(" · ")} — ${cleanOverview.slice(0, 220)}`
+      : `Watch ${shareTitle} (${metaParts.join(" · ")}) on 101Movies.`;
+    const shareImage = details.backdrop_path
+      ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
+      : details.poster_path
+      ? `https://image.tmdb.org/t/p/w780${details.poster_path}`
+      : DEFAULT_SITE_IMAGE;
+    const shareUrl = `${window.location.origin}/player/${type}/${id}`;
+
+    document.title = `${shareTitle} · ${DEFAULT_SITE_TITLE}`;
+    setHeadMeta('meta[name="title"]', "content", shareTitle);
+    setHeadMeta('meta[name="description"]', "content", shareDesc);
+    setHeadMeta('meta[property="og:type"]', "content", type === "tv" ? "video.tv_show" : "video.movie");
+    setHeadMeta('meta[property="og:title"]', "content", shareTitle);
+    setHeadMeta('meta[property="og:description"]', "content", shareDesc);
+    setHeadMeta('meta[property="og:image"]', "content", shareImage);
+    setHeadMeta('meta[property="og:image:alt"]', "content", shareTitle);
+    setHeadMeta('meta[property="og:url"]', "content", shareUrl);
+    setHeadMeta('meta[name="twitter:title"]', "content", shareTitle);
+    setHeadMeta('meta[name="twitter:description"]', "content", shareDesc);
+    setHeadMeta('meta[name="twitter:image"]', "content", shareImage);
+
+    return () => {
+      document.title = DEFAULT_SITE_TITLE;
+      setHeadMeta('meta[name="title"]', "content", DEFAULT_SITE_TITLE);
+      setHeadMeta('meta[name="description"]', "content", DEFAULT_SITE_DESC);
+      setHeadMeta('meta[property="og:type"]', "content", "website");
+      setHeadMeta('meta[property="og:title"]', "content", DEFAULT_SITE_TITLE);
+      setHeadMeta('meta[property="og:description"]', "content", DEFAULT_SITE_DESC);
+      setHeadMeta('meta[property="og:image"]', "content", DEFAULT_SITE_IMAGE);
+      setHeadMeta('meta[property="og:image:alt"]', "content", "101Movies - Cinematic Streaming Platform");
+      setHeadMeta('meta[property="og:url"]', "content", "https://101movies.pages.dev/");
+      setHeadMeta('meta[name="twitter:title"]', "content", DEFAULT_SITE_TITLE);
+      setHeadMeta('meta[name="twitter:description"]', "content", DEFAULT_SITE_DESC);
+      setHeadMeta('meta[name="twitter:image"]', "content", DEFAULT_SITE_IMAGE);
+    };
+  }, [details, type, id]);
 
   // Close episode popover on outside click
   useEffect(() => {

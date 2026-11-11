@@ -45,7 +45,7 @@ function buildOgMetadata(
     ? `${metaParts.join(" · ")} — ${overview}`
     : `Watch ${title} (${metaParts.join(" · ")}) on 101Movies.`;
 
-  let imageUrl = `${origin}/og-image.png?v=2`;
+  let imageUrl = `${origin}/og-image.png?v=3`;
   let imageWidth = "1200";
   let imageHeight = "630";
 

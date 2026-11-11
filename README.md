@@ -8,7 +8,7 @@ A minimalist, zero-scroll movie and TV show discovery and streaming web applicat
 
 ## Features
 
-- **Zero-Scroll Responsive Grid**: Adapts cleanly across screen sizes without vertical page scrolling (`2` columns on portrait mobile, `3` on small screens, `6` on `md` desktop, `8` on `xl` wide displays, and a `1`-row layout for mobile landscape viewports).
+- **Zero-Scroll Aspect-Aware Grid**: Dynamically adapts column and row density (`2`–`8` columns, `1`–`3` rows via `getGridLayout`) to viewport width and height so posters maintain natural framing and uniform vertical spacing across portrait phones, tablets, tall monitors, widescreen desktops, and mobile landscape viewports.
 - **Floating Bottom Navigation Capsule**: Smooth sliding indicator between four standalone top-level views:
   - **Trending (`/`):** Browse trending Movies and Shows by category with capsule switchers, pagination buttons, and horizontal touch swipe support.
   - **Rankings (`/rankings`):** Top-rated Movies and Shows ranked by genre and release year (`1970` to current year) with scrollable capsule pickers and ranked badges.

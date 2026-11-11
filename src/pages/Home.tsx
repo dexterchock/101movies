@@ -8,7 +8,13 @@ import {
 } from "../types";
 import { MediaCard } from "../components/MediaCard";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { cn, safeScrollTo } from "../utils";
+import {
+  cn,
+  safeScrollTo,
+  loadWatchHistory,
+  clearWatchHistory,
+  removeFromWatchHistory,
+} from "../utils";
 
 const MOVIE_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
 const TV_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
@@ -33,14 +39,7 @@ function getRowsForHeight(height: number): number {
 }
 
 export function Home() {
-  const [history, setHistory] = useState<MediaItem[]>(() => {
-    try {
-      const stored = localStorage.getItem("watch_history");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [history, setHistory] = useState<MediaItem[]>(loadWatchHistory);
 
   const [mediaType, setMediaType] = useState<"movie" | "tv" | "history">(() => {
     const saved = sessionStorage.getItem("trending_media_type");
@@ -162,32 +161,13 @@ export function Home() {
   }, [tvCategory]);
 
   const handleClearHistory = () => {
-    localStorage.removeItem("watch_history");
+    clearWatchHistory();
     setHistory([]);
     setMediaType("movie");
   };
 
   const handleRemoveHistoryItem = (itemToRemove: MediaItem) => {
-    setHistory((prev) => {
-      const targetType =
-        itemToRemove.media_type === "tv" ||
-        (!itemToRemove.media_type && !itemToRemove.title && itemToRemove.name)
-          ? "tv"
-          : "movie";
-      const updated = prev.filter((h) => {
-        const hType =
-          h.media_type === "tv" || (!h.media_type && !h.title && h.name)
-            ? "tv"
-            : "movie";
-        return !(h.id === itemToRemove.id && hType === targetType);
-      });
-      if (updated.length > 0) {
-        localStorage.setItem("watch_history", JSON.stringify(updated));
-      } else {
-        localStorage.removeItem("watch_history");
-      }
-      return updated;
-    });
+    setHistory((prev) => removeFromWatchHistory(prev, itemToRemove));
   };
 
   const mediaTypesList: { id: "movie" | "tv" | "history"; label: string }[] =

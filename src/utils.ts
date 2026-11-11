@@ -1,8 +1,51 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { MediaItem } from "./types";
+
+const WATCH_HISTORY_KEY = "watch_history";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+export function loadWatchHistory(): MediaItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(WATCH_HISTORY_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function clearWatchHistory(): void {
+  try {
+    localStorage.removeItem(WATCH_HISTORY_KEY);
+  } catch {}
+}
+
+function resolveMediaItemType(item: MediaItem): "movie" | "tv" {
+  return item.media_type === "tv" || (!item.media_type && !item.title && item.name)
+    ? "tv"
+    : "movie";
+}
+
+export function removeFromWatchHistory(
+  prev: MediaItem[],
+  itemToRemove: MediaItem
+): MediaItem[] {
+  const targetType = resolveMediaItemType(itemToRemove);
+  const updated = prev.filter(
+    (h) => !(h.id === itemToRemove.id && resolveMediaItemType(h) === targetType)
+  );
+  try {
+    if (updated.length > 0) {
+      localStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(updated));
+    } else {
+      localStorage.removeItem(WATCH_HISTORY_KEY);
+    }
+  } catch {}
+  return updated;
 }
 
 /**

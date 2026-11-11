@@ -7,8 +7,14 @@ import {
   normalizeCategoryId,
 } from "../types";
 import { MediaCard } from "../components/MediaCard";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { cn, safeScrollTo } from "../utils";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  cn,
+  safeScrollTo,
+  loadWatchHistory,
+  clearWatchHistory,
+  removeFromWatchHistory,
+} from "../utils";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const START_YEAR = 1970;
@@ -16,11 +22,6 @@ const ALL_YEARS = Array.from(
   { length: CURRENT_YEAR - START_YEAR + 1 },
   (_, i) => CURRENT_YEAR - i
 );
-
-const MEDIA_TYPES: { id: "movie" | "tv"; label: string }[] = [
-  { id: "movie", label: "Movies" },
-  { id: "tv", label: "Shows" },
-];
 
 const MOVIE_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
 const TV_CATEGORIES: MediaCategoryOption[] = MEDIA_CATEGORIES;
@@ -48,10 +49,25 @@ function getRowsForHeight(height: number): number {
 }
 
 export function Rankings() {
-  const [mediaType, setMediaType] = useState<"movie" | "tv">(() => {
+  const [history, setHistory] = useState<MediaItem[]>(loadWatchHistory);
+
+  const [mediaType, setMediaType] = useState<"movie" | "tv" | "history">(() => {
     const saved = sessionStorage.getItem("rankings_media_type");
-    return saved === "tv" ? "tv" : "movie";
+    if (saved === "tv") return "tv";
+    if (saved === "history") return "history";
+    return "movie";
   });
+
+  // Fallback to "movie" if "history" was selected but history is now empty
+  const effectiveMediaType: "movie" | "tv" | "history" =
+    mediaType === "history" && history.length === 0 ? "movie" : mediaType;
+
+  useEffect(() => {
+    if (effectiveMediaType !== mediaType) {
+      setMediaType(effectiveMediaType);
+    }
+  }, [effectiveMediaType, mediaType]);
+
   const [genre, setGenre] = useState<string>(() => {
     return normalizeCategoryId(sessionStorage.getItem("rankings_genre")) || "all";
   });
@@ -62,16 +78,18 @@ export function Rankings() {
   });
 
   const activeGenreList =
-    mediaType === "movie" ? MOVIE_CATEGORIES : TV_CATEGORIES;
+    effectiveMediaType === "tv" ? TV_CATEGORIES : MOVIE_CATEGORIES;
   const validGenre = activeGenreList.some((g) => g.id === genre) ? genre : "all";
 
   useEffect(() => {
     if (validGenre !== genre) {
       setGenre("all");
     }
-  }, [mediaType, validGenre, genre]);
+  }, [effectiveMediaType, validGenre, genre]);
 
-  const currentKey = `${mediaType}_${year}_${validGenre}`;
+  const rankingsMediaType: "movie" | "tv" =
+    effectiveMediaType === "tv" ? "tv" : "movie";
+  const currentKey = `${rankingsMediaType}_${year}_${validGenre}`;
   const [items, setItems] = useState<MediaItem[]>(() =>
     cachedRankingsKey === currentKey && cachedRankingsItems
       ? cachedRankingsItems
@@ -101,7 +119,22 @@ export function Rankings() {
   const [canScrollGenreLeft, setCanScrollGenreLeft] = useState(false);
   const [canScrollGenreRight, setCanScrollGenreRight] = useState(true);
 
-  const activeMediaTypeIndex = MEDIA_TYPES.findIndex((c) => c.id === mediaType);
+  const mediaTypesList: { id: "movie" | "tv" | "history"; label: string }[] =
+    history.length > 0
+      ? [
+          { id: "movie", label: "Movies" },
+          { id: "tv", label: "Shows" },
+          { id: "history", label: "History" },
+        ]
+      : [
+          { id: "movie", label: "Movies" },
+          { id: "tv", label: "Shows" },
+        ];
+
+  const activeMediaTypeIndex = Math.max(
+    0,
+    mediaTypesList.findIndex((c) => c.id === effectiveMediaType)
+  );
   const activeYearIndex = Math.max(0, ALL_YEARS.indexOf(year));
   const activeGenreIndex = Math.max(
     0,
@@ -128,7 +161,11 @@ export function Rankings() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const mediaTypeTabWidth = isMobileView ? 68 : 88;
+  const mediaTypeTabWidth = isMobileView
+    ? history.length > 0
+      ? 58
+      : 68
+    : 88;
   const yearPillWidth = isMobileView ? YEAR_PILL_WIDTH_MOBILE : YEAR_PILL_WIDTH_DESKTOP;
   const genrePillWidth = isMobileView ? GENRE_PILL_WIDTH_MOBILE : GENRE_PILL_WIDTH_DESKTOP;
 
@@ -164,6 +201,10 @@ export function Rankings() {
   );
 
   useEffect(() => {
+    if (effectiveMediaType === "history") {
+      isInitialYearMountRef.current = true;
+      return;
+    }
     const el = yearTrackRef.current;
     if (!el) return;
     const handleResize = () => centerYearTrack(false);
@@ -174,7 +215,7 @@ export function Rankings() {
       el.removeEventListener("scroll", updateScrollButtons);
       window.removeEventListener("resize", handleResize);
     };
-  }, [updateScrollButtons, centerYearTrack]);
+  }, [updateScrollButtons, centerYearTrack, effectiveMediaType]);
 
   const centerGenreTrack = useCallback(
     (smooth: boolean) => {
@@ -205,12 +246,13 @@ export function Rankings() {
       el.removeEventListener("scroll", updateGenreScrollButtons);
       window.removeEventListener("resize", onResize);
     };
-  }, [updateGenreScrollButtons, centerGenreTrack, mediaType]);
+  }, [updateGenreScrollButtons, centerGenreTrack, effectiveMediaType]);
 
   const isInitialYearMountRef = useRef(true);
   const isInitialGenreMountRef = useRef(true);
 
   useLayoutEffect(() => {
+    if (effectiveMediaType === "history") return;
     try {
       if (isInitialYearMountRef.current) {
         isInitialYearMountRef.current = false;
@@ -221,7 +263,7 @@ export function Rankings() {
     } catch (err) {
       console.warn("centerYearTrack failed in useLayoutEffect:", err);
     }
-  }, [centerYearTrack]);
+  }, [centerYearTrack, effectiveMediaType]);
 
   useLayoutEffect(() => {
     try {
@@ -238,12 +280,14 @@ export function Rankings() {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem("rankings_media_type", mediaType);
+      sessionStorage.setItem("rankings_media_type", effectiveMediaType);
       sessionStorage.setItem("rankings_year", String(year));
       sessionStorage.setItem("rankings_genre", validGenre);
     } catch {}
 
-    const key = `${mediaType}_${year}_${validGenre}`;
+    if (effectiveMediaType === "history") return;
+
+    const key = `${effectiveMediaType}_${year}_${validGenre}`;
     if (cachedRankingsKey === key && cachedRankingsItems) {
       setItems(cachedRankingsItems);
       setLoading(false);
@@ -252,7 +296,7 @@ export function Rankings() {
 
     let active = true;
     setLoading(true);
-    const fetchPromise = api.getRankings(mediaType, year, validGenre);
+    const fetchPromise = api.getRankings(effectiveMediaType, year, validGenre);
 
     fetchPromise
       .then((data) => {
@@ -269,7 +313,7 @@ export function Rankings() {
     return () => {
       active = false;
     };
-  }, [mediaType, year, validGenre]);
+  }, [effectiveMediaType, year, validGenre]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const el = yearTrackRef.current;
@@ -400,6 +444,75 @@ export function Rankings() {
     touchStartYRef.current = e.touches[0].clientY;
   };
 
+  const [historyPage, setHistoryPage] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("rankings_history_page");
+      const parsed = saved ? parseInt(saved, 10) : 0;
+      return Number.isNaN(parsed) ? 0 : parsed;
+    } catch {
+      return 0;
+    }
+  });
+
+  const handleClearHistory = () => {
+    clearWatchHistory();
+    setHistory([]);
+    setHistoryPage(0);
+    setMediaType("movie");
+    try {
+      sessionStorage.removeItem("rankings_history_page");
+    } catch {}
+  };
+
+  const handleRemoveHistoryItem = (itemToRemove: MediaItem) => {
+    setHistory((prev) => removeFromWatchHistory(prev, itemToRemove));
+  };
+
+  const isHistory = effectiveMediaType === "history";
+  const itemsPerPage = colsPerRow * rowsPerPage;
+  const totalHistoryPages = Math.ceil(history.length / itemsPerPage);
+
+  useEffect(() => {
+    if (historyPage >= totalHistoryPages && totalHistoryPages > 0) {
+      const clamped = Math.max(0, totalHistoryPages - 1);
+      setHistoryPage(clamped);
+      try {
+        sessionStorage.setItem("rankings_history_page", String(clamped));
+      } catch {}
+    }
+  }, [history.length, totalHistoryPages, historyPage]);
+
+  const prevHistoryPage = () => {
+    if (historyPage > 0) {
+      const next = historyPage - 1;
+      setHistoryPage(next);
+      try {
+        sessionStorage.setItem("rankings_history_page", String(next));
+      } catch {}
+    }
+  };
+
+  const nextHistoryPage = () => {
+    if (historyPage < totalHistoryPages - 1) {
+      const next = historyPage + 1;
+      setHistoryPage(next);
+      try {
+        sessionStorage.setItem("rankings_history_page", String(next));
+      } catch {}
+    }
+  };
+
+  const showHistoryLeft = historyPage > 0;
+  const showHistoryRight = historyPage < totalHistoryPages - 1;
+
+  const isGridLoading = isHistory ? false : loading;
+  const displayedItems = isHistory
+    ? history.slice(historyPage * itemsPerPage, (historyPage + 1) * itemsPerPage)
+    : items.slice(0, itemsPerPage);
+  const placeholderCount = !isGridLoading
+    ? Math.max(0, itemsPerPage - displayedItems.length)
+    : 0;
+
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartXRef.current === null || touchStartYRef.current === null) return;
     const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
@@ -408,7 +521,10 @@ export function Rankings() {
     touchStartYRef.current = null;
 
     if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
-      if (deltaX < 0) {
+      if (isHistory) {
+        if (deltaX < 0) nextHistoryPage();
+        else prevHistoryPage();
+      } else if (deltaX < 0) {
         scrollYearsBy(1); // Swipe left -> older year
       } else {
         scrollYearsBy(-1); // Swipe right -> newer year
@@ -416,17 +532,11 @@ export function Rankings() {
     }
   };
 
-  const itemsPerPage = colsPerRow * rowsPerPage;
-  const displayedItems = items.slice(0, itemsPerPage);
-  const placeholderCount = !loading
-    ? Math.max(0, itemsPerPage - displayedItems.length)
-    : 0;
-
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-black select-none">
       {/* Responsive Top Control Bar */}
       <div className="shrink-0 relative flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 sm:gap-x-3 gap-y-2 w-full px-4 sm:px-6 md:px-8 pt-3 sm:pt-4 md:pt-6 pb-2.5 sm:pb-3 md:pb-5 z-40">
-        {/* Left: Movies / Shows Capsule Toggle */}
+        {/* Left: Movies / Shows / History Capsule Toggle */}
         <div
           role="tablist"
           aria-label="Content Type"
@@ -439,8 +549,8 @@ export function Rankings() {
               transform: `translate3d(${activeMediaTypeIndex * (mediaTypeTabWidth + 4)}px, 0, 0)`,
             }}
           />
-          {MEDIA_TYPES.map((cat) => {
-            const isActive = mediaType === cat.id;
+          {mediaTypesList.map((cat) => {
+            const isActive = effectiveMediaType === cat.id;
             return (
               <button
                 key={cat.id}
@@ -467,7 +577,12 @@ export function Rankings() {
         </div>
 
         {/* Center on Desktop / Row 2 on Portrait Mobile: Genre Switcher Capsule */}
-        <div className="order-3 sm:order-2 w-full sm:w-auto sm:flex-1 lg:flex-none flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2 min-w-0">
+        <div
+          className={cn(
+            "order-3 sm:order-2 w-full sm:w-auto sm:flex-1 lg:flex-none flex justify-center lg:absolute lg:left-1/2 lg:-translate-x-1/2 min-w-0",
+            isHistory && "invisible pointer-events-none"
+          )}
+        >
           <div className="flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
             <button
               type="button"
@@ -562,99 +677,150 @@ export function Rankings() {
           </div>
         </div>
 
-        {/* Right: Year Switcher Capsule */}
-        <div className="order-2 sm:order-3 flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
-          <button
-            type="button"
-            onClick={() => scrollYearsBy(-1)}
-            disabled={!canScrollLeft}
-            aria-label="Scroll to newer years"
-            className={cn(
-              "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-              canScrollLeft
-                ? "hover:bg-white/15 cursor-pointer text-white"
-                : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
-            )}
-          >
-            <ChevronLeft
+        {/* Right: History Controls when History active, else Year Switcher Capsule */}
+        {isHistory ? (
+          <div className="order-2 sm:order-3 flex gap-1 sm:gap-2 items-center h-[38px] sm:h-[46px] shrink-0">
+            <button
+              onClick={handleClearHistory}
+              className="group relative sm:mr-1 flex items-center justify-center h-[38px] sm:h-[46px] px-2.5 sm:px-4 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 rounded-full bg-red-500/[0.08] hover:bg-red-500/18 border border-red-500/25 hover:border-red-500/40 shadow-[0_8px_24px_rgba(0,0,0,0.65)] transition-colors duration-300 cursor-pointer focus:outline-none focus-visible:outline-none select-none"
+              title="Clear History"
+            >
+              <div className="relative z-10 flex items-center gap-1 sm:gap-1.5 opacity-85 group-hover:opacity-100 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-105">
+                <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2]" />
+                <span>Clear</span>
+              </div>
+            </button>
+            <button
+              onClick={prevHistoryPage}
+              disabled={!showHistoryLeft}
               className={cn(
-                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                canScrollLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+                showHistoryLeft
+                  ? "hover:bg-white/15 cursor-pointer text-white"
+                  : "text-white opacity-25 cursor-not-allowed pointer-events-none"
               )}
-            />
-          </button>
-
-          <div
-            ref={yearTrackRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={stopDragging}
-            onMouseLeave={stopDragging}
-            onWheel={handleWheel}
-            className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[60px] sm:w-[200px] h-[30px] sm:h-[36px] rounded-full"
-          >
-            <div className="relative flex items-center gap-1 w-max h-[30px] sm:h-[36px]">
-              <div
-                className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
-                style={{
-                  width: `${yearPillWidth}px`,
-                  transform: `translate3d(${
-                    activeYearIndex * (yearPillWidth + YEAR_PILL_GAP)
-                  }px, 0, 0)`,
-                }}
+              aria-label="Previous history page"
+            >
+              <ChevronLeft
+                className={cn(
+                  "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                  showHistoryLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                )}
               />
-
-              {ALL_YEARS.map((y) => {
-                const isSelected = year === y;
-                return (
-                  <button
-                    key={y}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => {
-                      if (!hasDraggedRef.current) {
-                        setYear(y);
-                      }
-                    }}
-                    tabIndex={0}
-                    style={{ width: `${yearPillWidth}px` }}
-                    className={cn(
-                      "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
-                      "focus:outline-none focus-visible:outline-none select-none",
-                      isSelected
-                        ? "text-black"
-                        : "text-white/75 hover:text-white focus:text-white"
-                    )}
-                  >
-                    <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
-                      {y}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => scrollYearsBy(1)}
-            disabled={!canScrollRight}
-            aria-label="Scroll to older years"
-            className={cn(
-              "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
-              canScrollRight
-                ? "hover:bg-white/15 cursor-pointer text-white"
-                : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
-            )}
-          >
-            <ChevronRight
+            </button>
+            <button
+              onClick={nextHistoryPage}
+              disabled={!showHistoryRight}
               className={cn(
-                "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
-                canScrollRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                "group flex items-center justify-center w-[38px] h-[38px] sm:w-[46px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none",
+                showHistoryRight
+                  ? "hover:bg-white/15 cursor-pointer text-white"
+                  : "text-white opacity-25 cursor-not-allowed pointer-events-none"
               )}
-            />
-          </button>
-        </div>
+              aria-label="Next history page"
+            >
+              <ChevronRight
+                className={cn(
+                  "w-5 h-5 sm:w-7 sm:h-7 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                  showHistoryRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                )}
+              />
+            </button>
+          </div>
+        ) : (
+          <div className="order-2 sm:order-3 flex items-center justify-between gap-1 p-0.5 sm:p-1 h-[38px] sm:h-[46px] rounded-full bg-white/[0.07] border border-white/[0.14] shadow-[0_8px_32px_rgba(0,0,0,0.75)] shrink-0">
+            <button
+              type="button"
+              onClick={() => scrollYearsBy(-1)}
+              disabled={!canScrollLeft}
+              aria-label="Scroll to newer years"
+              className={cn(
+                "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+                canScrollLeft
+                  ? "hover:bg-white/15 cursor-pointer text-white"
+                  : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
+              )}
+            >
+              <ChevronLeft
+                className={cn(
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                  canScrollLeft ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                )}
+              />
+            </button>
+
+            <div
+              ref={yearTrackRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={stopDragging}
+              onMouseLeave={stopDragging}
+              onWheel={handleWheel}
+              className="relative overflow-x-auto no-scrollbar select-none cursor-grab active:cursor-grabbing w-[60px] sm:w-[200px] h-[30px] sm:h-[36px] rounded-full"
+            >
+              <div className="relative flex items-center gap-1 w-max h-[30px] sm:h-[36px]">
+                <div
+                  className="absolute top-0 bottom-0 left-0 bg-white text-black rounded-full transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] pointer-events-none"
+                  style={{
+                    width: `${yearPillWidth}px`,
+                    transform: `translate3d(${
+                      activeYearIndex * (yearPillWidth + YEAR_PILL_GAP)
+                    }px, 0, 0)`,
+                  }}
+                />
+
+                {ALL_YEARS.map((y) => {
+                  const isSelected = year === y;
+                  return (
+                    <button
+                      key={y}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => {
+                        if (!hasDraggedRef.current) {
+                          setYear(y);
+                        }
+                      }}
+                      tabIndex={0}
+                      style={{ width: `${yearPillWidth}px` }}
+                      className={cn(
+                        "group relative z-10 flex items-center justify-center h-[30px] sm:h-[36px] text-xs sm:text-sm rounded-full font-medium tracking-wide tabular-nums whitespace-nowrap shrink-0 transition-colors duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] cursor-pointer",
+                        "focus:outline-none focus-visible:outline-none select-none",
+                        isSelected
+                          ? "text-black"
+                          : "text-white/75 hover:text-white focus:text-white"
+                      )}
+                    >
+                      <span className="inline-block transition-transform duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:scale-110 group-focus:scale-110">
+                        {y}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollYearsBy(1)}
+              disabled={!canScrollRight}
+              aria-label="Scroll to older years"
+              className={cn(
+                "group flex items-center justify-center w-[30px] sm:w-[36px] h-[30px] sm:h-[36px] rounded-full transition-colors duration-300 ease-[cubic-bezier(0.25,1,0.5,1)] focus:outline-none focus-visible:outline-none select-none shrink-0",
+                canScrollRight
+                  ? "hover:bg-white/15 cursor-pointer text-white"
+                  : "bg-transparent text-white opacity-25 cursor-not-allowed pointer-events-none"
+              )}
+            >
+              <ChevronRight
+                className={cn(
+                  "w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]",
+                  canScrollRight ? "group-hover:scale-125 text-white" : "text-white opacity-25"
+                )}
+              />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Viewport Grid (Clears Bottom Nav Pill, Supports Touch Swipe, Adapts to Orientation & Wide Screens) */}
@@ -663,13 +829,15 @@ export function Rankings() {
         onTouchEnd={handleTouchEnd}
         className="flex-1 min-h-0 w-full px-4 sm:px-6 md:px-8 pb-[82px] sm:pb-[92px] md:pb-[98px] pb-[max(5.75rem,calc(5rem+env(safe-area-inset-bottom)))] relative z-10"
       >
-        {!loading && displayedItems.length === 0 ? (
+        {!isGridLoading && displayedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <p className="text-lg sm:text-xl text-white/70 font-medium mb-2">
-              No rankings found for {year}
+              {isHistory ? "No watch history yet" : `No rankings found for ${year}`}
             </p>
             <p className="text-xs sm:text-sm text-gray-500">
-              Try swiping to a different year or switching categories.
+              {isHistory
+                ? "Start watching a movie or show to see it here."
+                : "Try swiping to a different year or switching categories."}
             </p>
           </div>
         ) : (
@@ -681,7 +849,7 @@ export function Rankings() {
               "md:max-h-[calc((100vw-64px)*0.54)] xl:max-h-[calc((100vw-64px)*0.45)]"
             )}
           >
-            {loading
+            {isGridLoading
               ? Array.from({ length: itemsPerPage }).map((_, idx) => (
                   <div key={idx} className="flex flex-col gap-1.5 sm:gap-2 h-full min-h-0 w-full">
                     <div className="w-full flex-1 min-h-0 rounded-xl sm:rounded-2xl bg-white/5 border border-white/5 animate-pulse" />
@@ -695,9 +863,14 @@ export function Rankings() {
                 <>
                   {displayedItems.map((item, index) => (
                     <MediaCard
-                      key={`${mediaType}-${year}-${validGenre}-${item.id}`}
+                      key={
+                        isHistory
+                          ? `${item.media_type || "movie"}-${item.id}`
+                          : `${rankingsMediaType}-${year}-${validGenre}-${item.id}`
+                      }
                       item={item}
-                      rank={index + 1}
+                      rank={isHistory ? undefined : index + 1}
+                      onRemove={isHistory ? () => handleRemoveHistoryItem(item) : undefined}
                       className="w-full"
                     />
                   ))}

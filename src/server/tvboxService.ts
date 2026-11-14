@@ -512,7 +512,7 @@ function parseChineseNumeral(str: string): number | null {
   return null;
 }
 
-function stripYearSuffix(title: string): string {
+export function stripYearSuffix(title: string): string {
   return title.replace(/\s*[(（【[]?(19|20)\d{2}[)）】\]]?\s*$/, "").trim();
 }
 
@@ -563,7 +563,7 @@ export function detectSourceQuality(
   return "1080P";
 }
 
-function stripLanguageAndStatusTags(input: string): string {
+export function stripLanguageAndStatusTags(input: string): string {
   let clean = input.trim();
   // Strip bracketed tags like [美剧], (粤语), (国语版), 【更新至16集】
   clean = clean
@@ -633,14 +633,14 @@ export function parseSeasonInfo(rawTitle: string): {
   return { baseTitle: clean, seasonNumber: null, audioLang };
 }
 
-function normalizeTitleForComparison(title: string): string {
+export function normalizeTitleForComparison(title: string): string {
   return toSimplifiedChinese(title)
     .toLowerCase()
     .replace(/[\s:：·\-—_!！?？,，.。'’"“”()（）[\]【】*＊]/g, "")
     .trim();
 }
 
-function extractNumbers(str: string): string[] {
+export function extractNumbers(str: string): string[] {
   return str.match(/\d+/g) || [];
 }
 
@@ -736,7 +736,7 @@ function buildSearchKeywords(titles: string[]): string[] {
   return candidates;
 }
 
-function computeTitleMatchScore(
+export function computeTitleMatchScore(
   vodName: string,
   vodSub: string,
   targetTitles: string[],
@@ -1144,6 +1144,19 @@ interface TmdbCandidateMetadata {
   isUnreleased: boolean;
   primaryZhTitle?: string;
   expiresAt: number;
+}
+
+export function setBoundedCache<K, V>(
+  map: Map<K, V>,
+  key: K,
+  value: V,
+  maxSize = 500
+): void {
+  if (map.size >= maxSize && !map.has(key)) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey !== undefined) map.delete(oldestKey);
+  }
+  map.set(key, value);
 }
 
 const tmdbMetadataCache = new Map<string, TmdbCandidateMetadata>();

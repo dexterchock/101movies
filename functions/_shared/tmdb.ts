@@ -1,5 +1,6 @@
 import {
   filterItemsByServerAvailability,
+  setBoundedCache,
   toSimplifiedChinese,
 } from "./tvboxService";
 
@@ -177,12 +178,97 @@ export async function fetchTmdb(
     apiKey
   );
 
-  tmdbListCache.set(endpoint, {
-    results: verifiedResults,
-    expiresAt: Date.now() + 15 * 60 * 1000,
-  });
+  setBoundedCache(
+    tmdbListCache,
+    endpoint,
+    {
+      results: verifiedResults,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+    },
+    100
+  );
 
   return { page: 1, results: verifiedResults };
+}
+
+export async function fetchTrendingHk(
+  type: "movie" | "tv",
+  apiKey: string
+): Promise<any[]> {
+  if (!apiKey) return [];
+  const hkCacheKey = `trending_${type}_hk`;
+  const cachedHk = tmdbListCache.get(hkCacheKey);
+  if (cachedHk && cachedHk.expiresAt > Date.now()) {
+    return cachedHk.results;
+  }
+
+  const recentYear = new Date().getFullYear() - 3;
+  const recentDate = `${recentYear}-01-01`;
+  const dateFilter =
+    type === "movie"
+      ? `primary_release_date.gte=${recentDate}`
+      : `first_air_date.gte=${recentDate}`;
+  const popMinVotes = type === "movie" ? 5 : 2;
+  const recentUrl = `${TMDB_BASE_URL}/discover/${type}?sort_by=popularity.desc&with_origin_country=HK&${dateFilter}&vote_count.gte=1`;
+  const popUrl = `${TMDB_BASE_URL}/discover/${type}?sort_by=popularity.desc&with_origin_country=HK&vote_count.gte=${popMinVotes}`;
+
+  const [recentRes, popRes, recentZhRes, popZhRes] = await Promise.allSettled<any>([
+    fetch(`${recentUrl}&api_key=${apiKey}`).then((r) => r.json()),
+    fetch(`${popUrl}&api_key=${apiKey}`).then((r) => r.json()),
+    fetch(`${recentUrl}&language=zh-CN&api_key=${apiKey}`).then((r) => r.json()),
+    fetch(`${popUrl}&language=zh-CN&api_key=${apiKey}`).then((r) => r.json()),
+  ]);
+
+  const zhMap = new Map<number, string>();
+  for (const settled of [recentZhRes, popZhRes]) {
+    if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
+      for (const item of (settled.value as any).results) {
+        if (item && typeof item.id === "number") {
+          const t = item.title || item.name;
+          if (t && hasChineseChars(t)) {
+            zhMap.set(item.id, toSimplifiedChinese(t.trim()));
+          }
+        }
+      }
+    }
+  }
+
+  const combined: any[] = [];
+  const seenIds = new Set<number>();
+  for (const settled of [recentRes, popRes]) {
+    if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
+      for (const item of (settled.value as any).results) {
+        if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          const zhTitle = zhMap.get(item.id);
+          combined.push({
+            ...item,
+            media_type: type,
+            zh_title: zhTitle || item.zh_title,
+          });
+        }
+      }
+    }
+  }
+
+  const releasedCandidates = filterReleasedMedia(combined, 1).slice(0, 28);
+  const results = await filterItemsByServerAvailability(
+    releasedCandidates,
+    type,
+    apiKey
+  );
+
+  setBoundedCache(
+    tmdbListCache,
+    hkCacheKey,
+    {
+      results,
+      expiresAt: Date.now() + 15 * 60 * 1000,
+    },
+    100
+  );
+
+  return results;
 }
 
 const personZhNameCache = new Map<number, string>();
@@ -250,7 +336,7 @@ async function resolveChinesePersonName(
       ...(Array.isArray(data?.also_known_as) ? data.also_known_as : []),
     ];
     const resolved = pickChineseAlias(candidates) || fallbackName;
-    personZhNameCache.set(personId, resolved);
+    setBoundedCache(personZhNameCache, personId, resolved, 1000);
     return resolved;
   } catch {
     return fallbackName;

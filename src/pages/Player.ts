@@ -8,7 +8,6 @@ import {
   WatchProgress,
 } from "../types";
 import { escapeHtml, isInWatchLater, toggleWatchLater } from "../utils";
-import { toSimplifiedChinese } from "../zhSimp";
 import type { ViewCleanup } from "./Home";
 
 // VOD APIs responding >= 800ms indicate high latency / slow stream segment delivery
@@ -63,21 +62,19 @@ function formatPlaybackTime(seconds?: number): string {
 
 function cleanDisplayZhTitle(rawVodName?: string): string | undefined {
   if (!rawVodName || !/[\u4e00-\u9fff]/.test(rawVodName)) return undefined;
-  return toSimplifiedChinese(
-    rawVodName
-      .replace(/\s*[(（【[]?(19|20)\d{2}[)）】\]]?\s*$/, "")
-      .replace(
-        /\s*[(（【[]?\s*(粤语版?|国语版?|普通话版?|粤语配音|国语配音|中字|高清|超清|HD|BD|1080P)\s*[)）】\]]?\s*$/gi,
-        ""
-      )
-      .replace(
-        /[\s\-·:：/_]*(粤语版?|国语版?|普通话版?|粤语配音|国语配音|粤语|国语|普通话)\s*$/gi,
-        ""
-      )
-      .replace(/\s*第\s*[一二两三四五六七八九十\d]+\s*[季部]\s*$/, "")
-      .replace(/\s*(?:Season\s*\d+|S\d+)\s*$/i, "")
-      .trim()
-  );
+  return rawVodName
+    .replace(/\s*[(（【[]?(19|20)\d{2}[)）】\]]?\s*$/, "")
+    .replace(
+      /\s*[(（【[]?\s*(粤语版?|国语版?|普通话版?|粤语配音|国语配音|中字|高清|超清|HD|BD|1080P)\s*[)）】\]]?\s*$/gi,
+      ""
+    )
+    .replace(
+      /[\s\-·:：/_]*(粤语版?|国语版?|普通话版?|粤语配音|国语配音|粤语|国语|普通话)\s*$/gi,
+      ""
+    )
+    .replace(/\s*第\s*[一二两三四五六七八九十\d]+\s*[季部]\s*$/, "")
+    .replace(/\s*(?:Season\s*\d+|S\d+)\s*$/i, "")
+    .trim();
 }
 
 function estimatePillSlotWidth(
@@ -319,12 +316,9 @@ export function mount(
     if (!details || (!details.title && !details.name)) return;
     const raw = details.title || details.name || "";
     const en = details.en_title || raw;
-    const zh = details.zh_title ? toSimplifiedChinese(details.zh_title) : undefined;
-    const rawShareTitle =
+    const zh = details.zh_title;
+    const shareTitle =
       details.is_chinese_origin && zh ? zh : en || zh || raw;
-    const shareTitle = /[\u4e00-\u9fff]/.test(rawShareTitle)
-      ? toSimplifiedChinese(rawShareTitle)
-      : rawShareTitle;
     if (!shareTitle) return;
 
     const releaseYear = (details.release_date || details.first_air_date || "").slice(
@@ -707,9 +701,7 @@ export function mount(
     const rawTitle = details.title || details.name || "";
     const englishTitle = details.en_title || rawTitle;
     const fallbackVodZhTitle = cleanDisplayZhTitle(sources[0]?.vodName);
-    const chineseTitle = details.zh_title
-      ? toSimplifiedChinese(details.zh_title)
-      : fallbackVodZhTitle;
+    const chineseTitle = details.zh_title || fallbackVodZhTitle;
 
     const isChineseDefault = Boolean(details.is_chinese_origin && chineseTitle);
     const primaryTitle = isChineseDefault
@@ -819,11 +811,7 @@ export function mount(
     )?.substring(0, 4);
     const countryCode = resolveCountryCode(details);
     const genreNames = details.genres?.slice(0, 3).map((g) => g.name).join(", ");
-    const castList = (details.cast || [])
-      .slice(0, 4)
-      .map((name) =>
-        /[\u4e00-\u9fff]/.test(name) ? toSimplifiedChinese(name) : name
-      );
+    const castList = (details.cast || []).slice(0, 4);
 
     const metaRow = document.createElement("div");
     metaRow.className = "player-meta-row tabular-nums";
@@ -859,9 +847,7 @@ export function mount(
     if (details.overview) {
       const overviewEl = document.createElement("p");
       overviewEl.className = "player-overview";
-      overviewEl.textContent = /[\u4e00-\u9fff]/.test(details.overview)
-        ? toSimplifiedChinese(details.overview)
-        : details.overview;
+      overviewEl.textContent = details.overview;
       info.appendChild(overviewEl);
     }
 
@@ -880,28 +866,24 @@ export function mount(
       }</span>`;
     };
     renderWatchLaterBtn(isInWatchLater(type, details.id));
-    watchLaterBtn.addEventListener(
-      "click",
-      () => {
-        if (!details) return;
-        const saved = toggleWatchLater({
-          id: details.id,
-          media_type: type,
-          title: details.title,
-          name: details.name,
-          poster_path: details.poster_path,
-          backdrop_path: details.backdrop_path,
-          vote_average: details.vote_average,
-          release_date: details.release_date,
-          first_air_date: details.first_air_date,
-          overview: details.overview,
-          en_title: details.en_title,
-          zh_title: details.zh_title,
-        });
-        renderWatchLaterBtn(saved);
-      },
-      { signal }
-    );
+    watchLaterBtn.addEventListener("click", () => {
+      if (!details) return;
+      const saved = toggleWatchLater({
+        id: details.id,
+        media_type: type,
+        title: details.title,
+        name: details.name,
+        poster_path: details.poster_path,
+        backdrop_path: details.backdrop_path,
+        vote_average: details.vote_average,
+        release_date: details.release_date,
+        first_air_date: details.first_air_date,
+        overview: details.overview,
+        en_title: details.en_title,
+        zh_title: details.zh_title,
+      });
+      renderWatchLaterBtn(saved);
+    });
     actionsRow.appendChild(watchLaterBtn);
 
     const imdbLink = document.createElement("a");
@@ -931,11 +913,7 @@ export function mount(
     titleEl.replaceChildren();
     const primarySpan = document.createElement("span");
     primarySpan.textContent = primaryTitle;
-    primarySpan.addEventListener(
-      "click",
-      () => copyTextSilently(primaryTitle),
-      { signal }
-    );
+    primarySpan.addEventListener("click", () => copyTextSilently(primaryTitle));
     titleEl.appendChild(primarySpan);
 
     if (secondaryTitle) {
@@ -944,11 +922,7 @@ export function mount(
       wrap.appendChild(document.createTextNode("/ "));
       const secSpan = document.createElement("span");
       secSpan.textContent = secondaryTitle;
-      secSpan.addEventListener(
-        "click",
-        () => copyTextSilently(secondaryTitle),
-        { signal }
-      );
+      secSpan.addEventListener("click", () => copyTextSilently(secondaryTitle));
       wrap.appendChild(secSpan);
       titleEl.appendChild(wrap);
     }
@@ -1040,19 +1014,15 @@ export function mount(
           <span class="latency-label tabular-nums">${src.latencyMs}ms</span>
         </span>
       `;
-      btn.addEventListener(
-        "click",
-        () => {
-          const seekTime = isPlaying ? currentVideoTime : 0;
-          startPlaybackWithProgress(
-            absoluteIndex,
-            activeSeasonIndex,
-            activeEpisodeIndex,
-            seekTime
-          );
-        },
-        { signal }
-      );
+      btn.addEventListener("click", () => {
+        const seekTime = isPlaying ? currentVideoTime : 0;
+        startPlaybackWithProgress(
+          absoluteIndex,
+          activeSeasonIndex,
+          activeEpisodeIndex,
+          seekTime
+        );
+      });
       list.appendChild(btn);
     });
 
@@ -1069,16 +1039,12 @@ export function mount(
       prevSrvBtn.disabled = !showServerPrev;
       prevSrvBtn.setAttribute("aria-label", "Previous servers");
       prevSrvBtn.innerHTML = icons.chevronLeft("server-nav-icon");
-      prevSrvBtn.addEventListener(
-        "click",
-        () => {
-          if (serverPage > 0) {
-            serverPage -= 1;
-            renderServerBar();
-          }
-        },
-        { signal }
-      );
+      prevSrvBtn.addEventListener("click", () => {
+        if (serverPage > 0) {
+          serverPage -= 1;
+          renderServerBar();
+        }
+      });
 
       const nextSrvBtn = document.createElement("button");
       nextSrvBtn.type = "button";
@@ -1087,16 +1053,12 @@ export function mount(
       nextSrvBtn.disabled = !showServerNext;
       nextSrvBtn.setAttribute("aria-label", "Next servers");
       nextSrvBtn.innerHTML = icons.chevronRight("server-nav-icon");
-      nextSrvBtn.addEventListener(
-        "click",
-        () => {
-          if (serverPage < totalServerPages - 1) {
-            serverPage += 1;
-            renderServerBar();
-          }
-        },
-        { signal }
-      );
+      nextSrvBtn.addEventListener("click", () => {
+        if (serverPage < totalServerPages - 1) {
+          serverPage += 1;
+          renderServerBar();
+        }
+      });
 
       navGroup.append(prevSrvBtn, nextSrvBtn);
       row.appendChild(navGroup);
@@ -1158,7 +1120,7 @@ export function mount(
         "",
         12
       )}<span>${escapeHtml(resumeLabel)}</span></span>`;
-      resumeBtn.addEventListener("click", handleResumeClick, { signal });
+      resumeBtn.addEventListener("click", handleResumeClick);
       frag.appendChild(resumeBtn);
     }
 
@@ -1205,14 +1167,10 @@ export function mount(
           : "";
       }
 
-      triggerBtn.addEventListener(
-        "click",
-        () => {
-          isEpisodePopoverOpen = !isEpisodePopoverOpen;
-          renderActionsRight();
-        },
-        { signal }
-      );
+      triggerBtn.addEventListener("click", () => {
+        isEpisodePopoverOpen = !isEpisodePopoverOpen;
+        renderActionsRight();
+      });
       wrap.appendChild(triggerBtn);
 
       if (isEpisodePopoverOpen) {
@@ -1243,14 +1201,10 @@ export function mount(
           16,
           2
         )}</span>`;
-        closeBtn.addEventListener(
-          "click",
-          () => {
-            isEpisodePopoverOpen = false;
-            renderActionsRight();
-          },
-          { signal }
-        );
+        closeBtn.addEventListener("click", () => {
+          isEpisodePopoverOpen = false;
+          renderActionsRight();
+        });
         header.appendChild(closeBtn);
         popover.appendChild(header);
 
@@ -1266,15 +1220,11 @@ export function mount(
                 : "season-btn";
             sBtn.tabIndex = 0;
             sBtn.textContent = season.name;
-            sBtn.addEventListener(
-              "click",
-              () => {
-                activeSeasonIndex = sIdx;
-                activeEpisodeIndex = 0;
-                renderActionsRight();
-              },
-              { signal }
-            );
+            sBtn.addEventListener("click", () => {
+              activeSeasonIndex = sIdx;
+              activeEpisodeIndex = 0;
+              renderActionsRight();
+            });
             seasonBar.appendChild(sBtn);
           });
           popover.appendChild(seasonBar);
@@ -1293,21 +1243,17 @@ export function mount(
           epBtn.title = epLabel;
           epBtn.tabIndex = 0;
           epBtn.textContent = epLabel;
-          epBtn.addEventListener(
-            "click",
-            () => {
-              const targetServerIdx =
-                activeServerIndex !== null ? activeServerIndex : 0;
-              isEpisodePopoverOpen = false;
-              startPlaybackWithProgress(
-                targetServerIdx,
-                derived.safeSeasonIndex,
-                idx,
-                0
-              );
-            },
-            { signal }
-          );
+          epBtn.addEventListener("click", () => {
+            const targetServerIdx =
+              activeServerIndex !== null ? activeServerIndex : 0;
+            isEpisodePopoverOpen = false;
+            startPlaybackWithProgress(
+              targetServerIdx,
+              derived.safeSeasonIndex,
+              idx,
+              0
+            );
+          });
           epGrid.appendChild(epBtn);
         });
         popover.appendChild(epGrid);

@@ -239,8 +239,8 @@ export function openTvboxModal(onClose: () => void): TvboxModalController {
                   </a>
                 </div>
                 <div style="display:flex;flex-wrap:wrap;gap:10px;">
-                  <input data-custom-name type="text" value="${escapeHtml(customName)}" placeholder="Name (optional)" style="width:160px;height:40px;padding:0 14px;border-radius:9999px;background:#121212;border:1px solid rgba(255,255,255,0.1);font-size:12px;color:#fff;outline:none;" />
-                  <input data-custom-url type="url" value="${escapeHtml(customUrl)}" placeholder="Paste TVBox config URL, e.g. https://raw.liucn.cc/box/m.json" style="flex:1;min-width:220px;height:40px;padding:0 16px;border-radius:9999px;background:#121212;border:1px solid rgba(255,255,255,0.1);font-size:12px;font-family:monospace;color:#fff;outline:none;" />
+                  <input data-custom-name name="tvbox-custom-name" aria-label="Custom config name" type="text" value="${escapeHtml(customName)}" placeholder="Name (optional)" style="width:160px;height:40px;padding:0 14px;border-radius:9999px;background:#121212;border:1px solid rgba(255,255,255,0.1);font-size:12px;color:#fff;outline:none;" />
+                  <input data-custom-url name="tvbox-custom-url" aria-label="Custom TVBox config URL" type="url" value="${escapeHtml(customUrl)}" placeholder="Paste TVBox config URL, e.g. https://raw.liucn.cc/box/m.json" style="flex:1;min-width:220px;height:40px;padding:0 16px;border-radius:9999px;background:#121212;border:1px solid rgba(255,255,255,0.1);font-size:12px;font-family:monospace;color:#fff;outline:none;" />
                   <button type="submit" ${customParsing || !customUrl.trim() ? "disabled" : ""} style="height:40px;padding:0 20px;border-radius:9999px;background:#fff;color:#000;font-size:12px;font-weight:600;cursor:pointer;opacity:${customParsing || !customUrl.trim() ? 0.4 : 1};">
                     ${customParsing ? "Parsing..." : "Parse & Import"}
                   </button>
@@ -292,123 +292,89 @@ export function openTvboxModal(onClose: () => void): TvboxModalController {
       </div>
     `;
 
-    panel.querySelector("[data-close-modal]")?.addEventListener("click", handleClose, { signal });
+    panel.querySelector("[data-close-modal]")?.addEventListener("click", handleClose);
     panel.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((btn) => {
-      btn.addEventListener(
-        "click",
-        () => {
-          activeTab = btn.dataset.tab === "configs" ? "configs" : "sources";
-          render();
-        },
-        { signal }
-      );
-    });
-    panel.querySelector("[data-enable-all]")?.addEventListener(
-      "click",
-      () => {
-        disabledIds = [];
-        setDisabledSiteIds([]);
+      btn.addEventListener("click", () => {
+        activeTab = btn.dataset.tab === "configs" ? "configs" : "sources";
         render();
-      },
-      { signal }
-    );
-    panel.querySelector("[data-ping-all]")?.addEventListener("click", handlePingAll, {
-      signal,
+      });
     });
+    panel.querySelector("[data-enable-all]")?.addEventListener("click", () => {
+      disabledIds = [];
+      setDisabledSiteIds([]);
+      render();
+    });
+    panel.querySelector("[data-ping-all]")?.addEventListener("click", handlePingAll);
     panel.querySelectorAll<HTMLElement>("[data-toggle-site]").forEach((el) => {
-      el.addEventListener(
-        "click",
-        () => {
-          if (el.dataset.toggleSite) toggleSite(el.dataset.toggleSite);
-        },
-        { signal }
-      );
+      el.addEventListener("click", () => {
+        if (el.dataset.toggleSite) toggleSite(el.dataset.toggleSite);
+      });
     });
     panel.querySelectorAll<HTMLButtonElement>("[data-copy-cfg]").forEach((btn) => {
-      btn.addEventListener(
-        "click",
-        () => {
-          const id = btn.dataset.copyCfg || "";
-          const url = btn.dataset.copyUrl || "";
-          navigator.clipboard?.writeText(url).catch(() => {});
-          copiedId = id;
-          render();
-          setTimeout(() => {
-            if (!signal.aborted && copiedId === id) {
-              copiedId = null;
-              render();
-            }
-          }, 1800);
-        },
-        { signal }
-      );
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.copyCfg || "";
+        const url = btn.dataset.copyUrl || "";
+        navigator.clipboard?.writeText(url).catch(() => {});
+        copiedId = id;
+        render();
+        setTimeout(() => {
+          if (!signal.aborted && copiedId === id) {
+            copiedId = null;
+            render();
+          }
+        }, 1800);
+      });
     });
     panel.querySelectorAll<HTMLButtonElement>("[data-sync-cfg]").forEach((btn) => {
-      btn.addEventListener(
-        "click",
-        () => {
-          const id = btn.dataset.syncCfg || "";
-          const url = btn.dataset.syncUrl || "";
-          const name = btn.dataset.syncName || "";
-          handleSyncConfig(id, url, name);
-        },
-        { signal }
-      );
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.syncCfg || "";
+        const url = btn.dataset.syncUrl || "";
+        const name = btn.dataset.syncName || "";
+        handleSyncConfig(id, url, name);
+      });
     });
 
     const form = panel.querySelector<HTMLFormElement>("[data-custom-form]");
     if (form) {
       const nameInput = form.querySelector<HTMLInputElement>("[data-custom-name]");
       const urlInput = form.querySelector<HTMLInputElement>("[data-custom-url]");
-      nameInput?.addEventListener(
-        "input",
-        () => {
-          customName = nameInput.value;
-        },
-        { signal }
-      );
-      urlInput?.addEventListener(
-        "input",
-        () => {
-          customUrl = urlInput.value;
-          const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
-          if (submit) submit.disabled = customParsing || !customUrl.trim();
-        },
-        { signal }
-      );
-      form.addEventListener(
-        "submit",
-        async (e) => {
-          e.preventDefault();
-          if (!customUrl.trim()) return;
-          customParsing = true;
-          parseFeedback = null;
-          render();
-          try {
-            const data = await api.parseTvboxConfig(
-              customUrl.trim(),
-              customName.trim() || "Custom TVBox",
-              signal
-            );
-            if (data.sites) sites = data.sites;
-            parseFeedback = {
-              id: "custom",
-              ok: data.result.ok,
-              message: data.result.message || "Parsed successfully",
-              subRepos: data.result.subRepos,
-            };
-            if (data.result.ok) {
-              customUrl = "";
-              customName = "";
-            }
-            window.dispatchEvent(new CustomEvent("tvbox-sources-updated"));
-          } finally {
-            customParsing = false;
-            if (!signal.aborted) render();
+      nameInput?.addEventListener("input", () => {
+        customName = nameInput.value;
+      });
+      urlInput?.addEventListener("input", () => {
+        customUrl = urlInput.value;
+        const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+        if (submit) submit.disabled = customParsing || !customUrl.trim();
+      });
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!customUrl.trim()) return;
+        customParsing = true;
+        parseFeedback = null;
+        render();
+        try {
+          const data = await api.parseTvboxConfig(
+            customUrl.trim(),
+            customName.trim() || "Custom TVBox",
+            signal
+          );
+          if (data.sites) sites = data.sites;
+          parseFeedback = {
+            id: "custom",
+            ok: data.result.ok,
+            message: data.result.message || "Parsed successfully",
+            subRepos: data.result.subRepos,
+          };
+          if (data.result.ok) {
+            customUrl = "";
+            customName = "";
           }
-        },
-        { signal }
-      );
+          window.dispatchEvent(new CustomEvent("tvbox-sources-updated"));
+        } finally {
+          customParsing = false;
+          if (!signal.aborted) render();
+        }
+      });
     }
   };
 

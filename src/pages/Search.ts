@@ -59,6 +59,7 @@ export function mount(container: HTMLElement): ViewCleanup {
 
   const input = document.createElement("input");
   input.type = "text";
+  input.name = "search-query";
   input.className = "search-input";
   input.placeholder = "Search movies, shows...";
   input.value = query;

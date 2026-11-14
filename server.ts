@@ -5,7 +5,14 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { Resvg } from "@cf-wasm/resvg/node";
 import { buildMovieOgSvg, extractOgCardInput } from "./functions/_shared/ogCard";
-import { fetchMediaDetails as fetchTmdbMediaDetails } from "./functions/_shared/tmdb";
+import {
+  TMDB_BASE_URL,
+  fetchMediaDetails as fetchTmdbMediaDetails,
+  fetchTmdb as fetchSharedTmdb,
+  fetchTrendingHk,
+  filterReleasedMedia,
+  resolveTmdbGenre,
+} from "./functions/_shared/tmdb";
 import {
   AWESOME_ZHUIJU_TVBOX_CONFIGS,
   filterItemsByServerAvailability,
@@ -13,141 +20,9 @@ import {
   parseTvboxConfig,
   pingVodSite,
   resolveStreamsForMedia,
-  toSimplifiedChinese,
 } from "./src/server/tvboxService";
 
-const TMDB_API_KEY = process.env.TMDB_API_KEY;
-const TMDB_BASE_URL = "https://api.themoviedb.org/3";
-
-const CHINESE_LANGS = new Set(["zh", "cn", "yue", "bo", "za"]);
-const CHINESE_COUNTRIES = new Set(["CN", "HK", "TW", "MO"]);
-
-function hasChineseChars(str: string): boolean {
-  return /[\u4e00-\u9fff]/.test(str);
-}
-
-function resolveTmdbGenre(type: "movie" | "tv", genre?: string): string {
-  if (!genre || genre === "all") return "";
-  const g = genre.toLowerCase().trim();
-  switch (g) {
-    case "action":
-    case "28":
-    case "10759":
-      return type === "tv" ? "10759" : "28";
-    case "scifi":
-    case "sci-fi":
-    case "878":
-    case "10765":
-      return type === "tv" ? "10765" : "878";
-    case "comedy":
-    case "35":
-      return "35";
-    case "drama":
-    case "18":
-      return "18";
-    case "animation":
-    case "16":
-      return "16";
-    case "thriller":
-    case "53":
-      return type === "tv" ? "80,9648" : "53";
-    case "crime":
-    case "80":
-      return "80";
-    case "mystery":
-    case "9648":
-      return "9648";
-    case "horror":
-    case "27":
-      return type === "tv" ? "9648" : "27";
-    case "romance":
-    case "10749":
-      return type === "tv" ? "18" : "10749";
-    case "adventure":
-    case "12":
-      return type === "tv" ? "10759" : "12";
-    default:
-      return genre;
-  }
-}
-
-function isChineseOriginItem(item: any): boolean {
-  if (!item) return false;
-  const origLang = String(item.original_language || "").toLowerCase().trim();
-  if (CHINESE_LANGS.has(origLang)) return true;
-
-  if (Array.isArray(item.origin_country)) {
-    if (
-      item.origin_country.some((c: any) =>
-        CHINESE_COUNTRIES.has(String(c || "").toUpperCase().trim())
-      )
-    ) {
-      return true;
-    }
-  }
-
-  if (Array.isArray(item.production_countries)) {
-    if (
-      item.production_countries.some((c: any) =>
-        CHINESE_COUNTRIES.has(String(c?.iso_3166_1 || "").toUpperCase().trim())
-      )
-    ) {
-      return true;
-    }
-  }
-
-  const origText = String(item.original_title || item.original_name || "").trim();
-  if (hasChineseChars(origText) && (origLang === "zh" || origLang === "cn" || origLang === "yue")) {
-    return true;
-  }
-
-  return false;
-}
-
-function normalizeMediaItemTitles(item: any): any {
-  if (!item || typeof item !== "object") return item;
-  const isZhOrigin = isChineseOriginItem(item);
-  const enTitle = String(item.title || item.name || "").trim();
-  const rawOrigTitle = String(item.original_title || item.original_name || "").trim();
-
-  if (isZhOrigin && hasChineseChars(rawOrigTitle)) {
-    const simpTitle = toSimplifiedChinese(rawOrigTitle);
-    return {
-      ...item,
-      title: item.title !== undefined ? simpTitle : undefined,
-      name: item.name !== undefined ? simpTitle : undefined,
-      en_title: enTitle && enTitle !== simpTitle ? enTitle : undefined,
-      zh_title: simpTitle,
-      is_chinese_origin: true,
-    };
-  }
-
-  return {
-    ...item,
-    en_title: enTitle || undefined,
-    is_chinese_origin: isZhOrigin,
-  };
-}
-
-function filterReleasedMedia(items: any[], minVotes = 3): any[] {
-  if (!Array.isArray(items)) return [];
-  const todayIso = new Date().toISOString().slice(0, 10);
-  return items
-    .filter((item: any) => {
-      if (!item || !item.poster_path) return false;
-      const dateStr = item.release_date || item.first_air_date;
-      if (!dateStr || typeof dateStr !== "string") return false;
-      if (dateStr > todayIso) return false;
-      // Unreleased future movies/shows (like Avengers: Doomsday / Godzilla Minus Zero)
-      const voteCount = Number(item.vote_count || 0);
-      const voteAvg = Number(item.vote_average || 0);
-      if (voteCount < minVotes || voteAvg <= 0) return false;
-      return true;
-    })
-    .map(normalizeMediaItemTitles);
-}
-
-const tmdbListCache = new Map<string, { results: any[]; expiresAt: number }>();
+const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 
 async function startServer() {
   const app = express();
@@ -155,58 +30,21 @@ async function startServer() {
 
   app.use(express.json());
 
-  // TMDB Proxy helper that fetches candidates and verifies VOD server stream availability
+  // TMDB Proxy helper delegating to shared Cloudflare/Node logic
   const fetchTmdb = async (
     endpoint: string,
     res: express.Response,
     defaultType: "movie" | "tv",
     minVotes = 3
   ) => {
-    if (!TMDB_API_KEY) {
-      console.warn("TMDB API Key not configured.");
-      return res.json({ results: [] });
-    }
-    const cached = tmdbListCache.get(endpoint);
-    if (cached && cached.expiresAt > Date.now()) {
-      return res.json({ page: 1, results: cached.results });
-    }
-
     try {
-      const separator = endpoint.includes("?") ? "&" : "?";
-      const urlPage1 = `${TMDB_BASE_URL}${endpoint}${separator}page=1&api_key=${TMDB_API_KEY}`;
-      const urlPage2 = `${TMDB_BASE_URL}${endpoint}${separator}page=2&api_key=${TMDB_API_KEY}`;
-
-      const [res1, res2] = await Promise.allSettled<any>([
-        fetch(urlPage1).then((r) => r.json()),
-        fetch(urlPage2).then((r) => r.json()),
-      ]);
-
-      const rawCombined: any[] = [];
-      const seenIds = new Set<number>();
-      for (const settled of [res1, res2]) {
-        if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
-          for (const item of (settled.value as any).results) {
-            if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
-              seenIds.add(item.id);
-              rawCombined.push({ ...item, media_type: item.media_type || defaultType });
-            }
-          }
-        }
-      }
-
-      const releasedCandidates = filterReleasedMedia(rawCombined, minVotes).slice(0, 28);
-      const verifiedResults = await filterItemsByServerAvailability(
-        releasedCandidates,
+      const data = await fetchSharedTmdb(
+        endpoint,
         defaultType,
-        TMDB_API_KEY
+        TMDB_API_KEY,
+        minVotes
       );
-
-      tmdbListCache.set(endpoint, {
-        results: verifiedResults,
-        expiresAt: Date.now() + 15 * 60 * 1000,
-      });
-
-      res.json({ page: 1, results: verifiedResults });
+      res.json(data);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Failed to fetch from TMDB" });
@@ -217,49 +55,19 @@ async function startServer() {
     const genre = req.query.genre ? String(req.query.genre).trim() : "";
     if (genre.toLowerCase() === "hk") {
       if (!TMDB_API_KEY) return res.json({ results: [] });
-      const hkCacheKey = "trending_movie_hk";
-      const cachedHk = tmdbListCache.get(hkCacheKey);
-      if (cachedHk && cachedHk.expiresAt > Date.now()) {
-        return res.json({ page: 1, results: cachedHk.results });
-      }
       try {
-        const recentYear = new Date().getFullYear() - 3;
-        const recentDate = `${recentYear}-01-01`;
-        const [recentRes, popRes] = await Promise.allSettled<any>([
-          fetch(
-            `${TMDB_BASE_URL}/discover/movie?sort_by=popularity.desc&with_origin_country=HK&primary_release_date.gte=${recentDate}&vote_count.gte=1&api_key=${TMDB_API_KEY}`
-          ).then((r) => r.json()),
-          fetch(
-            `${TMDB_BASE_URL}/discover/movie?sort_by=popularity.desc&with_origin_country=HK&vote_count.gte=5&api_key=${TMDB_API_KEY}`
-          ).then((r) => r.json()),
-        ]);
-
-        const combined: any[] = [];
-        const seenIds = new Set<number>();
-        for (const settled of [recentRes, popRes]) {
-          if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
-            for (const item of (settled.value as any).results) {
-              if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
-                seenIds.add(item.id);
-                combined.push({ ...item, media_type: "movie" });
-              }
-            }
-          }
-        }
-        const releasedCandidates = filterReleasedMedia(combined, 1).slice(0, 28);
-        const results = await filterItemsByServerAvailability(
-          releasedCandidates,
-          "movie",
-          TMDB_API_KEY
-        );
-        tmdbListCache.set(hkCacheKey, {
+        const results = await fetchTrendingHk("movie", TMDB_API_KEY);
+        return res.json({
+          page: 1,
           results,
-          expiresAt: Date.now() + 15 * 60 * 1000,
+          total_pages: 1,
+          total_results: results.length,
         });
-        return res.json({ page: 1, results, total_pages: 1, total_results: results.length });
       } catch (err) {
         console.error(err);
-        return res.status(500).json({ error: "Failed to fetch HK movies from TMDB" });
+        return res
+          .status(500)
+          .json({ error: "Failed to fetch HK movies from TMDB" });
       }
     }
     if (genre && genre !== "all") {
@@ -277,49 +85,19 @@ async function startServer() {
     const genre = req.query.genre ? String(req.query.genre).trim() : "";
     if (genre.toLowerCase() === "hk") {
       if (!TMDB_API_KEY) return res.json({ results: [] });
-      const hkCacheKey = "trending_tv_hk";
-      const cachedHk = tmdbListCache.get(hkCacheKey);
-      if (cachedHk && cachedHk.expiresAt > Date.now()) {
-        return res.json({ page: 1, results: cachedHk.results });
-      }
       try {
-        const recentYear = new Date().getFullYear() - 3;
-        const recentDate = `${recentYear}-01-01`;
-        const [recentRes, popRes] = await Promise.allSettled<any>([
-          fetch(
-            `${TMDB_BASE_URL}/discover/tv?sort_by=popularity.desc&with_origin_country=HK&first_air_date.gte=${recentDate}&vote_count.gte=1&api_key=${TMDB_API_KEY}`
-          ).then((r) => r.json()),
-          fetch(
-            `${TMDB_BASE_URL}/discover/tv?sort_by=popularity.desc&with_origin_country=HK&vote_count.gte=2&api_key=${TMDB_API_KEY}`
-          ).then((r) => r.json()),
-        ]);
-
-        const combined: any[] = [];
-        const seenIds = new Set<number>();
-        for (const settled of [recentRes, popRes]) {
-          if (settled.status === "fulfilled" && Array.isArray((settled.value as any)?.results)) {
-            for (const item of (settled.value as any).results) {
-              if (item && typeof item.id === "number" && !seenIds.has(item.id)) {
-                seenIds.add(item.id);
-                combined.push({ ...item, media_type: "tv" });
-              }
-            }
-          }
-        }
-        const releasedCandidates = filterReleasedMedia(combined, 1).slice(0, 28);
-        const results = await filterItemsByServerAvailability(
-          releasedCandidates,
-          "tv",
-          TMDB_API_KEY
-        );
-        tmdbListCache.set(hkCacheKey, {
+        const results = await fetchTrendingHk("tv", TMDB_API_KEY);
+        return res.json({
+          page: 1,
           results,
-          expiresAt: Date.now() + 15 * 60 * 1000,
+          total_pages: 1,
+          total_results: results.length,
         });
-        return res.json({ page: 1, results, total_pages: 1, total_results: results.length });
       } catch (err) {
         console.error(err);
-        return res.status(500).json({ error: "Failed to fetch HK dramas from TMDB" });
+        return res
+          .status(500)
+          .json({ error: "Failed to fetch HK dramas from TMDB" });
       }
     }
     if (genre && genre !== "all") {
@@ -524,88 +302,14 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
       res.status(500).json({ error: "Failed to fetch from TMDB" });
     }
   });
-  const fetchMediaDetails = async (type: "movie" | "tv", id: string, res: express.Response) => {
-    if (!TMDB_API_KEY) {
-      console.warn("TMDB API Key not configured.");
-      return res.json({});
-    }
+  const sendMediaDetails = async (
+    type: "movie" | "tv",
+    id: string,
+    res: express.Response
+  ) => {
     try {
-      const [enRes, zhRes] = await Promise.allSettled<any>([
-        fetch(
-          `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits,external_ids&api_key=${TMDB_API_KEY}`
-        ).then((r) => r.json()),
-        fetch(
-          `${TMDB_BASE_URL}/${type}/${id}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${TMDB_API_KEY}`
-        ).then((r) => r.json()),
-      ]);
-
-      const enData: any = enRes.status === "fulfilled" && enRes.value ? enRes.value : {};
-      const zhData: any = zhRes.status === "fulfilled" && zhRes.value ? zhRes.value : {};
-
-      let rawZhTitle = "";
-
-      const zhPrimary = (zhData.title || zhData.name || "").trim();
-      const origPrimary = (enData.original_title || enData.original_name || "").trim();
-
-      if (hasChineseChars(zhPrimary)) {
-        rawZhTitle = zhPrimary;
-      } else if (hasChineseChars(origPrimary)) {
-        rawZhTitle = origPrimary;
-      } else {
-        const transList = Array.isArray(zhData?.translations?.translations)
-          ? zhData.translations.translations
-          : [];
-        for (const region of ["CN", "SG", "TW", "HK"]) {
-          const found = transList.find(
-            (tr: any) =>
-              tr?.iso_639_1 === "zh" &&
-              tr?.iso_3166_1 === region &&
-              hasChineseChars(String(tr?.data?.title || tr?.data?.name || ""))
-          );
-          if (found) {
-            rawZhTitle = String(found.data.title || found.data.name).trim();
-            break;
-          }
-        }
-        if (!rawZhTitle) {
-          const altList = Array.isArray(zhData?.alternative_titles?.results)
-            ? zhData.alternative_titles.results
-            : Array.isArray(zhData?.alternative_titles?.titles)
-            ? zhData.alternative_titles.titles
-            : [];
-          const foundAlt = altList.find((a: any) =>
-            hasChineseChars(String(a?.title || a?.name || ""))
-          );
-          if (foundAlt) {
-            rawZhTitle = String(foundAlt.title || foundAlt.name).trim();
-          }
-        }
-      }
-
-      const zh_title = rawZhTitle ? toSimplifiedChinese(rawZhTitle) : undefined;
-      const en_title = String(enData.title || enData.name || "").trim() || undefined;
-      const is_chinese_origin = isChineseOriginItem(enData);
-
-      const cast: string[] = Array.isArray(enData?.credits?.cast)
-        ? enData.credits.cast
-            .slice(0, 5)
-            .map((c: any) => String(c?.name || "").trim())
-            .filter(Boolean)
-        : [];
-
-      const primaryDisplayTitle =
-        is_chinese_origin && zh_title ? zh_title : en_title || zh_title || "";
-
-      res.json({
-        ...enData,
-        imdb_id: enData.imdb_id || enData?.external_ids?.imdb_id || undefined,
-        title: type === "movie" ? primaryDisplayTitle : enData.title,
-        name: type === "tv" ? primaryDisplayTitle : enData.name,
-        en_title,
-        zh_title,
-        is_chinese_origin,
-        cast,
-      });
+      const data = await fetchTmdbMediaDetails(type, id, TMDB_API_KEY);
+      res.json(data);
     } catch (err) {
       console.error(err);
       res.status(500).json({ error: "Failed to fetch from TMDB" });
@@ -613,10 +317,10 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
   };
 
   app.get("/api/tmdb/movie/:id", (req, res) => {
-    fetchMediaDetails("movie", req.params.id, res);
+    sendMediaDetails("movie", req.params.id, res);
   });
   app.get("/api/tmdb/tv/:id", (req, res) => {
-    fetchMediaDetails("tv", req.params.id, res);
+    sendMediaDetails("tv", req.params.id, res);
   });
   app.get("/api/tmdb/discover/:type", async (req, res) => {
     const type = req.params.type === "tv" ? "tv" : "movie";

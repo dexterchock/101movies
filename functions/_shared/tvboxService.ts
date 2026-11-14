@@ -1,8 +1,12 @@
 import {
-  getAllVodSites,
-  parseVodPlayGroups,
-  parseSeasonInfo,
+  computeTitleMatchScore,
   extractAudioLangFromText,
+  generateZhTitleVariants,
+  getAllVodSites,
+  parseSeasonInfo,
+  parseVodPlayGroups,
+  setBoundedCache,
+  stripYearSuffix,
   toSimplifiedChinese,
 } from "../../src/server/tvboxService";
 import type {
@@ -15,109 +19,11 @@ import type {
 // Re-export everything from the original tvboxService
 export * from "../../src/server/tvboxService";
 
-// In-memory cache for stream availability
+// In-memory cache for stream availability (bounded)
 const availabilityCache = new Map<
   string,
   { available: boolean; primaryZhTitle?: string; expiresAt: number }
 >();
-
-function stripLanguageAndStatusTags(text: string): string {
-  return text
-    .replace(
-      /(?:国粤双语|中文字幕|国语版|粤语版|国语|粤语|英语|韩语|日语|俄语|法语|西语|泰语|印地语|德语|意大利语|普通话|双语)/gi,
-      ""
-    )
-    .replace(/(?:HD|BD|TC|TS|CAM|4K|1080P|720P|2160P|HDR|杜比|蓝光|抢先版|高清版|高清|清晰版|未删减版|完整版|加长版)/gi, "")
-    .replace(/(?:完结|全集|更新至\d+集?|第\d+集|全\d+集|连载\d+)/gi, "")
-    .trim();
-}
-
-function stripYearSuffix(text: string): string {
-  return text.replace(/[\(\[\{（【](?:19|20)\d{2}[\)\]\}）】]/g, "").trim();
-}
-
-function normalizeTitleForComparison(title: string): string {
-  return String(title || "")
-    .toLowerCase()
-    .replace(/[：:·・,，!！?？'’"“”()（）[\]【】\-_/\\]/g, "")
-    .replace(/\s+/g, "")
-    .trim();
-}
-
-function extractNumbers(str: string): number[] {
-  const matches = str.match(/\d+/g);
-  return matches ? matches.map(Number) : [];
-}
-
-function computeTitleMatchScore(
-  vodName: string,
-  vodSub: string,
-  targetTitles: string[],
-  mediaType?: "movie" | "tv"
-): number {
-  const cleanVod = stripLanguageAndStatusTags(
-    toSimplifiedChinese(stripYearSuffix(vodName))
-  );
-  const { baseTitle: vodBaseTitle } =
-    mediaType === "tv" ? parseSeasonInfo(vodName) : { baseTitle: cleanVod };
-
-  const normVodName = normalizeTitleForComparison(vodBaseTitle);
-  const normCleanVod = normalizeTitleForComparison(cleanVod);
-  if (!normVodName) return 0;
-
-  const normAliases = vodSub
-    .split(/[\/|,，;；、]+/)
-    .map((s) => {
-      const cleaned = stripLanguageAndStatusTags(
-        toSimplifiedChinese(stripYearSuffix(s))
-      );
-      const base = mediaType === "tv" ? parseSeasonInfo(s).baseTitle : cleaned;
-      return normalizeTitleForComparison(base);
-    })
-    .filter(Boolean);
-
-  const vodNumbers = extractNumbers(normVodName);
-  let bestScore = 0;
-
-  for (const rawTarget of targetTitles) {
-    const normTarget = normalizeTitleForComparison(rawTarget);
-    if (!normTarget) continue;
-
-    const targetNumbers = extractNumbers(normTarget);
-    if (vodNumbers.length > 0 || targetNumbers.length > 0) {
-      const vodNumStr = vodNumbers.join(",");
-      const targetNumStr = targetNumbers.join(",");
-      if (vodNumStr !== targetNumStr) continue;
-    }
-
-    if (normVodName === normTarget) return 200;
-    if (normCleanVod === normTarget) return 195;
-
-    for (const alias of normAliases) {
-      if (alias === normTarget) return 190;
-    }
-
-    if (normVodName.includes(normTarget)) {
-      const extraLen = normVodName.length - normTarget.length;
-      if (extraLen <= 4) bestScore = Math.max(bestScore, 175);
-      else if (extraLen <= 10) bestScore = Math.max(bestScore, 155);
-      else bestScore = Math.max(bestScore, 140);
-    } else if (normTarget.includes(normVodName)) {
-      if (normVodName.length >= 2) bestScore = Math.max(bestScore, 145);
-    }
-
-    for (const alias of normAliases) {
-      if (alias.includes(normTarget)) {
-        const extraLen = alias.length - normTarget.length;
-        if (normTarget.length >= 8 || extraLen <= 25) {
-          bestScore = Math.max(bestScore, 170);
-        }
-      }
-    }
-  }
-
-  return bestScore;
-}
 
 // Top curated VOD providers for fast availability checks ordered by coverage and speed
 const FAST_PROBE_SITES: { id: string; url: string }[] = [
@@ -198,58 +104,6 @@ async function probeVodSiteForMedia(
     }
   } catch {}
   return false;
-}
-
-export function generateZhTitleVariants(rawZh?: string): {
-  variants: string[];
-  probeKeyword: string;
-} {
-  if (!rawZh || typeof rawZh !== "string") {
-    return { variants: [], probeKeyword: "" };
-  }
-  const simp = toSimplifiedChinese(stripYearSuffix(rawZh)).trim();
-  if (!simp) return { variants: [], probeKeyword: "" };
-
-  const variants = new Set<string>();
-  variants.add(simp);
-
-  // Check colon or space separating subtitle: e.g. "生化危机6：终章" or "生化危机：终章" or "蜘蛛侠：英雄归来"
-  const colonMatch = simp.match(
-    /^(.+?)(?:\s*([0-9一二两三四五六七八九十]+)\s*)?[:：\s]+(.+)$/
-  );
-  let probeKeyword = simp;
-
-  if (colonMatch) {
-    const base = colonMatch[1].trim();
-    const num = colonMatch[2] ? colonMatch[2].trim() : "";
-    const sub = colonMatch[3].trim();
-
-    // Prefer clean base + subtitle (e.g. "蜘蛛侠：英雄无归" or "生化危机：终章") for exact VOD matching
-    probeKeyword = base + "：" + sub;
-
-    variants.add(base + "：" + sub);
-    variants.add(base + " " + sub);
-    variants.add(base + sub);
-    if (num) {
-      variants.add(base + num + "：" + sub);
-      variants.add(base + num + " " + sub);
-      variants.add(base + num + sub);
-      variants.add(base + num);
-    }
-    variants.add(base);
-    variants.add(sub);
-  } else {
-    // Check trailing sequel number: e.g. "生化危机6" or "蜘蛛侠3"
-    const trailMatch = simp.match(/^(.+?)\s*([0-9一二两三四五六七八九十]+)$/);
-    if (trailMatch) {
-      const base = trailMatch[1].trim();
-      probeKeyword = base;
-      variants.add(base);
-      variants.add(base + " " + trailMatch[2].trim());
-    }
-  }
-
-  return { variants: Array.from(variants), probeKeyword };
 }
 
 export async function checkMediaHasPlayableStreams(
@@ -377,11 +231,16 @@ export async function checkMediaHasPlayableStreams(
   }
 
   const ttl = available ? 30 * 60 * 1000 : 15 * 60 * 1000;
-  availabilityCache.set(availKey, {
-    available,
-    primaryZhTitle,
-    expiresAt: Date.now() + ttl,
-  });
+  setBoundedCache(
+    availabilityCache,
+    availKey,
+    {
+      available,
+      primaryZhTitle,
+      expiresAt: Date.now() + ttl,
+    },
+    500
+  );
 
   return { available, primaryZhTitle };
 }

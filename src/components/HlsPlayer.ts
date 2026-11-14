@@ -210,12 +210,29 @@ export function createHlsPlayer(
   window.addEventListener(
     "keydown",
     (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
+      if (e.defaultPrevented) return;
+      const activeEl = (document.activeElement || e.target) as HTMLElement | null;
+      const tag = activeEl?.tagName?.toLowerCase();
       if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        activeEl?.isContentEditable
+      ) {
+        return;
+      }
+      const isInteractiveControl =
+        tag === "button" ||
+        tag === "a" ||
+        Boolean(
+          activeEl?.closest(
+            ".player-bottom-bar, .back-btn, .episodes-popover, .modal-backdrop"
+          )
+        );
+      if (
+        !document.fullscreenElement &&
+        isInteractiveControl &&
+        (e.code === "Space" || e.code === "ArrowLeft" || e.code === "ArrowRight")
       ) {
         return;
       }

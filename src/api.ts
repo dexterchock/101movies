@@ -59,6 +59,27 @@ async function fetchJsonWithLocalFallback<T>(
   return data as T;
 }
 
+function setBoundedCache<K, V>(
+  map: Map<K, V>,
+  key: K,
+  value: V,
+  maxSize = 100
+): void {
+  if (map.size >= maxSize && !map.has(key)) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey !== undefined) map.delete(oldestKey);
+  }
+  map.set(key, value);
+}
+
+function addBoundedSet<T>(set: Set<T>, value: T, maxSize = 150): void {
+  if (set.size >= maxSize && !set.has(value)) {
+    const oldest = set.values().next().value;
+    if (oldest !== undefined) set.delete(oldest);
+  }
+  set.add(value);
+}
+
 // In-memory caches
 export const trendingMoviesCache = new Map<string, MediaItem[]>();
 export const trendingTVCache = new Map<string, MediaItem[]>();
@@ -183,7 +204,7 @@ export function prewarmStreamManifests(
   }
 
   if (prewarmedManifests.has(rawUrl)) return;
-  prewarmedManifests.add(rawUrl);
+  addBoundedSet(prewarmedManifests, rawUrl);
 
   const isHttpOnHttps =
     typeof window !== "undefined" &&
@@ -211,7 +232,7 @@ export function prewarmStreamManifests(
       const text = await res.text();
       const detected = parseM3u8Resolution(text);
       if (detected) {
-        manifestResolutionCache.set(firstM3u8Source.sourceId, detected);
+        setBoundedCache(manifestResolutionCache, firstM3u8Source.sourceId, detected, 100);
         onQuality?.(firstM3u8Source.sourceId, detected);
       }
     })
@@ -255,7 +276,7 @@ export const api = {
     return manifestResolutionCache.get(sourceId);
   },
   setCachedManifestQuality(sourceId: string, quality: string): void {
-    manifestResolutionCache.set(sourceId, quality);
+    setBoundedCache(manifestResolutionCache, sourceId, quality, 100);
   },
 
   async getTrendingMovies(
@@ -280,7 +301,7 @@ export const api = {
       ...item,
       media_type: "movie" as const,
     }));
-    if (items.length > 0) trendingMoviesCache.set(cacheKey, items);
+    if (items.length > 0) setBoundedCache(trendingMoviesCache, cacheKey, items, 40);
     return items;
   },
 
@@ -306,7 +327,7 @@ export const api = {
       ...item,
       media_type: "tv" as const,
     }));
-    if (items.length > 0) trendingTVCache.set(cacheKey, items);
+    if (items.length > 0) setBoundedCache(trendingTVCache, cacheKey, items, 40);
     return items;
   },
 
@@ -322,7 +343,7 @@ export const api = {
       signal
     );
     const items: MediaItem[] = data.results || [];
-    searchCache.set(trimmed, items);
+    setBoundedCache(searchCache, trimmed, items, 60);
     return items;
   },
 
@@ -348,7 +369,7 @@ export const api = {
     )
       .then((data) => {
         if (data && (data.id || data.title || data.name)) {
-          detailsCache.set(key, data);
+          setBoundedCache(detailsCache, key, data, 100);
         }
         return data;
       })
@@ -384,7 +405,7 @@ export const api = {
       signal
     );
     const items: MediaItem[] = data.results || [];
-    rankingsCache.set(cacheKey, items);
+    setBoundedCache(rankingsCache, cacheKey, items, 80);
     return items;
   },
 
@@ -469,7 +490,7 @@ export const api = {
     )
       .then((data) => {
         if (data && Array.isArray(data.sources) && data.sources.length > 0) {
-          vodResolveCache.set(key, data);
+          setBoundedCache(vodResolveCache, key, data, 80);
         }
         return data;
       })

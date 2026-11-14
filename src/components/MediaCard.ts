@@ -2,7 +2,6 @@ import { api } from "../api";
 import { icons } from "../icons";
 import type { MediaItem } from "../types";
 import { cn, escapeHtml, resolveMediaItemType } from "../utils";
-import { toSimplifiedChinese } from "../zhSimp";
 
 export interface MediaCardOptions {
   item: MediaItem;
@@ -16,13 +15,10 @@ export interface MediaCardOptions {
 export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
   const { item, rank, className, onRemove, removeLabel = "Remove from history", signal } = options;
   const type = resolveMediaItemType(item);
-  const rawCardTitle =
+  const title =
     item.is_chinese_origin && item.zh_title
       ? item.zh_title
       : item.title || item.name || "Untitled";
-  const title = /[\u4e00-\u9fff]/.test(rawCardTitle)
-    ? toSimplifiedChinese(rawCardTitle)
-    : rawCardTitle;
   const yearOrType =
     (item.release_date || item.first_air_date)?.substring(0, 4) ||
     (type === "tv" ? "Show" : "Movie");
@@ -119,9 +115,11 @@ export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
   let intentTimer: ReturnType<typeof setTimeout> | null = null;
 
   const schedulePrefetch = () => {
+    if (signal?.aborted) return;
     if (intentTimer !== null) clearTimeout(intentTimer);
     intentTimer = setTimeout(() => {
       intentTimer = null;
+      if (signal?.aborted || !card.isConnected) return;
       api.prefetchMediaIntent(type, String(item.id));
     }, 150);
   };

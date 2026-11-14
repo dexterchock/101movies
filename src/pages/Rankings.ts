@@ -44,6 +44,24 @@ export function mount(container: HTMLElement): ViewCleanup {
   const savedYearParsed = savedYearRaw ? parseInt(savedYearRaw, 10) : CURRENT_YEAR;
   let year = Number.isNaN(savedYearParsed) ? CURRENT_YEAR : savedYearParsed;
 
+  const getPageStorageKey = (t = mediaType, y = year, g = genre) =>
+    `rankings_page_${t}_${y}_${g}`;
+  const getSavedPage = (t = mediaType, y = year, g = genre) => {
+    try {
+      const saved = sessionStorage.getItem(getPageStorageKey(t, y, g));
+      return saved ? Math.max(0, parseInt(saved, 10) || 0) : 0;
+    } catch {
+      return 0;
+    }
+  };
+  const savePage = (val: number) => {
+    page = val;
+    try {
+      sessionStorage.setItem(getPageStorageKey(), String(val));
+    } catch {}
+  };
+  let page = getSavedPage();
+
   let items: MediaItem[] = api.getCachedRankings(mediaType, year, genre) || [];
   let loading = !api.getCachedRankings(mediaType, year, genre);
 
@@ -86,6 +104,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       () => {
         if (mediaType === t.id) return;
         mediaType = t.id;
+        savePage(0);
         updateMediaToggle();
         loadRankings();
       },
@@ -111,6 +130,7 @@ export function mount(container: HTMLElement): ViewCleanup {
     onSelect: (id) => {
       if (genre === id) return;
       genre = id;
+      savePage(0);
       genreTrack.setActive(id, true);
       loadRankings();
     },
@@ -137,6 +157,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       const nextYear = parseInt(id, 10);
       if (Number.isNaN(nextYear) || year === nextYear) return;
       year = nextYear;
+      savePage(0);
       yearTrack.setActive(id, true);
       loadRankings();
     },
@@ -181,12 +202,23 @@ export function mount(container: HTMLElement): ViewCleanup {
     );
   };
 
-  attachHorizontalSwipe(
-    stage,
-    () => yearTrack.scrollByDirection(1),
-    () => yearTrack.scrollByDirection(-1),
-    signal
-  );
+  const setPage = (nextPageVal: number) => {
+    savePage(nextPageVal);
+    renderStage();
+  };
+
+  const goPrev = () => {
+    if (!loading && page > 0) setPage(page - 1);
+  };
+
+  const goNext = () => {
+    if (loading) return;
+    const itemsPerPage = gridState.colsPerRow * gridState.rowsPerPage;
+    const totalPages = Math.ceil(items.length / itemsPerPage);
+    if (page < totalPages - 1) setPage(page + 1);
+  };
+
+  attachHorizontalSwipe(stage, goNext, goPrev, signal);
 
   function renderStage() {
     if (signal.aborted) return;
@@ -196,13 +228,21 @@ export function mount(container: HTMLElement): ViewCleanup {
     }
 
     const itemsPerPage = gridState.colsPerRow * gridState.rowsPerPage;
-    const displayedItems = items.slice(0, itemsPerPage);
+    const totalPages = Math.ceil(items.length / itemsPerPage);
+    if (page >= totalPages && totalPages > 0) {
+      savePage(Math.max(0, totalPages - 1));
+    }
 
-    if (!loading && displayedItems.length === 0) {
+    const displayedItems = items.slice(
+      page * itemsPerPage,
+      (page + 1) * itemsPerPage
+    );
+
+    if (!loading && items.length === 0) {
       stage.innerHTML = `
         <div class="empty-state">
           <p class="empty-state-title">No rankings found for ${year}</p>
-          <p class="empty-state-desc">Try swiping to a different year or switching categories.</p>
+          <p class="empty-state-desc">Try selecting a different year or switching categories.</p>
         </div>
       `;
       return;
@@ -230,7 +270,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       frag.appendChild(
         createMediaCard({
           item,
-          rank: index + 1,
+          rank: page * itemsPerPage + index + 1,
           signal: gridRenderAbort!.signal,
         })
       );

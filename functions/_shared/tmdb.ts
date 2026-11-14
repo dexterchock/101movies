@@ -60,15 +60,24 @@ export function normalizeMediaItemTitles(item: any): any {
   const isZhOrigin = isChineseOriginItem(item);
   const enTitle = String(item.title || item.name || "").trim();
   const rawOrigTitle = String(item.original_title || item.original_name || "").trim();
-  const existingZh = item.zh_title;
+  const simpExistingZh =
+    item.zh_title && hasChineseChars(String(item.zh_title))
+      ? toSimplifiedChinese(String(item.zh_title).trim())
+      : undefined;
+  const simpOrigTitle = hasChineseChars(rawOrigTitle)
+    ? toSimplifiedChinese(rawOrigTitle)
+    : undefined;
+  const simpTitle = simpExistingZh || simpOrigTitle;
 
-  if (isZhOrigin && hasChineseChars(rawOrigTitle)) {
-    const simpTitle = toSimplifiedChinese(rawOrigTitle);
+  if (isZhOrigin && simpTitle) {
     return {
       ...item,
       title: item.title !== undefined ? simpTitle : undefined,
       name: item.name !== undefined ? simpTitle : undefined,
-      en_title: enTitle && enTitle !== simpTitle ? enTitle : undefined,
+      en_title:
+        enTitle && !hasChineseChars(enTitle) && enTitle !== simpTitle
+          ? enTitle
+          : undefined,
       zh_title: simpTitle,
       is_chinese_origin: true,
     };
@@ -77,7 +86,7 @@ export function normalizeMediaItemTitles(item: any): any {
   return {
     ...item,
     en_title: enTitle || undefined,
-    zh_title: existingZh,
+    zh_title: simpExistingZh,
     is_chinese_origin: isZhOrigin,
   };
 }

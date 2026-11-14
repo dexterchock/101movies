@@ -3,7 +3,10 @@ import {
   filterReleasedMedia,
   getTmdbKey,
 } from "../../_shared/tmdb";
-import { filterItemsByServerAvailability } from "../../_shared/tvboxService";
+import {
+  filterItemsByServerAvailability,
+  toSimplifiedChinese,
+} from "../../_shared/tvboxService";
 
 function computeSearchRelevance(item: any, query: string, cleanQuery: string): number {
   const titles = [
@@ -143,7 +146,7 @@ export const onRequestGet: PagesFunction = async (context) => {
         const t = item.title || item.name;
         if (t) {
           if (/[\u4e00-\u9fff]/.test(t)) {
-            zhMap.set(item.id, t.trim());
+            zhMap.set(item.id, toSimplifiedChinese(t.trim()));
           } else {
             enMap.set(item.id, t.trim());
           }
@@ -165,7 +168,7 @@ export const onRequestGet: PagesFunction = async (context) => {
       const zhTitle =
         zhMap.get(item.id) ||
         (isZhQuery && /[\u4e00-\u9fff]/.test(item.title || item.name)
-          ? item.title || item.name
+          ? toSimplifiedChinese(item.title || item.name)
           : undefined);
       const enTitle =
         enMap.get(item.id) ||

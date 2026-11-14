@@ -8,6 +8,7 @@ import {
   WatchProgress,
 } from "../types";
 import { escapeHtml, isInWatchLater, toggleWatchLater } from "../utils";
+import { toSimplifiedChinese } from "../zhSimp";
 import type { ViewCleanup } from "./Home";
 
 // VOD APIs responding >= 800ms indicate high latency / slow stream segment delivery
@@ -62,19 +63,21 @@ function formatPlaybackTime(seconds?: number): string {
 
 function cleanDisplayZhTitle(rawVodName?: string): string | undefined {
   if (!rawVodName || !/[\u4e00-\u9fff]/.test(rawVodName)) return undefined;
-  return rawVodName
-    .replace(/\s*[(（【[]?(19|20)\d{2}[)）】\]]?\s*$/, "")
-    .replace(
-      /\s*[(（【[]?\s*(粤语版?|国语版?|普通话版?|粤语配音|国语配音|中字|高清|超清|HD|BD|1080P)\s*[)）】\]]?\s*$/gi,
-      ""
-    )
-    .replace(
-      /[\s\-·:：/_]*(粤语版?|国语版?|普通话版?|粤语配音|国语配音|粤语|国语|普通话)\s*$/gi,
-      ""
-    )
-    .replace(/\s*第\s*[一二两三四五六七八九十\d]+\s*[季部]\s*$/, "")
-    .replace(/\s*(?:Season\s*\d+|S\d+)\s*$/i, "")
-    .trim();
+  return toSimplifiedChinese(
+    rawVodName
+      .replace(/\s*[(（【[]?(19|20)\d{2}[)）】\]]?\s*$/, "")
+      .replace(
+        /\s*[(（【[]?\s*(粤语版?|国语版?|普通话版?|粤语配音|国语配音|中字|高清|超清|HD|BD|1080P)\s*[)）】\]]?\s*$/gi,
+        ""
+      )
+      .replace(
+        /[\s\-·:：/_]*(粤语版?|国语版?|普通话版?|粤语配音|国语配音|粤语|国语|普通话)\s*$/gi,
+        ""
+      )
+      .replace(/\s*第\s*[一二两三四五六七八九十\d]+\s*[季部]\s*$/, "")
+      .replace(/\s*(?:Season\s*\d+|S\d+)\s*$/i, "")
+      .trim()
+  );
 }
 
 function estimatePillSlotWidth(
@@ -316,9 +319,12 @@ export function mount(
     if (!details || (!details.title && !details.name)) return;
     const raw = details.title || details.name || "";
     const en = details.en_title || raw;
-    const zh = details.zh_title;
-    const shareTitle =
+    const zh = details.zh_title ? toSimplifiedChinese(details.zh_title) : undefined;
+    const rawShareTitle =
       details.is_chinese_origin && zh ? zh : en || zh || raw;
+    const shareTitle = /[\u4e00-\u9fff]/.test(rawShareTitle)
+      ? toSimplifiedChinese(rawShareTitle)
+      : rawShareTitle;
     if (!shareTitle) return;
 
     const releaseYear = (details.release_date || details.first_air_date || "").slice(
@@ -701,7 +707,9 @@ export function mount(
     const rawTitle = details.title || details.name || "";
     const englishTitle = details.en_title || rawTitle;
     const fallbackVodZhTitle = cleanDisplayZhTitle(sources[0]?.vodName);
-    const chineseTitle = details.zh_title || fallbackVodZhTitle;
+    const chineseTitle = details.zh_title
+      ? toSimplifiedChinese(details.zh_title)
+      : fallbackVodZhTitle;
 
     const isChineseDefault = Boolean(details.is_chinese_origin && chineseTitle);
     const primaryTitle = isChineseDefault
@@ -811,7 +819,11 @@ export function mount(
     )?.substring(0, 4);
     const countryCode = resolveCountryCode(details);
     const genreNames = details.genres?.slice(0, 3).map((g) => g.name).join(", ");
-    const castList = (details.cast || []).slice(0, 4);
+    const castList = (details.cast || [])
+      .slice(0, 4)
+      .map((name) =>
+        /[\u4e00-\u9fff]/.test(name) ? toSimplifiedChinese(name) : name
+      );
 
     const metaRow = document.createElement("div");
     metaRow.className = "player-meta-row tabular-nums";
@@ -847,7 +859,9 @@ export function mount(
     if (details.overview) {
       const overviewEl = document.createElement("p");
       overviewEl.className = "player-overview";
-      overviewEl.textContent = details.overview;
+      overviewEl.textContent = /[\u4e00-\u9fff]/.test(details.overview)
+        ? toSimplifiedChinese(details.overview)
+        : details.overview;
       info.appendChild(overviewEl);
     }
 

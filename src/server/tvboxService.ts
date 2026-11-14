@@ -7,6 +7,7 @@ import {
   ResolvedStreamSource,
   VodResolveResponse,
 } from "../types";
+import { toSimplifiedChinese } from "../zhSimp";
 
 export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
   {
@@ -479,25 +480,7 @@ export function parseVodPlayGroups(
   };
 }
 
-const TRAD_CHARS =
-  "複復質閃電俠龍戰絕師權遊戲語鏡紙將軍輻異聯驚隊長級壞腦轉彎奧達鐵號駭國際啟動盜夢間門開關見觀視聽聲音樂傳說話記錄憶愛戀親兒孫媽爺兄敵殺傷醫藥療運氣風雲霧陽陰紅綠藍黃銀銅鋼鑽寶島樹葉鳥獸魚蟲馬貓獅鷹鷗鴿雞鴨鵝鳳聖偵諜賊幫會團黨鎮鄉莊園館樓橋場廠鋪宮廟獄籠網線絲繩帶環鏈鎖鑰匙劍槍彈車艦機飛時紀節曉東內後淺遠強舊醜貧貴賤難遲閒熱溫涼乾濕淨髒亂齊雙單萬億貳弎陸柒捌玖拾佰仟兩隻條種類眾獨們誰麼樣裏裡邊處點體頭臉齒膽腎腸膚髮腳殼劇員導編寫畫圖書籍頁冊報雜志碼數學練試驗證據實況態勢論識覺緒願懼淚歡慶祿壽財業務勞動飯湯飲裝襪褲牆層階躍潛墜滯離終敗輸贏勝負爭奪搶佔統規懲罰賞賜贈給歸返還進尋覓詢應諾許認塗測算謀術藝慣聞稱題載擊斷滅毀損觸擁護衛禦襲闖過顯隱換變創築補癒甦";
-const SIMP_CHARS =
-  "复复质闪电侠龙战绝师权游戏语镜纸将军辐异联惊队长级坏脑转弯奥达铁号骇国际启动盗梦间门开关见观视听声音乐传说话记录忆爱恋亲儿孙妈爷兄敌杀伤医药疗运气风云雾阳阴红绿蓝黄银铜钢钻宝岛树叶鸟兽鱼虫马猫狮鹰鸥鸽鸡鸭鹅凤圣侦谍贼帮会团党镇乡庄园馆楼桥场厂铺宫庙狱笼网线丝绳带环链锁钥匙剑枪弹车舰机飞时纪节晓东内后浅远强旧丑贫贵贱难迟闲热温凉干湿净脏乱齐双单万亿二三六七八九十百千两只条种类众独们谁么样里里边处点体头脸齿胆肾肠肤发脚壳剧员导编写画图书籍页册报杂志码数学练试验证据实况态势论识觉绪愿惧泪欢庆禄寿财业务劳动饭汤饮装袜裤墙层阶跃潜坠滞离终败输赢胜负争夺抢占统规惩罚赏赐赠给归返还进寻觅询应诺许认涂测算谋术艺惯闻称题载击断灭毁损触拥护卫御袭闯过显隐换变创筑补愈苏";
-
-const TRAD_TO_SIMP_MAP: Record<string, string> = {};
-for (let i = 0; i < TRAD_CHARS.length; i++) {
-  TRAD_TO_SIMP_MAP[TRAD_CHARS[i]] = SIMP_CHARS[i];
-}
-
-export function toSimplifiedChinese(input: string): string {
-  if (!input) return "";
-  let out = "";
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
-    out += TRAD_TO_SIMP_MAP[ch] || ch;
-  }
-  return out;
-}
+export { toSimplifiedChinese };
 
 const CHINESE_NUMERAL_MAP: Record<string, number> = {
   零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5,
@@ -1022,7 +1005,7 @@ async function searchSingleVodSite(
           seasonNumber: sc.seasonNumber,
           name: `Season ${sc.seasonNumber}`,
           vodId: sc.item.vod_id,
-          vodName: String(sc.item.vod_name || keyword).trim(),
+          vodName: toSimplifiedChinese(String(sc.item.vod_name || keyword).trim()),
           episodes: sc.episodes,
         }));
 
@@ -1039,7 +1022,9 @@ async function searchSingleVodSite(
           audioLang: langTag,
           fromConfig: site.fromConfig,
           vodId: primaryCand.item.vod_id,
-          vodName: String(primaryCand.item.vod_name || keyword).trim(),
+          vodName: toSimplifiedChinese(
+            String(primaryCand.item.vod_name || keyword).trim()
+          ),
           vodYear: primaryCand.item.vod_year
             ? String(primaryCand.item.vod_year)
             : undefined,
@@ -1073,7 +1058,9 @@ async function searchSingleVodSite(
         audioLang: langTag,
         fromConfig: site.fromConfig,
         vodId: bestCandidate.item.vod_id,
-        vodName: String(bestCandidate.item.vod_name || keyword).trim(),
+        vodName: toSimplifiedChinese(
+          String(bestCandidate.item.vod_name || keyword).trim()
+        ),
         vodYear: bestCandidate.item.vod_year
           ? String(bestCandidate.item.vod_year)
           : undefined,

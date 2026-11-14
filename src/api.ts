@@ -269,8 +269,8 @@ export const api = {
     const resolved = resolveGenreId("movie", genre);
     const query =
       resolved && resolved !== "all"
-        ? `?genre=${encodeURIComponent(resolved)}`
-        : "";
+        ? `?genre=${encodeURIComponent(resolved)}&v=3`
+        : "?v=3";
     const data = await fetchJsonWithLocalFallback<any>(
       `/api/tmdb/trending/movie${query}`,
       (d) => Array.isArray(d?.results) && d.results.length > 0,
@@ -295,8 +295,8 @@ export const api = {
     const resolved = resolveGenreId("tv", genre);
     const query =
       resolved && resolved !== "all"
-        ? `?genre=${encodeURIComponent(resolved)}`
-        : "";
+        ? `?genre=${encodeURIComponent(resolved)}&v=3`
+        : "?v=3";
     const data = await fetchJsonWithLocalFallback<any>(
       `/api/tmdb/trending/tv${query}`,
       (d) => Array.isArray(d?.results) && d.results.length > 0,
@@ -317,7 +317,7 @@ export const api = {
     if (cached) return cached;
 
     const data = await fetchJsonWithLocalFallback<any>(
-      `/api/tmdb/search?q=${encodeURIComponent(trimmed)}`,
+      `/api/tmdb/search?q=${encodeURIComponent(trimmed)}&v=3`,
       (d) => Array.isArray(d?.results) && d.results.length > 0,
       signal
     );
@@ -342,7 +342,7 @@ export const api = {
 
     const controller = new AbortController();
     const promise = fetchJsonWithLocalFallback<MediaDetails>(
-      `/api/tmdb/${type}/${id}?v=2`,
+      `/api/tmdb/${type}/${id}?v=3`,
       (d) => Boolean(d && (d.id || d.title || d.name)),
       controller.signal
     )
@@ -379,7 +379,7 @@ export const api = {
         ? `&genre=${encodeURIComponent(resolved)}`
         : "";
     const data = await fetchJsonWithLocalFallback<any>(
-      `/api/tmdb/discover/${type}?year=${year}${genreQuery}`,
+      `/api/tmdb/discover/${type}?year=${year}${genreQuery}&v=3`,
       (d) => Array.isArray(d?.results) && d.results.length > 0,
       signal
     );

@@ -1,3 +1,4 @@
+import "./polyfills";
 import "./index.css";
 import { icons } from "./icons";
 import { initRouter } from "./router";
@@ -188,9 +189,17 @@ function scrollFocusTargetWithinTrack(el: HTMLElement) {
     | HTMLElement
     | null;
   if (!scroller) return;
-  try {
-    el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  } catch {}
+  const scrollerRect = scroller.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  if (scroller.classList.contains("episodes-grid")) {
+    const offsetTop = elRect.top - scrollerRect.top + scroller.scrollTop;
+    const targetTop = offsetTop - scrollerRect.height / 2 + elRect.height / 2;
+    scroller.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+  } else {
+    const offsetLeft = elRect.left - scrollerRect.left + scroller.scrollLeft;
+    const targetLeft = offsetLeft - scrollerRect.width / 2 + elRect.width / 2;
+    scroller.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
+  }
 }
 
 function attachSpatialNavigation() {
@@ -198,6 +207,22 @@ function attachSpatialNavigation() {
     if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
 
     const active = document.activeElement as HTMLElement | null;
+
+    // Handle Tizen TV Remote Return / Back button on player page when overlays are closed
+    if (e.keyCode === 10009 || e.key === "XF86Back") {
+      if (
+        !document.querySelector(".modal-backdrop") &&
+        !document.querySelector(".episodes-popover") &&
+        window.location.pathname.startsWith("/player/")
+      ) {
+        const backBtn = document.querySelector<HTMLElement>(".back-btn");
+        if (backBtn) {
+          e.preventDefault();
+          backBtn.click();
+          return;
+        }
+      }
+    }
 
     // Do not hijack video shortcuts when focused inside active player or fullscreen
     if (

@@ -388,6 +388,43 @@ export function attachHorizontalSwipe(
   );
 }
 
+/**
+ * Binds mouse wheel pagination to a browse page element (scroll down -> next page, scroll up -> previous page).
+ */
+export function attachWheelPagination(
+  el: HTMLElement,
+  onNext: () => void,
+  onPrev: () => void,
+  signal: AbortSignal
+): void {
+  let lastWheelTime = 0;
+  const COOLDOWN_MS = 280;
+
+  el.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && target.closest && target.closest(".pill-track, .modal-backdrop")) {
+        return;
+      }
+      if (Math.abs(e.deltaY) < 15 || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) {
+        return;
+      }
+      const now = Date.now();
+      if (now - lastWheelTime < COOLDOWN_MS) return;
+      lastWheelTime = now;
+
+      if (e.deltaY > 0) {
+        onNext();
+      } else {
+        onPrev();
+      }
+    },
+    { passive: true, signal }
+  );
+}
+
 export interface PillTrackItem {
   id: string;
   label: string;

@@ -6,6 +6,7 @@ import {
   GRID_ROWS_CLASS,
   appendGridPlaceholders,
   attachHorizontalSwipe,
+  attachWheelPagination,
   cn,
   escapeHtml,
   observeResponsiveGrid,
@@ -225,6 +226,7 @@ export function mountSavedCollection(
   prevBtn.addEventListener("click", prevPage, { signal });
   nextBtn.addEventListener("click", nextPage, { signal });
   attachHorizontalSwipe(stage, nextPage, prevPage, signal);
+  attachWheelPagination(root, nextPage, prevPage, signal);
 
   function renderStage() {
     if (signal.aborted) return;

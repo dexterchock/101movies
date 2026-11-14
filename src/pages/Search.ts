@@ -7,6 +7,7 @@ import {
   GRID_ROWS_CLASS,
   appendGridPlaceholders,
   attachHorizontalSwipe,
+  attachWheelPagination,
   cn,
   escapeHtml,
   observeResponsiveGrid,
@@ -161,6 +162,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   prevBtn.addEventListener("click", goPrev, { signal });
   nextBtn.addEventListener("click", goNext, { signal });
   attachHorizontalSwipe(stage, goNext, goPrev, signal);
+  attachWheelPagination(root, goNext, goPrev, signal);
 
   function handleQueryChange(nextVal: string) {
     query = nextVal;

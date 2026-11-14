@@ -176,6 +176,119 @@ export async function fetchTmdb(
   return { page: 1, results: verifiedResults };
 }
 
+const personZhNameCache = new Map<number, string>();
+const ZH_TRANSLATION_REGIONS = ["CN", "SG", "TW", "HK", "MO"];
+
+function findZhTranslationText(
+  zhData: any,
+  pickText: (data: any) => string
+): string {
+  const transList = Array.isArray(zhData?.translations?.translations)
+    ? zhData.translations.translations
+    : [];
+  for (const region of ZH_TRANSLATION_REGIONS) {
+    const found = transList.find(
+      (tr: any) =>
+        tr?.iso_639_1 === "zh" &&
+        tr?.iso_3166_1 === region &&
+        hasChineseChars(String(pickText(tr?.data) || ""))
+    );
+    if (found) {
+      return String(pickText(found.data) || "").trim();
+    }
+  }
+  const fallback = transList.find(
+    (tr: any) =>
+      tr?.iso_639_1 === "zh" &&
+      hasChineseChars(String(pickText(tr?.data) || ""))
+  );
+  return fallback ? String(pickText(fallback.data) || "").trim() : "";
+}
+
+function pickChineseAlias(candidates: unknown[]): string {
+  const cleaned = candidates
+    .map((v) => String(v || "").trim())
+    .filter((s) => s && hasChineseChars(s))
+    .map((s) =>
+      s.replace(/\s*[（(][^)）]*[A-Za-z][^)）]*[)）]\s*/g, "").trim() || s
+    );
+  if (cleaned.length === 0) return "";
+
+  const pureCjk = cleaned.filter((s) =>
+    /^[\u3400-\u9FFF\uF900-\uFAFF·•．\s]+$/.test(s)
+  );
+  if (pureCjk.length > 0) {
+    const alreadySimplified = pureCjk.find((s) => toSimplifiedChinese(s) === s);
+    return toSimplifiedChinese(alreadySimplified || pureCjk[0]);
+  }
+  return toSimplifiedChinese(cleaned[0]);
+}
+
+async function resolveChinesePersonName(
+  personId: number,
+  fallbackName: string,
+  apiKey: string
+): Promise<string> {
+  if (personZhNameCache.has(personId)) {
+    return personZhNameCache.get(personId) || fallbackName;
+  }
+  try {
+    const res = await fetch(`${TMDB_BASE_URL}/person/${personId}?api_key=${apiKey}`);
+    if (!res.ok) return fallbackName;
+    const data: any = await res.json();
+    const candidates: unknown[] = [
+      data?.name,
+      ...(Array.isArray(data?.also_known_as) ? data.also_known_as : []),
+    ];
+    const resolved = pickChineseAlias(candidates) || fallbackName;
+    personZhNameCache.set(personId, resolved);
+    return resolved;
+  } catch {
+    return fallbackName;
+  }
+}
+
+async function resolveChineseCastNames(
+  rawCast: any[],
+  zhCast: any[],
+  apiKey: string
+): Promise<string[]> {
+  const zhCastById = new Map<number, any>();
+  for (const item of zhCast) {
+    if (item && typeof item.id === "number") {
+      zhCastById.set(item.id, item);
+    }
+  }
+
+  const topCast = rawCast.slice(0, 5);
+  const resolved = await Promise.all(
+    topCast.map(async (c: any) => {
+      const enName = String(c?.name || "").trim();
+      const zhEntry = typeof c?.id === "number" ? zhCastById.get(c.id) : undefined;
+      const directCandidates = [
+        zhEntry?.name,
+        zhEntry?.original_name,
+        c?.name,
+        c?.original_name,
+      ]
+        .map((s) => String(s || "").trim())
+        .filter(Boolean);
+
+      const directZh = directCandidates.find((s) => hasChineseChars(s));
+      if (directZh) {
+        return toSimplifiedChinese(directZh);
+      }
+
+      if (typeof c?.id === "number" && c.id > 0) {
+        return resolveChinesePersonName(c.id, enName, apiKey);
+      }
+      return enName;
+    })
+  );
+
+  return resolved.filter(Boolean);
+}
+
 export async function fetchMediaDetails(
   type: "movie" | "tv",
   id: string,
@@ -191,7 +304,7 @@ export async function fetchMediaDetails(
       `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits,external_ids&api_key=${apiKey}`
     ).then((r) => r.json()),
     fetch(
-      `${TMDB_BASE_URL}/${type}/${id}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${apiKey}`
+      `${TMDB_BASE_URL}/${type}/${id}?language=zh-CN&append_to_response=credits,translations,alternative_titles&api_key=${apiKey}`
     ).then((r) => r.json()),
   ]);
 
@@ -208,21 +321,10 @@ export async function fetchMediaDetails(
   } else if (hasChineseChars(origPrimary)) {
     rawZhTitle = origPrimary;
   } else {
-    const transList = Array.isArray(zhData?.translations?.translations)
-      ? zhData.translations.translations
-      : [];
-    for (const region of ["CN", "SG", "TW", "HK"]) {
-      const found = transList.find(
-        (tr: any) =>
-          tr?.iso_639_1 === "zh" &&
-          tr?.iso_3166_1 === region &&
-          hasChineseChars(String(tr?.data?.title || tr?.data?.name || ""))
-      );
-      if (found) {
-        rawZhTitle = String(found.data.title || found.data.name).trim();
-        break;
-      }
-    }
+    rawZhTitle = findZhTranslationText(
+      zhData,
+      (data) => data?.title || data?.name || ""
+    );
     if (!rawZhTitle) {
       const altList = Array.isArray(zhData?.alternative_titles?.results)
         ? zhData.alternative_titles.results
@@ -242,18 +344,38 @@ export async function fetchMediaDetails(
   const en_title = String(enData.title || enData.name || "").trim() || undefined;
   const is_chinese_origin = isChineseOriginItem(enData);
 
-  const cast: string[] = Array.isArray(enData?.credits?.cast)
-    ? enData.credits.cast
-        .slice(0, 5)
-        .map((c: any) => String(c?.name || "").trim())
-        .filter(Boolean)
-    : [];
+  const rawCast =
+    Array.isArray(enData?.credits?.cast) && enData.credits.cast.length > 0
+      ? enData.credits.cast
+      : Array.isArray(zhData?.credits?.cast)
+      ? zhData.credits.cast
+      : [];
+
+  let cast: string[];
+  let overview = enData.overview;
+
+  if (is_chinese_origin) {
+    const zhCast = Array.isArray(zhData?.credits?.cast) ? zhData.credits.cast : [];
+    const rawZhOverview = hasChineseChars(String(zhData.overview || ""))
+      ? String(zhData.overview).trim()
+      : findZhTranslationText(zhData, (data) => data?.overview || "");
+    if (rawZhOverview) {
+      overview = toSimplifiedChinese(rawZhOverview);
+    }
+    cast = await resolveChineseCastNames(rawCast, zhCast, apiKey);
+  } else {
+    cast = rawCast
+      .slice(0, 5)
+      .map((c: any) => String(c?.name || "").trim())
+      .filter(Boolean);
+  }
 
   const primaryDisplayTitle =
     is_chinese_origin && zh_title ? zh_title : en_title || zh_title || "";
 
   return {
     ...enData,
+    overview,
     imdb_id: enData.imdb_id || enData?.external_ids?.imdb_id || undefined,
     title: type === "movie" ? primaryDisplayTitle : enData.title,
     name: type === "tv" ? primaryDisplayTitle : enData.name,

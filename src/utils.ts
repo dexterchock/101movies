@@ -166,7 +166,7 @@ export function getGridLayout(
   }
 
   let candidates: [number, number][];
-  if (width >= 1280) candidates = [[8, 2], [6, 2], [5, 2], [6, 3], [5, 3], [4, 3]];
+  if (width >= 1280) candidates = [[6, 2], [5, 2], [6, 3], [5, 3], [4, 3]];
   else if (width >= 768) candidates = [[6, 2], [5, 2], [4, 2], [4, 3], [6, 3], [5, 3]];
   else if (width >= 640) candidates = [[3, 2], [3, 3]];
   else candidates = [[2, 2], [2, 3]];

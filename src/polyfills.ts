@@ -1,12 +1,68 @@
 // Targeted runtime polyfills for legacy Smart TV browsers (e.g., Samsung Tizen 4.0 / Chromium 56).
 // Every guard is a no-op on modern desktop and mobile browsers.
 
-// 1. Detect :focus-visible selector support so legacy browsers can use html.no-focus-visible rules
-if (typeof document !== "undefined") {
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  // 1. Optional PC emulation mode (?tv=1 / ?tv=0) to force the Tizen 4.0 layout & focus path on PC
+  try {
+    const search = window.location.search || "";
+    if (/(?:^|[?&])tv=1(?:&|$)/.test(search)) {
+      window.sessionStorage.setItem("tv_emulation", "1");
+    } else if (/(?:^|[?&])tv=0(?:&|$)/.test(search)) {
+      window.sessionStorage.removeItem("tv_emulation");
+    }
+    if (window.sessionStorage.getItem("tv_emulation") === "1") {
+      document.documentElement.classList.add("no-focus-visible", "tv-emulate");
+    }
+  } catch {
+    // Ignore storage restriction errors
+  }
+
+  // 2. Detect :focus-visible selector support so legacy browsers can use html.no-focus-visible rules
   try {
     document.querySelector(":focus-visible");
   } catch {
     document.documentElement.classList.add("no-focus-visible");
+  }
+
+  // 3. Polyfill plain-object record constructor support for URLSearchParams (Chrome < 61)
+  if (typeof window.URLSearchParams === "function") {
+    try {
+      const probe = new window.URLSearchParams({ a: "1" } as unknown as string);
+      if (probe.toString() !== "a=1") {
+        const NativeURLSearchParams = window.URLSearchParams;
+        const PatchedURLSearchParams = function (
+          init?:
+            | string
+            | string[][]
+            | Record<string, string>
+            | URLSearchParams
+        ): URLSearchParams {
+          if (
+            init &&
+            typeof init === "object" &&
+            !Array.isArray(init) &&
+            !(init instanceof NativeURLSearchParams) &&
+            Object.prototype.toString.call(init) === "[object Object]"
+          ) {
+            const instance = new NativeURLSearchParams();
+            const record = init as Record<string, string>;
+            const keys = Object.keys(record);
+            for (let i = 0; i < keys.length; i++) {
+              const key = keys[i];
+              instance.append(key, String(record[key]));
+            }
+            return instance;
+          }
+          return init === undefined
+            ? new NativeURLSearchParams()
+            : new NativeURLSearchParams(init as string);
+        } as unknown as typeof URLSearchParams;
+        PatchedURLSearchParams.prototype = NativeURLSearchParams.prototype;
+        window.URLSearchParams = PatchedURLSearchParams;
+      }
+    } catch {
+      // Ignore if URLSearchParams cannot be patched
+    }
   }
 }
 

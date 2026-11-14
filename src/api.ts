@@ -448,24 +448,27 @@ export const api = {
       );
     }
 
-    const params = new URLSearchParams({ type, id });
+    const queryParts = [
+      `type=${encodeURIComponent(type)}`,
+      `id=${encodeURIComponent(id)}`,
+    ];
     if (customKeyword && customKeyword.trim()) {
-      params.set("wd", customKeyword.trim());
+      queryParts.push(`wd=${encodeURIComponent(customKeyword.trim())}`);
     }
     if (disabledIds.length > 0) {
-      params.set("disabled", disabledIds.join(","));
+      queryParts.push(`disabled=${encodeURIComponent(disabledIds.join(","))}`);
     }
 
     const controller = new AbortController();
     const hasCustomKeyword = Boolean(customKeyword && customKeyword.trim());
     const promise = fetchJsonWithLocalFallback<VodResolveResponse>(
-      `/api/vod/resolve?${params.toString()}`,
+      `/api/vod/resolve?${queryParts.join("&")}`,
       (d) => Array.isArray(d?.sources) && d.sources.length > 0,
       controller.signal,
       !hasCustomKeyword
     )
       .then((data) => {
-        if (data && Array.isArray(data.sources)) {
+        if (data && Array.isArray(data.sources) && data.sources.length > 0) {
           vodResolveCache.set(key, data);
         }
         return data;

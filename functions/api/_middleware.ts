@@ -44,18 +44,10 @@ export const onRequest: PagesFunction = async (context) => {
   // Apply Edge Caching headers if successful GET response
   if (isGet && response.status === 200 && !url.pathname.includes("/vod/proxy")) {
     headers.set("X-Cache-Status", "MISS");
-    if (
-      url.pathname.includes("/tmdb/trending") ||
-      url.pathname.includes("/tmdb/discover")
-    ) {
+    if (url.pathname.includes("/tmdb/")) {
       headers.set(
         "Cache-Control",
-        "public, max-age=1800, s-maxage=3600, stale-while-revalidate=86400"
-      );
-    } else if (url.pathname.includes("/tmdb/search")) {
-      headers.set(
-        "Cache-Control",
-        "public, max-age=900, s-maxage=1800, stale-while-revalidate=43200"
+        "public, s-maxage=3600, stale-while-revalidate=86400"
       );
     } else if (url.pathname.includes("/vod/resolve")) {
       headers.set(

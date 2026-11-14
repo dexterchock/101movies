@@ -20,12 +20,19 @@ export const onRequestGet: PagesFunction = async (context) => {
     const hkCacheKey = "trending_movie_hk";
     const cachedHk = tmdbListCache.get(hkCacheKey);
     if (cachedHk && cachedHk.expiresAt > Date.now()) {
-      return Response.json({
-        page: 1,
-        results: cachedHk.results,
-        total_pages: 1,
-        total_results: cachedHk.results.length,
-      });
+      return Response.json(
+        {
+          page: 1,
+          results: cachedHk.results,
+          total_pages: 1,
+          total_results: cachedHk.results.length,
+        },
+        {
+          headers: {
+            "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+          },
+        }
+      );
     }
 
     try {
@@ -65,12 +72,19 @@ export const onRequestGet: PagesFunction = async (context) => {
         expiresAt: Date.now() + 15 * 60 * 1000,
       });
 
-      return Response.json({
-        page: 1,
-        results,
-        total_pages: 1,
-        total_results: results.length,
-      });
+      return Response.json(
+        {
+          page: 1,
+          results,
+          total_pages: 1,
+          total_results: results.length,
+        },
+        {
+          headers: {
+            "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+          },
+        }
+      );
     } catch (err: any) {
       console.error(err);
       return Response.json(
@@ -94,7 +108,11 @@ export const onRequestGet: PagesFunction = async (context) => {
     } else {
       data = await fetchTmdb("/trending/movie/week", "movie", apiKey);
     }
-    return Response.json(data);
+    return Response.json(data, {
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+      },
+    });
   } catch (err: any) {
     console.error(err);
     return Response.json({ error: "Failed to fetch from TMDB" }, { status: 500 });

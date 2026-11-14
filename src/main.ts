@@ -1,0 +1,328 @@
+import "./index.css";
+import { icons } from "./icons";
+import { initRouter } from "./router";
+
+// Polyfill smooth-scroll options API on older Smart TV Chromium engines (WebOS / Tizen)
+if (typeof window !== "undefined") {
+  const proto = Element.prototype;
+  const origElScrollTo = proto.scrollTo;
+  if (typeof origElScrollTo === "function") {
+    proto.scrollTo = function (
+      optionsOrX?: ScrollToOptions | number,
+      y?: number
+    ) {
+      try {
+        if (typeof optionsOrX === "object" && optionsOrX !== null) {
+          origElScrollTo.call(this, optionsOrX);
+        } else {
+          origElScrollTo.call(this, optionsOrX as number, y as number);
+        }
+      } catch {
+        if (typeof optionsOrX === "object" && optionsOrX !== null) {
+          if (typeof optionsOrX.left === "number")
+            this.scrollLeft = optionsOrX.left;
+          if (typeof optionsOrX.top === "number")
+            this.scrollTop = optionsOrX.top;
+        }
+      }
+    };
+  } else {
+    proto.scrollTo = function (
+      optionsOrX?: ScrollToOptions | number,
+      y?: number
+    ) {
+      if (typeof optionsOrX === "object" && optionsOrX !== null) {
+        if (typeof optionsOrX.left === "number")
+          this.scrollLeft = optionsOrX.left;
+        if (typeof optionsOrX.top === "number")
+          this.scrollTop = optionsOrX.top;
+      } else {
+        if (typeof optionsOrX === "number") this.scrollLeft = optionsOrX;
+        if (typeof y === "number") this.scrollTop = y;
+      }
+    };
+  }
+}
+
+interface NavItem {
+  name: string;
+  path: string;
+  icon: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { name: "Trending", path: "/", icon: icons.flame("bottom-nav-icon") },
+  {
+    name: "Rankings",
+    path: "/rankings",
+    icon: icons.trophy("bottom-nav-icon"),
+  },
+  {
+    name: "History",
+    path: "/history",
+    icon: icons.history("bottom-nav-icon"),
+  },
+  { name: "Search", path: "/search", icon: icons.search("bottom-nav-icon") },
+];
+
+type Direction = "up" | "down" | "left" | "right";
+
+function isVisibleFocusable(el: HTMLElement): boolean {
+  if ((el as HTMLButtonElement | HTMLInputElement).disabled) return false;
+  const rect = el.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const style = window.getComputedStyle(el);
+  if (
+    style.display === "none" ||
+    style.visibility === "hidden" ||
+    style.pointerEvents === "none" ||
+    style.opacity === "0"
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function getSpatialCandidates(): HTMLElement[] {
+  // Scope focus traversal when a modal or episode popover overlay is active
+  const scope: ParentNode =
+    document.querySelector(".modal-backdrop") ||
+    document.querySelector(".episodes-popover") ||
+    document;
+
+  const nodes = scope.querySelectorAll<HTMLElement>(
+    'a[href], button:not(:disabled), input:not(:disabled), [tabindex="0"]'
+  );
+  const result: HTMLElement[] = [];
+  nodes.forEach((el) => {
+    if (isVisibleFocusable(el)) {
+      result.push(el);
+    }
+  });
+  return result;
+}
+
+function findBestSpatialCandidate(
+  current: HTMLElement,
+  dir: Direction,
+  candidates: HTMLElement[]
+): HTMLElement | null {
+  const curRect = current.getBoundingClientRect();
+  const curCx = curRect.left + curRect.width / 2;
+  const curCy = curRect.top + curRect.height / 2;
+
+  let best: HTMLElement | null = null;
+  let bestScore = Infinity;
+
+  for (const cand of candidates) {
+    if (cand === current) continue;
+    const r = cand.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+
+    const dx = cx - curCx;
+    const dy = cy - curCy;
+
+    let valid = false;
+    let primaryDist = 0;
+    let orthoDist = 0;
+    let sameBandOverlap = 0;
+
+    if (dir === "right") {
+      valid = dx > 4;
+      primaryDist = dx;
+      orthoDist = Math.abs(dy);
+      sameBandOverlap = Math.max(
+        0,
+        Math.min(curRect.bottom, r.bottom) - Math.max(curRect.top, r.top)
+      );
+    } else if (dir === "left") {
+      valid = dx < -4;
+      primaryDist = -dx;
+      orthoDist = Math.abs(dy);
+      sameBandOverlap = Math.max(
+        0,
+        Math.min(curRect.bottom, r.bottom) - Math.max(curRect.top, r.top)
+      );
+    } else if (dir === "down") {
+      valid = dy > 4;
+      primaryDist = dy;
+      orthoDist = Math.abs(dx);
+      sameBandOverlap = Math.max(
+        0,
+        Math.min(curRect.right, r.right) - Math.max(curRect.left, r.left)
+      );
+    } else {
+      valid = dy < -4;
+      primaryDist = -dy;
+      orthoDist = Math.abs(dx);
+      sameBandOverlap = Math.max(
+        0,
+        Math.min(curRect.right, r.right) - Math.max(curRect.left, r.left)
+      );
+    }
+
+    if (!valid) continue;
+
+    // Heavily favor elements aligned in the same row/column before jumping across sections
+    const bandPenalty = sameBandOverlap > 0 ? 0 : 1000;
+    const orthoWeight = dir === "left" || dir === "right" ? 3.5 : 2.5;
+    const score = bandPenalty + primaryDist + orthoDist * orthoWeight;
+
+    if (score < bestScore) {
+      bestScore = score;
+      best = cand;
+    }
+  }
+
+  return best;
+}
+
+function scrollFocusTargetWithinTrack(el: HTMLElement) {
+  const scroller = el.closest(".pill-scroll, .season-bar, .episodes-grid") as
+    | HTMLElement
+    | null;
+  if (!scroller) return;
+  try {
+    el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  } catch {}
+}
+
+function attachSpatialNavigation() {
+  window.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+
+    const active = document.activeElement as HTMLElement | null;
+
+    // Do not hijack video shortcuts when focused inside active player or fullscreen
+    if (
+      document.fullscreenElement ||
+      active instanceof HTMLVideoElement
+    ) {
+      return;
+    }
+
+    // Handle Smart TV remote Select / OK keys cleanly
+    if (e.key === "Select" || e.key === "OK") {
+      if (active && active !== document.body && !(active instanceof HTMLInputElement)) {
+        e.preventDefault();
+        active.click();
+      }
+      return;
+    }
+
+    const dirMap: Record<string, Direction | undefined> = {
+      ArrowUp: "up",
+      ArrowDown: "down",
+      ArrowLeft: "left",
+      ArrowRight: "right",
+    };
+    const dir = dirMap[e.key];
+    if (!dir) return;
+
+    // Inside search text input: keep ArrowLeft/ArrowRight for caret movement
+    if (
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement
+    ) {
+      if (dir === "left" || dir === "right" || dir === "up") {
+        return;
+      }
+    }
+
+    const candidates = getSpatialCandidates();
+    if (candidates.length === 0) return;
+
+    if (!active || active === document.body || !candidates.includes(active)) {
+      e.preventDefault();
+      const initial =
+        document.querySelector<HTMLElement>(".bottom-nav-link.is-active") ||
+        document.querySelector<HTMLElement>(".media-card") ||
+        candidates[0];
+      initial?.focus({ preventScroll: true });
+      return;
+    }
+
+    const next = findBestSpatialCandidate(active, dir, candidates);
+    if (next) {
+      e.preventDefault();
+      next.focus({ preventScroll: true });
+      scrollFocusTargetWithinTrack(next);
+    }
+  });
+}
+
+function bootstrap() {
+  const rootEl = document.getElementById("root");
+  if (!rootEl) return;
+
+  const shell = document.createElement("div");
+  shell.className = "app-shell";
+
+  const mainStage = document.createElement("main");
+  mainStage.className = "main-stage";
+
+  const bottomNavWrap = document.createElement("div");
+  bottomNavWrap.className = "bottom-nav-wrap";
+
+  const bottomNav = document.createElement("nav");
+  bottomNav.className = "bottom-nav";
+  bottomNav.setAttribute("aria-label", "Primary Navigation");
+
+  const indicator = document.createElement("div");
+  indicator.className = "bottom-nav-indicator";
+  bottomNav.appendChild(indicator);
+
+  const linkEls = NAV_ITEMS.map((item) => {
+    const a = document.createElement("a");
+    a.href = item.path;
+    a.tabIndex = 0;
+    a.className = "bottom-nav-link";
+    a.setAttribute("aria-label", item.name);
+    a.innerHTML = `<span class="bottom-nav-link-inner">${item.icon}<span>${item.name}</span></span>`;
+    bottomNav.appendChild(a);
+    return a;
+  });
+
+  bottomNavWrap.appendChild(bottomNav);
+  shell.append(bottomNavWrap, mainStage);
+  rootEl.replaceChildren(shell);
+
+  let currentPath = window.location.pathname || "/";
+
+  function updateBottomNav() {
+    const isPlayerPage = currentPath.startsWith("/player/");
+    bottomNavWrap.style.display = isPlayerPage ? "none" : "";
+    if (isPlayerPage) return;
+
+    const rawIndex = NAV_ITEMS.findIndex((item) => item.path === currentPath);
+    const hasActiveTab = rawIndex !== -1;
+    const activeIndex = hasActiveTab ? rawIndex : 0;
+
+    const isMobileNav = window.innerWidth < 640;
+    const navTabWidth = isMobileNav ? 80 : 132;
+    const navTabGap = isMobileNav ? 4 : 8;
+
+    indicator.classList.toggle("is-hidden", !hasActiveTab);
+    indicator.style.width = `${navTabWidth}px`;
+    indicator.style.transform = `translate3d(${
+      activeIndex * (navTabWidth + navTabGap)
+    }px, 0, 0)`;
+
+    linkEls.forEach((a, idx) => {
+      const isActive = hasActiveTab && idx === activeIndex;
+      a.style.width = `${navTabWidth}px`;
+      a.classList.toggle("is-active", isActive);
+    });
+  }
+
+  window.addEventListener("resize", updateBottomNav);
+  attachSpatialNavigation();
+
+  initRouter(mainStage, (pathname) => {
+    currentPath = pathname;
+    updateBottomNav();
+  });
+}
+
+bootstrap();

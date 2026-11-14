@@ -1,12 +1,19 @@
-import { useEffect, useState } from "react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
 import type { MediaItem } from "./types";
+import { icons } from "./icons";
 
 const WATCH_HISTORY_KEY = "watch_history";
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+export function cn(...inputs: (string | false | null | undefined)[]): string {
+  return inputs.filter(Boolean).join(" ");
+}
+
+export function escapeHtml(str: string): string {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export function loadWatchHistory(): MediaItem[] {
@@ -120,41 +127,45 @@ export function getGridLayout(
   };
 }
 
-/**
- * Tracks responsive grid columns, rows, maxHeight cap, and mobile breakpoint
- * on viewport resize across browse views.
- */
-export function useResponsiveGrid(twoRowMobileHeader = false) {
-  const [state, setState] = useState(() => {
-    if (typeof window === "undefined") {
-      return {
-        layout: { cols: 6, rows: 2 } as GridLayoutConfig,
-        isMobileView: false,
-      };
-    }
-    return {
-      layout: getGridLayout(window.innerWidth, window.innerHeight, twoRowMobileHeader),
-      isMobileView: window.innerWidth < 640,
-    };
-  });
+export interface ResponsiveGridState {
+  colsPerRow: number;
+  rowsPerPage: number;
+  maxGridHeight?: number;
+  isMobileView: boolean;
+}
 
-  useEffect(() => {
-    const onResize = () => {
-      setState({
-        layout: getGridLayout(window.innerWidth, window.innerHeight, twoRowMobileHeader),
-        isMobileView: window.innerWidth < 640,
-      });
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [twoRowMobileHeader]);
-
+export function getResponsiveGridState(twoRowMobileHeader = false): ResponsiveGridState {
+  const w = typeof window !== "undefined" ? window.innerWidth : 1280;
+  const h = typeof window !== "undefined" ? window.innerHeight : 720;
+  const layout = getGridLayout(w, h, twoRowMobileHeader);
   return {
-    colsPerRow: state.layout.cols,
-    rowsPerPage: state.layout.rows,
-    maxGridHeight: state.layout.maxGridHeight,
-    isMobileView: state.isMobileView,
+    colsPerRow: layout.cols,
+    rowsPerPage: layout.rows,
+    maxGridHeight: layout.maxGridHeight,
+    isMobileView: w < 640,
   };
+}
+
+export function observeResponsiveGrid(
+  twoRowMobileHeader: boolean,
+  onChange: (state: ResponsiveGridState) => void,
+  signal: AbortSignal
+): ResponsiveGridState {
+  let current = getResponsiveGridState(twoRowMobileHeader);
+  const onResize = () => {
+    const next = getResponsiveGridState(twoRowMobileHeader);
+    if (
+      next.colsPerRow !== current.colsPerRow ||
+      next.rowsPerPage !== current.rowsPerPage ||
+      next.maxGridHeight !== current.maxGridHeight ||
+      next.isMobileView !== current.isMobileView
+    ) {
+      current = next;
+      onChange(next);
+    }
+  };
+  window.addEventListener("resize", onResize, { signal });
+  return current;
 }
 
 export function removeFromWatchHistory(
@@ -191,7 +202,6 @@ export function safeScrollTo(
       return;
     }
   } catch {
-    // Fallback if passing dictionary options throws in older browsers
     try {
       if (typeof el.scrollTo === "function") {
         el.scrollTo(targetLeft, 0);
@@ -200,8 +210,327 @@ export function safeScrollTo(
     } catch {}
   }
 
-  // Universal fallback supported by all browsers
   try {
     el.scrollLeft = targetLeft;
   } catch {}
+}
+
+/**
+ * Builds skeleton loading cards inside a grid container.
+ */
+export function renderSkeletonCards(grid: HTMLElement, count: number): void {
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < count; i++) {
+    const card = document.createElement("div");
+    card.className = "media-card";
+    card.innerHTML = `
+      <div class="skeleton-poster animate-pulse"></div>
+      <div class="media-card-meta" style="gap: 4px;">
+        <div class="skeleton-title animate-pulse"></div>
+        <div class="skeleton-year animate-pulse"></div>
+      </div>
+    `;
+    frag.appendChild(card);
+  }
+  grid.replaceChildren(frag);
+}
+
+/**
+ * Appends invisible placeholder slots so partial rows stay evenly sized.
+ */
+export function appendGridPlaceholders(frag: DocumentFragment, count: number): void {
+  for (let i = 0; i < count; i++) {
+    const ph = document.createElement("div");
+    ph.className = "media-card-placeholder";
+    ph.setAttribute("aria-hidden", "true");
+    ph.innerHTML = `
+      <div class="media-card-poster" style="border:0;background:transparent;"></div>
+      <div class="media-card-meta">
+        <span class="media-card-title">&nbsp;</span>
+        <span class="media-card-year">&nbsp;</span>
+      </div>
+    `;
+    frag.appendChild(ph);
+  }
+}
+
+/**
+ * Binds horizontal touch swipe navigation to a stage element.
+ */
+export function attachHorizontalSwipe(
+  el: HTMLElement,
+  onSwipeLeft: () => void,
+  onSwipeRight: () => void,
+  signal: AbortSignal
+): void {
+  let startX: number | null = null;
+  let startY: number | null = null;
+
+  el.addEventListener(
+    "touchstart",
+    (e: TouchEvent) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    },
+    { passive: true, signal }
+  );
+
+  el.addEventListener(
+    "touchend",
+    (e: TouchEvent) => {
+      if (startX === null || startY === null) return;
+      const deltaX = e.changedTouches[0].clientX - startX;
+      const deltaY = e.changedTouches[0].clientY - startY;
+      startX = null;
+      startY = null;
+
+      if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
+        if (deltaX < 0) onSwipeLeft();
+        else onSwipeRight();
+      }
+    },
+    { passive: true, signal }
+  );
+}
+
+export interface PillTrackItem {
+  id: string;
+  label: string;
+}
+
+export interface PillTrackController {
+  root: HTMLElement;
+  setActive: (id: string, smooth?: boolean) => void;
+  setPillWidth: (width: number, smooth?: boolean) => void;
+  scrollByDirection: (direction: -1 | 1) => void;
+}
+
+/**
+ * Creates a reusable draggable, wheel-scrollable, arrow-navigable pill switcher
+ * with an animated white sliding indicator.
+ */
+export function createPillTrack(opts: {
+  items: PillTrackItem[];
+  activeId: string;
+  pillWidth: number;
+  pillGap?: number;
+  trackClass: string;
+  leftAriaLabel: string;
+  rightAriaLabel: string;
+  tabularNums?: boolean;
+  fixedVisibleCount?: number;
+  onSelect: (id: string) => void;
+  signal: AbortSignal;
+}): PillTrackController {
+  const pillGap = opts.pillGap ?? 4;
+  let pillWidth = opts.pillWidth;
+  let activeId = opts.activeId;
+  let isDragging = false;
+  let hasDragged = false;
+  let startX = 0;
+  let scrollLeftStart = 0;
+
+  const root = document.createElement("div");
+  root.className = "pill-switcher";
+
+  const leftBtn = document.createElement("button");
+  leftBtn.type = "button";
+  leftBtn.className = "pill-arrow-btn";
+  leftBtn.setAttribute("aria-label", opts.leftAriaLabel);
+  leftBtn.innerHTML = icons.chevronLeft("pill-arrow-icon");
+
+  const track = document.createElement("div");
+  track.className = `pill-track no-scrollbar ${opts.trackClass}`;
+
+  const inner = document.createElement("div");
+  inner.className = "pill-track-inner";
+
+  const indicator = document.createElement("div");
+  indicator.className = "pill-indicator";
+  indicator.style.width = `${pillWidth}px`;
+  inner.appendChild(indicator);
+
+  const buttons = new Map<string, HTMLButtonElement>();
+  opts.items.forEach((item) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = cn("pill-btn", opts.tabularNums && "tabular-nums");
+    btn.style.width = `${pillWidth}px`;
+    btn.tabIndex = 0;
+    btn.innerHTML = `<span class="pill-btn-label">${escapeHtml(item.label)}</span>`;
+    btn.addEventListener(
+      "click",
+      () => {
+        if (!hasDragged) {
+          opts.onSelect(item.id);
+        }
+      },
+      { signal: opts.signal }
+    );
+    buttons.set(item.id, btn);
+    inner.appendChild(btn);
+  });
+
+  const rightBtn = document.createElement("button");
+  rightBtn.type = "button";
+  rightBtn.className = "pill-arrow-btn";
+  rightBtn.setAttribute("aria-label", opts.rightAriaLabel);
+  rightBtn.innerHTML = icons.chevronRight("pill-arrow-icon");
+
+  track.appendChild(inner);
+  root.append(leftBtn, track, rightBtn);
+
+  const updateScrollButtons = () => {
+    leftBtn.disabled = track.scrollLeft <= 4;
+    rightBtn.disabled = track.scrollLeft >= track.scrollWidth - track.clientWidth - 4;
+  };
+
+  const getActiveIndex = () => {
+    const idx = opts.items.findIndex((i) => i.id === activeId);
+    return idx >= 0 ? idx : 0;
+  };
+
+  const updateVisualState = () => {
+    const idx = getActiveIndex();
+    indicator.style.width = `${pillWidth}px`;
+    indicator.style.transform = `translate3d(${idx * (pillWidth + pillGap)}px, 0, 0)`;
+    opts.items.forEach((item) => {
+      const btn = buttons.get(item.id);
+      if (!btn) return;
+      const isSelected = item.id === activeId;
+      btn.classList.toggle("is-active", isSelected);
+      btn.setAttribute("aria-pressed", String(isSelected));
+      btn.style.width = `${pillWidth}px`;
+    });
+  };
+
+  const centerTrack = (smooth: boolean) => {
+    if (opts.items.length === 0) return;
+    const stride = pillWidth + pillGap;
+    const activeIdx = getActiveIndex();
+    let startIdx: number;
+    if (opts.fixedVisibleCount) {
+      const visiblePills = track.clientWidth >= 180 ? opts.fixedVisibleCount : 1;
+      startIdx =
+        visiblePills === 3
+          ? Math.max(0, Math.min(opts.items.length - 3, activeIdx - 1))
+          : activeIdx;
+    } else {
+      const visiblePills = Math.max(1, Math.round(track.clientWidth / stride));
+      const half = Math.floor(visiblePills / 2);
+      startIdx = Math.max(
+        0,
+        Math.min(opts.items.length - visiblePills, activeIdx - half)
+      );
+    }
+    safeScrollTo(track, startIdx * stride, smooth);
+    updateScrollButtons();
+  };
+
+  const scrollByDirection = (direction: -1 | 1) => {
+    const stride = pillWidth + pillGap;
+    const visiblePills = opts.fixedVisibleCount
+      ? track.clientWidth >= 180
+        ? opts.fixedVisibleCount
+        : 1
+      : Math.max(1, Math.round(track.clientWidth / stride));
+
+    if (visiblePills <= 1) {
+      const nextIndex = Math.max(
+        0,
+        Math.min(opts.items.length - 1, getActiveIndex() + direction)
+      );
+      opts.onSelect(opts.items[nextIndex].id);
+      return;
+    }
+
+    const maxIdx = Math.max(0, opts.items.length - visiblePills);
+    const currentIdx = Math.round(track.scrollLeft / stride);
+    const step = Math.max(1, visiblePills - 1);
+    const nextIdx = Math.max(0, Math.min(maxIdx, currentIdx + direction * step));
+    const targetLeft =
+      nextIdx >= maxIdx
+        ? track.scrollWidth - track.clientWidth
+        : nextIdx <= 0
+          ? 0
+          : nextIdx * stride;
+    safeScrollTo(track, targetLeft, true);
+  };
+
+  leftBtn.addEventListener("click", () => scrollByDirection(-1), {
+    signal: opts.signal,
+  });
+  rightBtn.addEventListener("click", () => scrollByDirection(1), {
+    signal: opts.signal,
+  });
+
+  track.addEventListener(
+    "mousedown",
+    (e: MouseEvent) => {
+      isDragging = true;
+      hasDragged = false;
+      startX = e.pageX - track.offsetLeft;
+      scrollLeftStart = track.scrollLeft;
+    },
+    { signal: opts.signal }
+  );
+
+  track.addEventListener(
+    "mousemove",
+    (e: MouseEvent) => {
+      if (!isDragging) return;
+      const x = e.pageX - track.offsetLeft;
+      const walk = x - startX;
+      if (Math.abs(walk) > 5) {
+        hasDragged = true;
+        e.preventDefault();
+        track.scrollLeft = scrollLeftStart - walk * 1.25;
+      }
+    },
+    { signal: opts.signal }
+  );
+
+  const stopDrag = () => {
+    isDragging = false;
+  };
+  track.addEventListener("mouseup", stopDrag, { signal: opts.signal });
+  track.addEventListener("mouseleave", stopDrag, { signal: opts.signal });
+
+  track.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        track.scrollLeft += e.deltaY;
+      }
+    },
+    { passive: true, signal: opts.signal }
+  );
+
+  track.addEventListener("scroll", updateScrollButtons, {
+    passive: true,
+    signal: opts.signal,
+  });
+
+  window.addEventListener("resize", () => centerTrack(false), {
+    signal: opts.signal,
+  });
+
+  updateVisualState();
+  requestAnimationFrame(() => centerTrack(false));
+
+  return {
+    root,
+    setActive(id: string, smooth = true) {
+      activeId = id;
+      updateVisualState();
+      centerTrack(smooth);
+    },
+    setPillWidth(width: number, smooth = false) {
+      if (pillWidth === width) return;
+      pillWidth = width;
+      updateVisualState();
+      centerTrack(smooth);
+    },
+    scrollByDirection,
+  };
 }

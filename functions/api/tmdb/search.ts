@@ -195,7 +195,14 @@ export const onRequestGet: PagesFunction = async (context) => {
       "movie",
       apiKey
     );
-    return Response.json({ page: 1, results: verified });
+    return Response.json(
+      { page: 1, results: verified },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        },
+      }
+    );
   } catch (err: any) {
     console.error(err);
     return Response.json({ error: "Failed to fetch from TMDB" }, { status: 500 });

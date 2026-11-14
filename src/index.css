@@ -33,6 +33,8 @@ button {
   background: none;
   border: 0;
   padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 a {
@@ -979,7 +981,7 @@ svg {
   }
 }
 
-/* Smart TV Flexbox fallback for browsers lacking native CSS Grid (and ?tv=1 PC emulation) */
+/* Smart TV Flexbox fallback for browsers lacking native CSS Grid */
 .media-grid {
   display: flex;
   flex-wrap: wrap;
@@ -1029,11 +1031,18 @@ svg {
   margin-right: 12px;
 }
 
+.media-grid.grid-cols-8 > * {
+  width: calc((100% - 85px) / 8);
+  max-width: calc((100% - 85px) / 8);
+  margin-right: 12px;
+}
+
 .media-grid.grid-cols-2 > *:nth-child(2n),
 .media-grid.grid-cols-3 > *:nth-child(3n),
 .media-grid.grid-cols-4 > *:nth-child(4n),
 .media-grid.grid-cols-5 > *:nth-child(5n),
-.media-grid.grid-cols-6 > *:nth-child(6n) {
+.media-grid.grid-cols-6 > *:nth-child(6n),
+.media-grid.grid-cols-8 > *:nth-child(8n) {
   margin-right: 0;
 }
 
@@ -1084,11 +1093,18 @@ svg {
     margin-right: 20px;
   }
 
+  .media-grid.grid-cols-8 > * {
+    width: calc((100% - 141px) / 8);
+    max-width: calc((100% - 141px) / 8);
+    margin-right: 20px;
+  }
+
   .media-grid.grid-cols-2 > *:nth-child(2n),
   .media-grid.grid-cols-3 > *:nth-child(3n),
   .media-grid.grid-cols-4 > *:nth-child(4n),
   .media-grid.grid-cols-5 > *:nth-child(5n),
-  .media-grid.grid-cols-6 > *:nth-child(6n) {
+  .media-grid.grid-cols-6 > *:nth-child(6n),
+  .media-grid.grid-cols-8 > *:nth-child(8n) {
     margin-right: 0;
   }
 
@@ -1135,11 +1151,18 @@ svg {
     margin-right: 28px;
   }
 
+  .media-grid.grid-cols-8 > * {
+    width: calc((100% - 197px) / 8);
+    max-width: calc((100% - 197px) / 8);
+    margin-right: 28px;
+  }
+
   .media-grid.grid-cols-2 > *:nth-child(2n),
   .media-grid.grid-cols-3 > *:nth-child(3n),
   .media-grid.grid-cols-4 > *:nth-child(4n),
   .media-grid.grid-cols-5 > *:nth-child(5n),
-  .media-grid.grid-cols-6 > *:nth-child(6n) {
+  .media-grid.grid-cols-6 > *:nth-child(6n),
+  .media-grid.grid-cols-8 > *:nth-child(8n) {
     margin-right: 0;
   }
 
@@ -1160,16 +1183,18 @@ svg {
 .media-grid.grid-cols-4.grid-rows-2 > *:nth-child(n+5),
 .media-grid.grid-cols-5.grid-rows-2 > *:nth-child(n+6),
 .media-grid.grid-cols-6.grid-rows-2 > *:nth-child(n+7),
+.media-grid.grid-cols-8.grid-rows-2 > *:nth-child(n+9),
 .media-grid.grid-cols-2.grid-rows-3 > *:nth-child(n+5),
 .media-grid.grid-cols-3.grid-rows-3 > *:nth-child(n+7),
 .media-grid.grid-cols-4.grid-rows-3 > *:nth-child(n+9),
 .media-grid.grid-cols-5.grid-rows-3 > *:nth-child(n+11),
-.media-grid.grid-cols-6.grid-rows-3 > *:nth-child(n+13) {
+.media-grid.grid-cols-6.grid-rows-3 > *:nth-child(n+13),
+.media-grid.grid-cols-8.grid-rows-3 > *:nth-child(n+17) {
   margin-bottom: 0;
 }
 
 @supports (display: grid) {
-  html:not(.tv-emulate) .media-grid {
+  .media-grid {
     display: grid;
     justify-content: normal;
     align-content: normal;
@@ -1178,50 +1203,54 @@ svg {
   }
 
   @media (min-width: 640px) {
-    html:not(.tv-emulate) .media-grid {
+    .media-grid {
       column-gap: 20px;
       row-gap: 16px;
     }
   }
 
   @media (min-width: 768px) {
-    html:not(.tv-emulate) .media-grid {
+    .media-grid {
       column-gap: 28px;
       row-gap: 20px;
     }
   }
 
-  html:not(.tv-emulate) .media-grid.grid-cols-2 {
+  .media-grid.grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  html:not(.tv-emulate) .media-grid.grid-cols-3 {
+  .media-grid.grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  html:not(.tv-emulate) .media-grid.grid-cols-4 {
+  .media-grid.grid-cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-  html:not(.tv-emulate) .media-grid.grid-cols-5 {
+  .media-grid.grid-cols-5 {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
-  html:not(.tv-emulate) .media-grid.grid-cols-6 {
+  .media-grid.grid-cols-6 {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
+  .media-grid.grid-cols-8 {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
 
-  html:not(.tv-emulate) .media-grid.grid-rows-1 {
+  .media-grid.grid-rows-1 {
     grid-template-rows: repeat(1, minmax(0, 1fr));
   }
-  html:not(.tv-emulate) .media-grid.grid-rows-2 {
+  .media-grid.grid-rows-2 {
     grid-template-rows: repeat(2, minmax(0, 1fr));
   }
-  html:not(.tv-emulate) .media-grid.grid-rows-3 {
+  .media-grid.grid-rows-3 {
     grid-template-rows: repeat(3, minmax(0, 1fr));
   }
 
-  html:not(.tv-emulate) .media-grid.grid-cols-2 > *,
-  html:not(.tv-emulate) .media-grid.grid-cols-3 > *,
-  html:not(.tv-emulate) .media-grid.grid-cols-4 > *,
-  html:not(.tv-emulate) .media-grid.grid-cols-5 > *,
-  html:not(.tv-emulate) .media-grid.grid-cols-6 > * {
+  .media-grid.grid-cols-2 > *,
+  .media-grid.grid-cols-3 > *,
+  .media-grid.grid-cols-4 > *,
+  .media-grid.grid-cols-5 > *,
+  .media-grid.grid-cols-6 > *,
+  .media-grid.grid-cols-8 > * {
     width: 100%;
     max-width: 100%;
     height: 100%;
@@ -1278,6 +1307,7 @@ svg {
   height: 100%;
   display: block;
   object-fit: cover;
+  border-radius: 11px;
   transform: scale(1);
   transition: transform 300ms ease-out;
 }
@@ -1296,6 +1326,7 @@ svg {
   justify-content: center;
   padding: 12px;
   text-align: center;
+  border-radius: 11px;
   background-color: rgba(23, 23, 23, 0.9);
   transform: scale(1);
   transition: transform 300ms ease-out;
@@ -1330,6 +1361,7 @@ svg {
   right: 0;
   bottom: 0;
   left: 0;
+  border-radius: 11px;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 50%, transparent 100%);
   opacity: 0.6;
   transition: opacity 300ms ease-out;
@@ -2614,30 +2646,91 @@ svg {
 }
 
 /* =========================================================
-   Legacy Smart TV (:focus fallback when :focus-visible is unsupported)
+   Legacy Smart TV (:focus & Compositor Fallbacks when :focus-visible is unsupported)
    ========================================================= */
+
+html.no-focus-visible .capsule-indicator,
+html.no-focus-visible .pill-indicator,
+html.no-focus-visible .bottom-nav-indicator {
+  display: none !important;
+}
+
+html.no-focus-visible .capsule-btn,
+html.no-focus-visible .pill-btn,
+html.no-focus-visible .bottom-nav-link {
+  border-radius: 24px !important;
+  transition: none !important;
+}
+
+html.no-focus-visible .capsule-btn:not(.is-active):hover,
+html.no-focus-visible .pill-btn:not(.is-active):hover,
+html.no-focus-visible .bottom-nav-link:not(.is-active):hover {
+  color: #ffffff;
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.12);
+}
 
 html.no-focus-visible .bottom-nav-link:not(.is-active):focus,
 html.no-focus-visible .capsule-btn:not(.is-active):focus,
 html.no-focus-visible .pill-btn:not(.is-active):focus {
   color: #ffffff;
   opacity: 1;
+  background-color: rgba(255, 255, 255, 0.14);
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+html.no-focus-visible .bottom-nav-link.is-active,
+html.no-focus-visible .capsule-btn.is-active,
+html.no-focus-visible .pill-btn.is-active,
+html.no-focus-visible .bottom-nav-link.is-active:hover,
+html.no-focus-visible .capsule-btn.is-active:hover,
+html.no-focus-visible .pill-btn.is-active:hover {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 24px !important;
+  opacity: 1 !important;
 }
 
 html.no-focus-visible .bottom-nav-link.is-active:focus,
 html.no-focus-visible .capsule-btn.is-active:focus,
 html.no-focus-visible .pill-btn.is-active:focus {
+  background-color: #ffffff !important;
   color: #000000 !important;
-  opacity: 1;
+  border: 1px solid #ffffff !important;
+  border-radius: 24px !important;
+  opacity: 1 !important;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
+html.no-focus-visible .bottom-nav-link-inner,
+html.no-focus-visible .capsule-btn-label,
+html.no-focus-visible .pill-btn-label,
+html.no-focus-visible .back-btn-inner,
+html.no-focus-visible .bottom-nav-link:hover .bottom-nav-link-inner,
 html.no-focus-visible .bottom-nav-link:focus .bottom-nav-link-inner,
+html.no-focus-visible .capsule-btn:hover .capsule-btn-label,
 html.no-focus-visible .capsule-btn:focus .capsule-btn-label,
+html.no-focus-visible .pill-btn:hover .pill-btn-label,
 html.no-focus-visible .pill-btn:focus .pill-btn-label,
-html.no-focus-visible .back-btn:focus .back-btn-inner {
-  transform: scale(1.1);
+html.no-focus-visible .back-btn:hover .back-btn-inner,
+html.no-focus-visible .back-btn:focus .back-btn-inner,
+html.no-focus-visible .media-card-poster,
+html.no-focus-visible .media-card-img,
+html.no-focus-visible .media-card-fallback,
+html.no-focus-visible .media-card:hover .media-card-img,
+html.no-focus-visible .media-card:focus .media-card-img,
+html.no-focus-visible .media-card:hover .media-card-fallback,
+html.no-focus-visible .media-card:focus .media-card-fallback,
+html.no-focus-visible .media-card-gradient,
+html.no-focus-visible .media-card-badge,
+html.no-focus-visible .media-card-remove {
+  transform: none !important;
+  transition: none !important;
+}
+
+html.no-focus-visible .media-card:hover .media-card-poster {
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
 html.no-focus-visible .pill-arrow-btn:focus,

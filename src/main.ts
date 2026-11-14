@@ -63,8 +63,8 @@ const NAV_ITEMS: NavItem[] = [
     icon: icons.history("bottom-nav-icon"),
   },
   {
-    name: "Watch Later",
-    path: "/watch-later",
+    name: "Saved",
+    path: "/saved",
     icon: icons.bookmark("bottom-nav-icon"),
   },
   { name: "Search", path: "/search", icon: icons.search("bottom-nav-icon") },
@@ -300,7 +300,8 @@ function bootstrap() {
     bottomNavWrap.style.display = isPlayerPage ? "none" : "";
     if (isPlayerPage) return;
 
-    const rawIndex = NAV_ITEMS.findIndex((item) => item.path === currentPath);
+    const normalizedPath = currentPath === "/watch-later" ? "/saved" : currentPath;
+    const rawIndex = NAV_ITEMS.findIndex((item) => item.path === normalizedPath);
     const hasActiveTab = rawIndex !== -1;
     const activeIndex = hasActiveTab ? rawIndex : 0;
 

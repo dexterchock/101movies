@@ -476,8 +476,13 @@ export function createPillTrack(opts: {
   root.append(leftBtn, track, rightBtn);
 
   const updateScrollButtons = () => {
-    leftBtn.disabled = track.scrollLeft <= 4;
-    rightBtn.disabled = track.scrollLeft >= track.scrollWidth - track.clientWidth - 4;
+    if (track.clientWidth <= 0) return;
+    const canScroll = track.scrollWidth > track.clientWidth + 4;
+    leftBtn.style.display = canScroll ? "" : "none";
+    rightBtn.style.display = canScroll ? "" : "none";
+    leftBtn.disabled = !canScroll || track.scrollLeft <= 4;
+    rightBtn.disabled =
+      !canScroll || track.scrollLeft >= track.scrollWidth - track.clientWidth - 4;
   };
 
   const getActiveIndex = () => {

@@ -676,23 +676,21 @@ export function mount(
       const infoSkel = document.createElement("div");
       infoSkel.className = "player-info";
       infoSkel.innerHTML = `
-        <div class="player-info-card">
-          <div class="animate-pulse" style="height:40px;width:min(420px,75%);border-radius:12px;background:rgba(255,255,255,0.06);margin-bottom:14px"></div>
-          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-            <div class="animate-pulse" style="height:18px;width:48px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-            <div class="animate-pulse" style="height:18px;width:32px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-            <div class="animate-pulse" style="height:18px;width:56px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-            <div class="animate-pulse" style="height:18px;width:112px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-            <div class="animate-pulse" style="height:18px;width:220px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:8px;max-width:48rem">
-            <div class="animate-pulse" style="height:16px;width:100%;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-            <div class="animate-pulse" style="height:16px;width:66%;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-          </div>
-          <div style="display:flex;gap:10px;margin-top:16px">
-            <div class="animate-pulse" style="height:40px;width:136px;border-radius:9999px;background:rgba(255,255,255,0.06)"></div>
-            <div class="animate-pulse" style="height:40px;width:144px;border-radius:9999px;background:rgba(255,255,255,0.06)"></div>
-          </div>
+        <div class="animate-pulse" style="height:40px;width:min(420px,75%);border-radius:12px;background:rgba(255,255,255,0.06);margin-bottom:14px"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+          <div class="animate-pulse" style="height:18px;width:48px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+          <div class="animate-pulse" style="height:18px;width:32px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+          <div class="animate-pulse" style="height:18px;width:56px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+          <div class="animate-pulse" style="height:18px;width:112px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+          <div class="animate-pulse" style="height:18px;width:220px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;max-width:48rem">
+          <div class="animate-pulse" style="height:16px;width:100%;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+          <div class="animate-pulse" style="height:16px;width:66%;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <div class="animate-pulse" style="height:38px;width:96px;border-radius:9999px;background:rgba(255,255,255,0.06)"></div>
+          <div class="animate-pulse" style="height:38px;width:92px;border-radius:9999px;background:rgba(255,255,255,0.06)"></div>
         </div>
       `;
 
@@ -803,13 +801,10 @@ export function mount(
     const info = document.createElement("div");
     info.className = "player-info";
 
-    const card = document.createElement("div");
-    card.className = "player-info-card";
-
     const titleEl = document.createElement("h1");
     titleEl.className = "player-title";
     updateTitleElement(titleEl, primaryTitle, secondaryTitle);
-    card.appendChild(titleEl);
+    info.appendChild(titleEl);
 
     const releaseYear = (
       details.release_date || details.first_air_date
@@ -847,13 +842,13 @@ export function mount(
       );
     }
     metaRow.innerHTML = metaParts.join("");
-    card.appendChild(metaRow);
+    info.appendChild(metaRow);
 
     if (details.overview) {
       const overviewEl = document.createElement("p");
       overviewEl.className = "player-overview";
       overviewEl.textContent = details.overview;
-      card.appendChild(overviewEl);
+      info.appendChild(overviewEl);
     }
 
     const actionsRow = document.createElement("div");
@@ -866,8 +861,8 @@ export function mount(
     const renderWatchLaterBtn = (saved: boolean) => {
       watchLaterBtn.classList.toggle("is-saved", saved);
       watchLaterBtn.setAttribute("aria-pressed", String(saved));
-      watchLaterBtn.innerHTML = `${icons.bookmark("", 15)}<span>${
-        saved ? "Saved in Watch Later" : "Watch Later"
+      watchLaterBtn.innerHTML = `${icons.bookmark("", 14)}<span>${
+        saved ? "Saved" : "Save"
       }</span>`;
     };
     renderWatchLaterBtn(isInWatchLater(type, details.id));
@@ -899,20 +894,17 @@ export function mount(
     imdbLink.className = "imdb-btn";
     imdbLink.target = "_blank";
     imdbLink.rel = "noopener noreferrer";
+    imdbLink.setAttribute("aria-label", "Open IMDb page");
     imdbLink.tabIndex = 0;
     imdbLink.href = imdbId
       ? `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/`
       : `https://www.imdb.com/find/?s=tt&q=${encodeURIComponent(
           englishTitle || primaryTitle
         )}`;
-    imdbLink.innerHTML = `<span class="imdb-badge-tag">IMDb</span><span>Rate on IMDb</span>${icons.externalLink(
-      "",
-      14
-    )}`;
+    imdbLink.innerHTML = `<span>IMDb</span>${icons.externalLink("", 14)}`;
     actionsRow.appendChild(imdbLink);
 
-    card.appendChild(actionsRow);
-    info.appendChild(card);
+    info.appendChild(actionsRow);
 
     stageEl.replaceChildren(hero, info);
   }

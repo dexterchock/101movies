@@ -31,7 +31,7 @@ function matchAndMount(pathname: string): boolean {
     activeView = mountHistory(stageContainer);
     return true;
   }
-  if (pathname === "/watch-later") {
+  if (pathname === "/saved" || pathname === "/watch-later") {
     activeView = mountWatchLater(stageContainer);
     return true;
   }

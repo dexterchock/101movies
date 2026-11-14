@@ -61,7 +61,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   root.className = "browse-page";
 
   const topBar = document.createElement("div");
-  topBar.className = "top-bar";
+  topBar.className = "top-bar top-bar--rankings";
 
   // Left: Movies / Shows toggle
   const mediaToggle = document.createElement("div");
@@ -102,7 +102,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   const genreTrack = createPillTrack({
     items: MEDIA_CATEGORIES,
     activeId: genre,
-    pillWidth: gridState.isMobileView
+    pillWidth: gridState.isCompactHeader
       ? GENRE_PILL_WIDTH_MOBILE
       : GENRE_PILL_WIDTH_DESKTOP,
     trackClass: "pill-track--category",
@@ -125,7 +125,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   const yearTrack = createPillTrack({
     items: ALL_YEARS.map((y) => ({ id: String(y), label: String(y) })),
     activeId: String(year),
-    pillWidth: gridState.isMobileView
+    pillWidth: gridState.isCompactHeader
       ? YEAR_PILL_WIDTH_MOBILE
       : YEAR_PILL_WIDTH_DESKTOP,
     trackClass: "pill-track--year",
@@ -155,7 +155,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   let fetchAbort: AbortController | null = null;
 
   const updateMediaToggle = () => {
-    const tabW = gridState.isMobileView ? 68 : 88;
+    const tabW = gridState.isCompactHeader ? 68 : 88;
     const idx = mediaType === "tv" ? 1 : 0;
     mediaIndicator.style.width = `${tabW}px`;
     mediaIndicator.style.transform = `translate3d(${idx * (tabW + 4)}px, 0, 0)`;
@@ -172,11 +172,11 @@ export function mount(container: HTMLElement): ViewCleanup {
   const updateControlWidths = () => {
     updateMediaToggle();
     genreTrack.setPillWidth(
-      gridState.isMobileView ? GENRE_PILL_WIDTH_MOBILE : GENRE_PILL_WIDTH_DESKTOP,
+      gridState.isCompactHeader ? GENRE_PILL_WIDTH_MOBILE : GENRE_PILL_WIDTH_DESKTOP,
       false
     );
     yearTrack.setPillWidth(
-      gridState.isMobileView ? YEAR_PILL_WIDTH_MOBILE : YEAR_PILL_WIDTH_DESKTOP,
+      gridState.isCompactHeader ? YEAR_PILL_WIDTH_MOBILE : YEAR_PILL_WIDTH_DESKTOP,
       false
     );
   };

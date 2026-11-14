@@ -556,7 +556,7 @@ svg {
   }
 
   .pill-track--category {
-    width: 230px;
+    width: 196px;
   }
 }
 
@@ -600,7 +600,7 @@ svg {
   width: 60px;
 }
 
-@media (min-width: 640px) {
+@media (min-width: 960px) {
   .pill-track--year {
     width: 200px;
   }
@@ -690,6 +690,87 @@ svg {
   .pill-btn {
     height: 36px;
     font-size: 14px;
+  }
+}
+
+/* Compact Rankings top bar on tablet portrait (640px-959px) and adjusted desktop widths
+   so the wider year switcher on the right never collides with the centered categories. */
+@media (min-width: 640px) and (max-width: 959px) {
+  .top-bar--rankings .capsule-group,
+  .top-bar--rankings .pill-switcher {
+    height: 38px;
+    padding: 2px;
+  }
+
+  .top-bar--rankings .capsule-indicator {
+    top: 2px;
+    bottom: 2px;
+    left: 2px;
+  }
+
+  .top-bar--rankings .top-bar-right {
+    height: 38px;
+  }
+
+  .top-bar--rankings .capsule-btn,
+  .top-bar--rankings .pill-btn {
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .top-bar--rankings .pill-arrow-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .top-bar--rankings .pill-arrow-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .top-bar--rankings .pill-track,
+  .top-bar--rankings .pill-track-inner {
+    height: 30px;
+  }
+
+  .top-bar--rankings .pill-track--category {
+    width: 148px;
+  }
+}
+
+@media (min-width: 660px) and (max-width: 959px) {
+  .top-bar--rankings .pill-track--category {
+    width: 224px;
+  }
+}
+
+@media (min-width: 960px) {
+  .top-bar--rankings .pill-track--category {
+    width: 260px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .top-bar--rankings .pill-track--category {
+    width: 436px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .top-bar--rankings .pill-track--category {
+    width: 612px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .top-bar--rankings .pill-track--category {
+    width: 788px;
+  }
+}
+
+@media (min-width: 1800px) {
+  .top-bar--rankings .pill-track--category {
+    width: 964px;
   }
 }
 

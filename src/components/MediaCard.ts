@@ -8,11 +8,12 @@ export interface MediaCardOptions {
   rank?: number;
   className?: string;
   onRemove?: (e: MouseEvent) => void;
+  removeLabel?: string;
   signal: AbortSignal;
 }
 
 export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
-  const { item, rank, className, onRemove, signal } = options;
+  const { item, rank, className, onRemove, removeLabel = "Remove from history", signal } = options;
   const type = resolveMediaItemType(item);
   const title =
     item.is_chinese_origin && item.zh_title
@@ -77,10 +78,11 @@ export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
   if (onRemove) {
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
+    removeBtn.tabIndex = -1;
     removeBtn.className = "media-card-remove";
-    removeBtn.setAttribute("aria-label", `Remove ${title} from history`);
-    removeBtn.title = "Remove from history";
-    removeBtn.innerHTML = icons.x("", 13, 2.5);
+    removeBtn.setAttribute("aria-label", `${removeLabel}: ${title}`);
+    removeBtn.title = removeLabel;
+    removeBtn.innerHTML = icons.x("media-card-remove-icon", 14, 2.25);
     removeBtn.addEventListener(
       "click",
       (e: MouseEvent) => {

@@ -528,7 +528,7 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
     try {
       const [enRes, zhRes] = await Promise.allSettled<any>([
         fetch(
-          `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits&api_key=${TMDB_API_KEY}`
+          `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits,external_ids&api_key=${TMDB_API_KEY}`
         ).then((r) => r.json()),
         fetch(
           `${TMDB_BASE_URL}/${type}/${id}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${TMDB_API_KEY}`
@@ -594,6 +594,7 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
 
       res.json({
         ...enData,
+        imdb_id: enData.imdb_id || enData?.external_ids?.imdb_id || undefined,
         title: type === "movie" ? primaryDisplayTitle : enData.title,
         name: type === "tv" ? primaryDisplayTitle : enData.name,
         en_title,

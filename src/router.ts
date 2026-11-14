@@ -3,6 +3,7 @@ import { mount as mountHome, type ViewCleanup } from "./pages/Home";
 import { mount as mountPlayer } from "./pages/Player";
 import { mount as mountRankings } from "./pages/Rankings";
 import { mount as mountSearch } from "./pages/Search";
+import { mount as mountWatchLater } from "./pages/WatchLater";
 
 export interface NavigateOptions {
   replace?: boolean;
@@ -28,6 +29,10 @@ function matchAndMount(pathname: string): boolean {
   }
   if (pathname === "/history") {
     activeView = mountHistory(stageContainer);
+    return true;
+  }
+  if (pathname === "/watch-later") {
+    activeView = mountWatchLater(stageContainer);
     return true;
   }
   if (pathname === "/search") {

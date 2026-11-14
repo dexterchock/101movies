@@ -41,8 +41,20 @@ export const icons = {
     svg(`<path d="m9 18 6-6-6-6"/>`, className),
   chevronUp: (className = "", size = 14) =>
     svg(`<path d="m18 15-6-6-6 6"/>`, className, { size }),
-  arrowLeft: (className = "") =>
-    svg(`<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>`, className),
+  arrowLeft: (className = "", size = 18) =>
+    svg(`<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>`, className, { size }),
+  bookmark: (className = "", size = 16, filled = false) =>
+    svg(
+      `<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>`,
+      className,
+      { size, fill: filled ? "currentColor" : "none" }
+    ),
+  externalLink: (className = "", size = 12) =>
+    svg(
+      `<path d="M7 17 17 7"/><path d="M7 7h10v10"/>`,
+      className,
+      { size, strokeWidth: 2.5 }
+    ),
   star: (className = "") =>
     svg(
       `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,

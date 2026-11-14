@@ -7,7 +7,7 @@ import {
   ResolvedStreamSource,
   WatchProgress,
 } from "../types";
-import { escapeHtml } from "../utils";
+import { escapeHtml, isInWatchLater, toggleWatchLater } from "../utils";
 import type { ViewCleanup } from "./Home";
 
 // VOD APIs responding >= 800ms indicate high latency / slow stream segment delivery
@@ -267,7 +267,10 @@ export function mount(
   backBtn.className = "back-btn";
   backBtn.setAttribute("aria-label", "Go back");
   backBtn.tabIndex = 0;
-  backBtn.innerHTML = `<span class="back-btn-inner">${icons.arrowLeft("")}<span>Back</span></span>`;
+  backBtn.innerHTML = `<span class="back-btn-inner">${icons.arrowLeft(
+    "back-btn-icon",
+    18
+  )}<span>Back</span></span>`;
   backBtn.addEventListener("mousedown", (e) => e.stopPropagation(), { signal });
   backBtn.addEventListener("click", handleBack, { signal });
   backBtnWrap.appendChild(backBtn);
@@ -673,17 +676,23 @@ export function mount(
       const infoSkel = document.createElement("div");
       infoSkel.className = "player-info";
       infoSkel.innerHTML = `
-        <div class="animate-pulse" style="height:40px;width:min(420px,75%);border-radius:12px;background:rgba(255,255,255,0.06);margin-bottom:14px"></div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-          <div class="animate-pulse" style="height:18px;width:48px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-          <div class="animate-pulse" style="height:18px;width:32px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-          <div class="animate-pulse" style="height:18px;width:56px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-          <div class="animate-pulse" style="height:18px;width:112px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-          <div class="animate-pulse" style="height:18px;width:220px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px;max-width:48rem">
-          <div class="animate-pulse" style="height:16px;width:100%;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
-          <div class="animate-pulse" style="height:16px;width:66%;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+        <div class="player-info-card">
+          <div class="animate-pulse" style="height:40px;width:min(420px,75%);border-radius:12px;background:rgba(255,255,255,0.06);margin-bottom:14px"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+            <div class="animate-pulse" style="height:18px;width:48px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+            <div class="animate-pulse" style="height:18px;width:32px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+            <div class="animate-pulse" style="height:18px;width:56px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+            <div class="animate-pulse" style="height:18px;width:112px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+            <div class="animate-pulse" style="height:18px;width:220px;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;max-width:48rem">
+            <div class="animate-pulse" style="height:16px;width:100%;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+            <div class="animate-pulse" style="height:16px;width:66%;border-radius:6px;background:rgba(255,255,255,0.05)"></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <div class="animate-pulse" style="height:40px;width:136px;border-radius:9999px;background:rgba(255,255,255,0.06)"></div>
+            <div class="animate-pulse" style="height:40px;width:144px;border-radius:9999px;background:rgba(255,255,255,0.06)"></div>
+          </div>
         </div>
       `;
 
@@ -708,19 +717,21 @@ export function mount(
       ? chineseTitle
       : undefined;
 
+    const hasWideBackdrop = Boolean(details.backdrop_path);
     const backdropPath = details.backdrop_path || details.poster_path;
     const backdropUrl = backdropPath
       ? `https://image.tmdb.org/t/p/original${backdropPath}`
       : "";
+    const imdbId = details.imdb_id || details.external_ids?.imdb_id || "";
 
-    const nextHeroKey = `${details.id}_${primaryTitle}_${secondaryTitle || ""}_${backdropUrl}`;
+    const nextHeroKey = `${details.id}_${primaryTitle}_${secondaryTitle || ""}_${backdropUrl}_${hasWideBackdrop ? 1 : 0}_${imdbId}`;
     if (renderedHeroKey === nextHeroKey) return;
 
     // If only bilingual title changed (after VOD resolve), update title in-place without reloading backdrop image
     const existingInfo = stageEl.querySelector(".player-info");
     if (
       renderedHeroKey.startsWith(`${details.id}_`) &&
-      renderedHeroKey.endsWith(`_${backdropUrl}`) &&
+      renderedHeroKey.endsWith(`_${backdropUrl}_${hasWideBackdrop ? 1 : 0}_${imdbId}`) &&
       existingInfo
     ) {
       renderedHeroKey = nextHeroKey;
@@ -746,18 +757,37 @@ export function mount(
         hero.appendChild(pulseBg);
       }
 
+      let ambientImg: HTMLImageElement | null = null;
+      if (!hasWideBackdrop) {
+        ambientImg = document.createElement("img");
+        ambientImg.src = backdropUrl;
+        ambientImg.alt = "";
+        ambientImg.setAttribute("aria-hidden", "true");
+        ambientImg.referrerPolicy = "no-referrer";
+        ambientImg.decoding = "async";
+        ambientImg.className = backdropLoaded
+          ? "player-backdrop-ambient is-loaded"
+          : "player-backdrop-ambient";
+        hero.appendChild(ambientImg);
+      }
+
       const img = document.createElement("img");
       img.src = backdropUrl;
       img.alt = primaryTitle;
       img.referrerPolicy = "no-referrer";
       img.decoding = "async";
-      img.className = backdropLoaded
-        ? "player-backdrop is-loaded"
-        : "player-backdrop";
+      img.className = [
+        "player-backdrop",
+        hasWideBackdrop ? "" : "player-backdrop--poster",
+        backdropLoaded ? "is-loaded" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
 
       const markLoaded = () => {
         backdropLoaded = true;
         img.classList.add("is-loaded");
+        ambientImg?.classList.add("is-loaded");
         pulseBg?.remove();
         pulseBg = null;
       };
@@ -773,10 +803,13 @@ export function mount(
     const info = document.createElement("div");
     info.className = "player-info";
 
+    const card = document.createElement("div");
+    card.className = "player-info-card";
+
     const titleEl = document.createElement("h1");
     titleEl.className = "player-title";
     updateTitleElement(titleEl, primaryTitle, secondaryTitle);
-    info.appendChild(titleEl);
+    card.appendChild(titleEl);
 
     const releaseYear = (
       details.release_date || details.first_air_date
@@ -814,14 +847,72 @@ export function mount(
       );
     }
     metaRow.innerHTML = metaParts.join("");
-    info.appendChild(metaRow);
+    card.appendChild(metaRow);
 
     if (details.overview) {
       const overviewEl = document.createElement("p");
       overviewEl.className = "player-overview";
       overviewEl.textContent = details.overview;
-      info.appendChild(overviewEl);
+      card.appendChild(overviewEl);
     }
+
+    const actionsRow = document.createElement("div");
+    actionsRow.className = "player-info-actions";
+
+    const watchLaterBtn = document.createElement("button");
+    watchLaterBtn.type = "button";
+    watchLaterBtn.className = "watch-later-btn";
+    watchLaterBtn.tabIndex = 0;
+    const renderWatchLaterBtn = (saved: boolean) => {
+      watchLaterBtn.classList.toggle("is-saved", saved);
+      watchLaterBtn.setAttribute("aria-pressed", String(saved));
+      watchLaterBtn.innerHTML = `${icons.bookmark("", 15)}<span>${
+        saved ? "Saved in Watch Later" : "Watch Later"
+      }</span>`;
+    };
+    renderWatchLaterBtn(isInWatchLater(type, details.id));
+    watchLaterBtn.addEventListener(
+      "click",
+      () => {
+        if (!details) return;
+        const saved = toggleWatchLater({
+          id: details.id,
+          media_type: type,
+          title: details.title,
+          name: details.name,
+          poster_path: details.poster_path,
+          backdrop_path: details.backdrop_path,
+          vote_average: details.vote_average,
+          release_date: details.release_date,
+          first_air_date: details.first_air_date,
+          overview: details.overview,
+          en_title: details.en_title,
+          zh_title: details.zh_title,
+        });
+        renderWatchLaterBtn(saved);
+      },
+      { signal }
+    );
+    actionsRow.appendChild(watchLaterBtn);
+
+    const imdbLink = document.createElement("a");
+    imdbLink.className = "imdb-btn";
+    imdbLink.target = "_blank";
+    imdbLink.rel = "noopener noreferrer";
+    imdbLink.tabIndex = 0;
+    imdbLink.href = imdbId
+      ? `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/`
+      : `https://www.imdb.com/find/?s=tt&q=${encodeURIComponent(
+          englishTitle || primaryTitle
+        )}`;
+    imdbLink.innerHTML = `<span class="imdb-badge-tag">IMDb</span><span>Rate on IMDb</span>${icons.externalLink(
+      "",
+      14
+    )}`;
+    actionsRow.appendChild(imdbLink);
+
+    card.appendChild(actionsRow);
+    info.appendChild(card);
 
     stageEl.replaceChildren(hero, info);
   }
@@ -1059,7 +1150,7 @@ export function mount(
       resumeBtn.tabIndex = 0;
       resumeBtn.innerHTML = `<span class="episodes-trigger-inner">${icons.play(
         "",
-        13
+        12
       )}<span>${escapeHtml(resumeLabel)}</span></span>`;
       resumeBtn.addEventListener("click", handleResumeClick, { signal });
       frag.appendChild(resumeBtn);
@@ -1143,7 +1234,8 @@ export function mount(
         closeBtn.setAttribute("aria-label", "Close episodes");
         closeBtn.innerHTML = `<span class="episodes-trigger-inner">${icons.x(
           "",
-          15
+          16,
+          2
         )}</span>`;
         closeBtn.addEventListener(
           "click",

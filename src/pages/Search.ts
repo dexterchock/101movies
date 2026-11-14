@@ -69,7 +69,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   clearBtn.className = "search-clear-btn";
   clearBtn.setAttribute("aria-label", "Clear search");
   clearBtn.tabIndex = 0;
-  clearBtn.innerHTML = `<span class="search-clear-inner">${icons.x("", 15)}</span>`;
+  clearBtn.innerHTML = `<span class="search-clear-inner">${icons.x("", 14, 2)}</span>`;
 
   searchBox.append(input);
   searchBoxWrap.appendChild(searchBox);

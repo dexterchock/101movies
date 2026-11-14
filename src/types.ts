@@ -119,6 +119,8 @@ export interface MediaDetails extends MediaItem {
   origin_country?: string[];
   production_countries?: { iso_3166_1: string; name: string }[];
   original_language?: string;
+  imdb_id?: string;
+  external_ids?: { imdb_id?: string };
 }
 
 export interface TmdbResponse<T> {

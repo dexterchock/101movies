@@ -188,7 +188,7 @@ export async function fetchMediaDetails(
 
   const [enRes, zhRes] = await Promise.allSettled<any>([
     fetch(
-      `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits&api_key=${apiKey}`
+      `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits,external_ids&api_key=${apiKey}`
     ).then((r) => r.json()),
     fetch(
       `${TMDB_BASE_URL}/${type}/${id}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${apiKey}`
@@ -254,6 +254,7 @@ export async function fetchMediaDetails(
 
   return {
     ...enData,
+    imdb_id: enData.imdb_id || enData?.external_ids?.imdb_id || undefined,
     title: type === "movie" ? primaryDisplayTitle : enData.title,
     name: type === "tv" ? primaryDisplayTitle : enData.name,
     en_title,

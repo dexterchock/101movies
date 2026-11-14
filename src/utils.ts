@@ -2,6 +2,7 @@ import type { MediaItem } from "./types";
 import { icons } from "./icons";
 
 const WATCH_HISTORY_KEY = "watch_history";
+const WATCH_LATER_KEY = "watch_later";
 
 export function cn(...inputs: (string | false | null | undefined)[]): string {
   return inputs.filter(Boolean).join(" ");
@@ -16,20 +17,99 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, "&#39;");
 }
 
-export function loadWatchHistory(): MediaItem[] {
+function loadStoredMediaList(storageKey: string): MediaItem[] {
   if (typeof window === "undefined") return [];
   try {
-    const stored = localStorage.getItem(WATCH_HISTORY_KEY);
+    const stored = localStorage.getItem(storageKey);
     return stored ? JSON.parse(stored) : [];
   } catch {
     return [];
   }
 }
 
-export function clearWatchHistory(): void {
+function clearStoredMediaList(storageKey: string): void {
   try {
-    localStorage.removeItem(WATCH_HISTORY_KEY);
+    localStorage.removeItem(storageKey);
   } catch {}
+}
+
+export function loadWatchHistory(): MediaItem[] {
+  return loadStoredMediaList(WATCH_HISTORY_KEY);
+}
+
+export function clearWatchHistory(): void {
+  clearStoredMediaList(WATCH_HISTORY_KEY);
+}
+
+export function loadWatchLater(): MediaItem[] {
+  return loadStoredMediaList(WATCH_LATER_KEY);
+}
+
+export function clearWatchLater(): void {
+  clearStoredMediaList(WATCH_LATER_KEY);
+}
+
+export function isInWatchLater(
+  type: "movie" | "tv",
+  id: string | number
+): boolean {
+  const list = loadWatchLater();
+  return list.some(
+    (item) =>
+      String(item.id) === String(id) && resolveMediaItemType(item) === type
+  );
+}
+
+/**
+ * Adds or removes a title from the persistent Watch Later list without
+ * creating any Watch History entry. Returns `true` if now saved.
+ */
+export function toggleWatchLater(item: MediaItem): boolean {
+  const targetType = resolveMediaItemType(item);
+  const current = loadWatchLater();
+  const exists = current.some(
+    (entry) =>
+      String(entry.id) === String(item.id) &&
+      resolveMediaItemType(entry) === targetType
+  );
+
+  let updated: MediaItem[];
+  if (exists) {
+    updated = current.filter(
+      (entry) =>
+        !(
+          String(entry.id) === String(item.id) &&
+          resolveMediaItemType(entry) === targetType
+        )
+    );
+  } else {
+    const cleanEntry: MediaItem = {
+      id: item.id,
+      title: item.title,
+      name: item.name,
+      en_title: item.en_title,
+      zh_title: item.zh_title,
+      is_chinese_origin: item.is_chinese_origin,
+      poster_path: item.poster_path,
+      backdrop_path: item.backdrop_path,
+      overview: item.overview || "",
+      vote_average: item.vote_average || 0,
+      media_type: targetType,
+      release_date: item.release_date,
+      first_air_date: item.first_air_date,
+    };
+    updated = [cleanEntry, ...current].slice(0, 60);
+  }
+
+  try {
+    if (updated.length > 0) {
+      localStorage.setItem(WATCH_LATER_KEY, JSON.stringify(updated));
+    } else {
+      localStorage.removeItem(WATCH_LATER_KEY);
+    }
+  } catch {}
+
+  return !exists;
 }
 
 export function resolveMediaItemType(item: MediaItem): "movie" | "tv" {
@@ -168,7 +248,8 @@ export function observeResponsiveGrid(
   return current;
 }
 
-export function removeFromWatchHistory(
+function removeFromStoredMediaList(
+  storageKey: string,
   prev: MediaItem[],
   itemToRemove: MediaItem
 ): MediaItem[] {
@@ -178,12 +259,26 @@ export function removeFromWatchHistory(
   );
   try {
     if (updated.length > 0) {
-      localStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(updated));
+      localStorage.setItem(storageKey, JSON.stringify(updated));
     } else {
-      localStorage.removeItem(WATCH_HISTORY_KEY);
+      localStorage.removeItem(storageKey);
     }
   } catch {}
   return updated;
+}
+
+export function removeFromWatchHistory(
+  prev: MediaItem[],
+  itemToRemove: MediaItem
+): MediaItem[] {
+  return removeFromStoredMediaList(WATCH_HISTORY_KEY, prev, itemToRemove);
+}
+
+export function removeFromWatchLater(
+  prev: MediaItem[],
+  itemToRemove: MediaItem
+): MediaItem[] {
+  return removeFromStoredMediaList(WATCH_LATER_KEY, prev, itemToRemove);
 }
 
 /**

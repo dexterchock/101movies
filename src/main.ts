@@ -62,6 +62,11 @@ const NAV_ITEMS: NavItem[] = [
     path: "/history",
     icon: icons.history("bottom-nav-icon"),
   },
+  {
+    name: "Watch Later",
+    path: "/watch-later",
+    icon: icons.bookmark("bottom-nav-icon"),
+  },
   { name: "Search", path: "/search", icon: icons.search("bottom-nav-icon") },
 ];
 
@@ -91,7 +96,7 @@ function getSpatialCandidates(): HTMLElement[] {
     document;
 
   const nodes = scope.querySelectorAll<HTMLElement>(
-    'a[href], button:not(:disabled), input:not(:disabled), [tabindex="0"]'
+    'a[href], button:not(:disabled):not(.media-card-remove), input:not(:disabled), [tabindex="0"]'
   );
   const result: HTMLElement[] = [];
   nodes.forEach((el) => {
@@ -300,8 +305,11 @@ function bootstrap() {
     const activeIndex = hasActiveTab ? rawIndex : 0;
 
     const isMobileNav = window.innerWidth < 640;
-    const navTabWidth = isMobileNav ? 80 : 132;
+    const navTabCount = NAV_ITEMS.length;
     const navTabGap = isMobileNav ? 4 : 8;
+    const navTabWidth = isMobileNav
+      ? Math.max(54, Math.min(72, Math.floor((window.innerWidth - 42) / navTabCount)))
+      : Math.min(132, Math.floor((window.innerWidth - 78) / navTabCount));
 
     indicator.classList.toggle("is-hidden", !hasActiveTab);
     indicator.style.width = `${navTabWidth}px`;

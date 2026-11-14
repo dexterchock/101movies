@@ -8,4 +8,8 @@ coverage/
 !.env.example
 .local_env/
 .wrangler/
+.agent/
+.agents/
+.aistudio/
+
 

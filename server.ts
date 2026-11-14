@@ -1,7 +1,11 @@
 import "dotenv/config";
 import express from "express";
+import fs from "node:fs/promises";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import { Resvg } from "@cf-wasm/resvg/node";
+import { buildMovieOgSvg, extractOgCardInput } from "./functions/_shared/ogCard";
+import { fetchMediaDetails as fetchTmdbMediaDetails } from "./functions/_shared/tmdb";
 import {
   AWESOME_ZHUIJU_TVBOX_CONFIGS,
   filterItemsByServerAvailability,
@@ -634,6 +638,62 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
       res,
       type
     );
+  });
+
+  let localOgFontsPromise: Promise<Uint8Array[]> | null = null;
+  const loadLocalOgFonts = (): Promise<Uint8Array[]> => {
+    if (localOgFontsPromise) return localOgFontsPromise;
+    localOgFontsPromise = Promise.all([
+      fs.readFile(path.resolve(process.cwd(), "public/fonts/Poppins-Bold.ttf")),
+      fs.readFile(path.resolve(process.cwd(), "public/fonts/Poppins-Regular.ttf")),
+    ])
+      .then(([bold, regular]) => [new Uint8Array(bold), new Uint8Array(regular)])
+      .catch((err) => {
+        localOgFontsPromise = null;
+        throw err;
+      });
+    return localOgFontsPromise;
+  };
+
+  app.get("/api/og/:type/:id", async (req, res) => {
+    const rawType = String(req.params.type || "").toLowerCase();
+    const id = String(req.params.id || "").trim();
+    const fallbackUrl = "/og-image.png?v=4";
+
+    if ((rawType !== "movie" && rawType !== "tv") || !/^\d+$/.test(id) || !TMDB_API_KEY) {
+      return res.redirect(302, fallbackUrl);
+    }
+
+    try {
+      const mediaType = rawType as "movie" | "tv";
+      const details = await fetchTmdbMediaDetails(mediaType, id, TMDB_API_KEY);
+      const input = extractOgCardInput(details, mediaType);
+      if (!input) {
+        return res.redirect(302, fallbackUrl);
+      }
+
+      const [svg, fontBuffers] = await Promise.all([
+        buildMovieOgSvg(input),
+        loadLocalOgFonts(),
+      ]);
+
+      const resvg = await Resvg.async(svg, {
+        fitTo: { mode: "width", value: 1200 },
+        font: {
+          fontBuffers,
+          loadSystemFonts: false,
+          defaultFontFamily: "Poppins",
+        },
+      });
+      const pngBytes = resvg.render().asPng();
+
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.send(Buffer.from(pngBytes));
+    } catch (err) {
+      console.error("[og-image] render failed:", err);
+      return res.redirect(302, fallbackUrl);
+    }
   });
 
   // TVBox / 影视仓 Configuration & VOD Stream Resolver Routes

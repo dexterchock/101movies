@@ -21,6 +21,7 @@ function truncateOverview(text: string, maxLen = 220): string {
 function buildOgMetadata(
   details: any,
   type: "movie" | "tv",
+  id: string,
   origin: string
 ): OgMetadata | null {
   if (!details || details.success === false) return null;
@@ -45,26 +46,18 @@ function buildOgMetadata(
     ? `${metaParts.join(" · ")} — ${overview}`
     : `Watch ${title} (${metaParts.join(" · ")}) on 101Movies.`;
 
-  let imageUrl = `${origin}/og-image.png?v=3`;
-  let imageWidth = "1200";
-  let imageHeight = "630";
-
-  if (details.backdrop_path) {
-    imageUrl = `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`;
-    imageWidth = "1280";
-    imageHeight = "720";
-  } else if (details.poster_path) {
-    imageUrl = `https://image.tmdb.org/t/p/w780${details.poster_path}`;
-    imageWidth = "780";
-    imageHeight = "1170";
-  }
+  const displayTitle = year ? `${title} (${year})` : title;
+  const imageUrl =
+    details.backdrop_path || details.poster_path
+      ? `${origin}/api/og/${type}/${id}?v=1`
+      : `${origin}/og-image.png?v=4`;
 
   return {
-    title,
+    title: displayTitle,
     description,
     imageUrl,
-    imageWidth,
-    imageHeight,
+    imageWidth: "1200",
+    imageHeight: "630",
     ogType: type === "tv" ? "video.tv_show" : "video.movie",
   };
 }
@@ -96,7 +89,7 @@ async function getCachedOrFreshOgMetadata(
   if (!apiKey) return null;
 
   const cache = typeof caches !== "undefined" ? (caches as any).default : null;
-  const cacheUrl = `https://og-meta.101movies.internal/v1/${type}/${id}`;
+  const cacheUrl = `https://og-meta.101movies.internal/v2/${type}/${id}`;
   const cacheReq = new Request(cacheUrl, { method: "GET" });
 
   if (cache) {
@@ -120,7 +113,7 @@ async function getCachedOrFreshOgMetadata(
       }),
     ]);
 
-    const og = buildOgMetadata(details, type, origin);
+    const og = buildOgMetadata(details, type, id, origin);
     if (og && cache && context.waitUntil) {
       const toCache = new Response(JSON.stringify(og), {
         status: 200,

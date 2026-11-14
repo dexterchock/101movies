@@ -1,139 +1,139 @@
 # 101Movies
 
-A minimalist, zero-scroll movie and TV show discovery and streaming web application built for **Desktop**, **iOS/Mobile**, and **Smart TVs**, powered by **React**, **Vite**, **Tailwind CSS v4**, **TMDB**, **TVBox VOD aggregation**, and **Cloudflare Pages Functions**.
+A fast, keyboard-first streaming discovery and HLS playback web application built with zero-framework Vanilla TypeScript, HTML5, and modular CSS, powered by TMDB metadata, TVBox / VOD source resolution, and Cloudflare Pages Functions.
 
-**Live Site:** [https://101movies.pages.dev](https://101movies.pages.dev)
-
-![101Movies Preview](public/preview.png)
+![101Movies Interface Preview](public/preview.png)
 
 ## Features
 
-- **Zero-Scroll Aspect-Aware Grid**: Dynamically adapts column and row density (`2`–`8` columns, `1`–`3` rows via `getGridLayout`) to viewport width and height so posters maintain natural framing and uniform vertical spacing across portrait phones, tablets, tall monitors, widescreen desktops, and mobile landscape viewports.
-- **Floating Bottom Navigation Capsule**: Smooth sliding indicator between four standalone top-level views:
-  - **Trending (`/`):** Browse trending Movies and Shows by category with capsule switchers, pagination buttons, and horizontal touch swipe support.
-  - **Rankings (`/rankings`):** Top-rated Movies and Shows ranked by genre and release year (`1970` to current year) with scrollable capsule pickers and ranked badges.
-  - **History (`/history`):** Dedicated Watch History page stored locally in `localStorage`, featuring `All` / `Movies` / `Shows` filters, per-card removal, one-click `Clear`, pagination, and touch swipe navigation.
-  - **Search (`/search`):** Instant search across TMDB movies and TV shows.
-- **TVBox VOD Streaming & Player (`/player/:type/:id`):** Multi-source stream resolution and HLS proxy endpoints paired with `hls.js` playback, episode selection for series, and source switching.
-- **Dynamic Open Graph Link Previews:** Sharing a `/player/:type/:id` link unfurls title-specific metadata (title, rating, year, overview, and TMDB backdrop/poster) at the edge via Cloudflare Pages Functions (`functions/player/[type]/[id].ts`).
-- **Smart TV & Touch Friendly:** Keyboard/D-pad focus navigation, `@vitejs/plugin-legacy` polyfills for older Smart TV WebViews, safe-area padding for notched devices, and smooth horizontal swipe gestures.
-- **Server-Side API Key Security:** TMDB requests are proxied through Express (`server.ts`) locally or Cloudflare Pages Functions (`functions/api/`) in production so `TMDB_API_KEY` is never exposed to browser clients.
+- **Trending & Rankings Discovery**: Browse trending and yearly top-rated Movies & Shows across a 12-category filter bar (`All`, `HK`, `Action`, `Sci-Fi`, `Comedy`, `Drama`, `Animation`, `Thriller`, `Crime`, `Mystery`, `Horror`, `Romance`) verified against live VOD source availability.
+- **5-Tab Navigation (`Trending`, `Rankings`, `History`, `Saved`, `Search`)**:
+  - **History**: Tracks titles you have actually played, along with episode/progress timestamps for instant resume and one-click removal.
+  - **Saved**: Bookmark movies and shows directly from their detail view without polluting Watch History.
+  - **Search**: Multi-language TMDB search with live VOD source filtering.
+- **Detail View & Instant Playback**:
+  - Full-bleed untinted TMDB backdrop artwork with clean typography and poster framing.
+  - Dedicated **Save / Saved** bookmark control and direct **IMDb** link on the title action bar.
+  - 150 ms hover/focus intent prefetching for TMDB metadata and VOD stream resolution into an in-memory cache.
+  - Adaptive HLS streaming powered by `hls.js` with Smart TV-safe memory bounds (`maxBufferLength: 60`, `maxBufferSize: 60000000`, `backBufferLength: 30`) and strict buffer teardown on exit.
+  - Multi-source switching and custom TVBox JSON source configuration (`Sources` modal).
+- **Smart TV & Keyboard Spatial Navigation**: Full D-Pad / Arrow key, `Enter`, and `Escape` / `Back` spatial navigation across cards, pill tracks, detail controls, and player overlays alongside standard mouse and touch input.
+- **Dynamic Open Graph Link Previews**:
+  - `1200x630` darkroom contact-sheet site card (`public/og-image.png`).
+  - On-the-fly per-title `1200x630` PNG Open Graph cards rendered at `/api/og/:type/:id` via `@cf-wasm/resvg` and injected server-side by Cloudflare Pages `HTMLRewriter` (`functions/player/[type]/[id].ts`).
+
+![101Movies Open Graph Preview](public/og-image.png)
 
 ## Tech Stack
 
-- **Frontend:** React 19, TypeScript, Vite 6, Tailwind CSS v4, React Router DOM 7, Lucide Icons, HLS.js, `@vitejs/plugin-legacy`
-- **Local Dev Server:** Express (`tsx server.ts`) with integrated Vite middleware
-- **Production Edge Backend:** Cloudflare Pages Functions (`wrangler.toml`)
+- **Frontend**: Pure Vanilla TypeScript, Semantic HTML5, Modular CSS, Inline SVGs (zero UI framework dependencies)
+- **Bundler**: Vite 6
+- **Video Streaming**: `hls.js`
+- **Local Development Server**: Express + `tsx` + Vite middleware (`server.ts`)
+- **Edge Serverless Backend**: Cloudflare Pages Functions (`functions/`) + `@cf-wasm/resvg` for dynamic OG image generation
 
 ## Project Structure
 
 ```text
-├── functions/
+101movies/
+├── functions/                  # Cloudflare Pages Functions (production edge API & SSR meta)
 │   ├── _shared/
-│   │   ├── tmdb.ts                 # Shared TMDB fetch & detail helpers
-│   │   └── tvboxService.ts         # Edge TVBox config/VOD resolution helpers
+│   │   ├── ogCard.ts           # SVG card builder for dynamic 1200x630 Open Graph previews
+│   │   ├── tmdb.ts             # TMDB helpers & genre resolution
+│   │   └── tvboxService.ts     # VOD source parsing & stream resolver
 │   ├── api/
-│   │   ├── _middleware.ts          # Shared API middleware & CORS headers
-│   │   ├── tmdb/
-│   │   │   ├── discover/[type].ts  # Rankings / year & genre discovery
-│   │   │   ├── movie/[id].ts       # Movie details
-│   │   │   ├── tv/[id].ts          # TV show details
-│   │   │   ├── search.ts           # Multi-search endpoint
-│   │   │   └── trending/
-│   │   │       ├── movie.ts        # Trending / category movies
-│   │   │       └── tv.ts           # Trending / category TV shows
-│   │   ├── tvbox/
-│   │   │   ├── configs.ts          # Preset TVBox configuration list
-│   │   │   └── parse.ts            # Parse custom/preset TVBox JSON configs
-│   │   └── vod/
-│   │       ├── ping/[siteId].ts    # Check VOD source availability
-│   │       ├── proxy.ts            # HLS / media stream proxy
-│   │       └── resolve.ts          # Resolve playback streams for a title
-│   └── player/[type]/[id].ts       # Dynamic Open Graph meta injection for shared links
-├── public/                         # Static icons, manifest, sitemap, preview & OG images
+│   │   ├── _middleware.ts      # CORS & error handling middleware
+│   │   ├── og/[type]/[id].ts   # Edge PNG renderer (@cf-wasm/resvg/workerd)
+│   │   ├── tmdb/               # Read-only edge-cached TMDB proxy routes
+│   │   ├── tvbox/              # TVBox config listing & parser routes
+│   │   └── vod/                # Stream resolution, ping & proxy routes
+│   └── player/[type]/[id].ts   # HTMLRewriter OG & Twitter meta injection for shared links
+├── public/
+│   ├── fonts/                  # Bundled static Poppins TTF fonts for OG rendering
+│   ├── og-image.png            # Site Open Graph preview (1200x630)
+│   ├── preview.png             # Application screenshot
+│   ├── robots.txt
+│   ├── site.webmanifest
+│   └── sitemap.xml
 ├── src/
 │   ├── components/
-│   │   ├── ErrorBoundary.tsx
-│   │   ├── HlsPlayer.tsx           # HLS.js & native video player wrapper
-│   │   ├── Layout.tsx              # App shell + 4-tab floating bottom nav bar
-│   │   ├── MediaCard.tsx           # Poster card with optional rank badge & remove button
-│   │   └── TvboxModal.tsx          # TVBox source configuration modal
+│   │   ├── HlsPlayer.ts        # Adaptive HLS player with strict lifecycle cleanup
+│   │   ├── MediaCard.ts        # Poster card with hover/focus intent prefetching
+│   │   └── TvboxModal.ts       # Custom VOD source manager modal
 │   ├── pages/
-│   │   ├── Home.tsx                # Trending view
-│   │   ├── Rankings.tsx            # Rankings view (year + genre filters)
-│   │   ├── History.tsx             # Standalone Watch History view
-│   │   ├── Search.tsx              # Search view
-│   │   └── Player.tsx              # Details, source picker & video player
+│   │   ├── History.ts          # Watch history view
+│   │   ├── Home.ts             # Trending feed & category pill navigation
+│   │   ├── Player.ts           # Title info view, IMDb & Save actions, VOD switcher
+│   │   ├── Rankings.ts         # Yearly rankings explorer
+│   │   ├── SavedCollection.ts  # Shared filterable grid engine for History & Saved
+│   │   ├── Search.ts           # Search interface
+│   │   └── WatchLater.ts       # Saved watchlist view
 │   ├── server/
-│   │   └── tvboxService.ts         # Node/Express TVBox service implementation
-│   ├── App.tsx                     # Client router
-│   ├── api.ts                      # Frontend API client
-│   ├── index.css                   # Tailwind v4 setup & custom utilities
-│   ├── main.tsx                    # App entry point
-│   ├── types.ts                    # Shared MediaItem & category definitions
-│   └── utils.ts                    # Grid sizing, watch history & scroll helpers
-├── index.html
+│   │   └── tvboxService.ts     # Shared Node/Edge VOD source service
+│   ├── api.ts                  # Client API wrapper with request abort support
+│   ├── icons.ts                # Inline SVG icon registry
+│   ├── index.css               # Design tokens, responsive grids & Smart TV styles
+│   ├── main.ts                 # App shell & 5-tab navigation controller
+│   ├── router.ts               # History API router & view cleanup lifecycle
+│   ├── types.ts                # Category maps & shared data interfaces
+│   └── utils.ts                # Storage helpers, horizontal swipe & layout utilities
+├── index.html                  # HTML5 entry shell with preconnect & Open Graph meta
 ├── package.json
-├── server.ts                       # Local Express + Vite dev/prod server
+├── server.ts                   # Local Express + Vite development server
 ├── tsconfig.json
 ├── vite.config.ts
-└── wrangler.toml                   # Cloudflare Pages configuration
+└── wrangler.toml
 ```
 
 ## Getting Started
 
-### 1. Prerequisites
+### Prerequisites
 
-- Node.js 18+ (20+ recommended)
-- A [TMDB API Key](https://www.themoviedb.org/settings/api)
+- Node.js 20+
+- A free [TMDB API Key](https://www.themoviedb.org/settings/api)
 
-### 2. Installation
+### Installation
 
 ```bash
 npm install
 ```
 
-### 3. Environment Variables
-
-Copy `.env.example` to `.env` for local development and set your TMDB key:
+Create a `.env` file in the project root based on `.env.example`:
 
 ```env
 TMDB_API_KEY=your_tmdb_api_key_here
 ```
 
-For local `wrangler pages dev` testing, put secrets in `.dev.vars` (`TMDB_API_KEY=your_tmdb_api_key_here`) and never commit `.env` or `.dev.vars`.
-
-### 4. Local Development
-
-Start the Express + Vite full-stack dev server:
+Start the local development server at `http://localhost:3000`:
 
 ```bash
 npm run dev
 ```
 
-Or preview the compiled build with Cloudflare Pages Functions locally:
+## Scripts
 
-```bash
-npm run build
-npm run pages:dev
-```
-
-### 5. Scripts
-
-| Script | Command | Description |
+| Command | Action | Description |
 | :--- | :--- | :--- |
-| `npm run dev` | `tsx server.ts` | Start local Express + Vite dev server |
-| `npm run build` | `vite build` | Build production assets into `dist/` |
-| `npm run lint` | `tsc --noEmit` | Run TypeScript type checking |
-| `npm run pages:dev` | `wrangler pages dev dist` | Run local Cloudflare Pages Functions preview |
-| `npm run pages:deploy` | `wrangler pages deploy dist` | Build output & deploy manually to Cloudflare Pages |
-| `npm run build:server` | `tsc -p tsconfig.server.json` | Compile Express server bundle |
-| `npm start` | `node dist-server/server.js` | Run compiled Node production server |
+| `npm run dev` | `tsx server.ts` | Start local Express + Vite dev server with HMR |
+| `npm run build` | `vite build` | Build production static frontend assets into `dist/` |
+| `npm run pages:dev` | `wrangler pages dev dist` | Run local Cloudflare Pages Functions simulation |
+| `npm run pages:deploy` | `wrangler pages deploy dist` | Deploy `dist/` and `functions/` to Cloudflare Pages |
+| `npm run build:server` | `vite build && esbuild server.ts ...` | Bundle frontend + Node server into `dist/server.cjs` |
+| `npm start` | `node dist/server.cjs` | Run the bundled Node production server |
+| `npm run preview` | `vite preview` | Preview built static Vite bundle |
+| `npm run clean` | `rm -rf dist server.js` | Remove build output artifacts |
+| `npm run lint` | `tsc --noEmit` | Run strict TypeScript typechecking |
 
-## Deployment (Cloudflare Pages)
+## Cloudflare Pages Deployment
 
-This project is configured via [`wrangler.toml`](wrangler.toml) for Cloudflare Pages with Node.js compatibility (`nodejs_compat`) and build output directory `dist`.
+1. Connect the repository to Cloudflare Pages or deploy manually with Wrangler:
+   ```bash
+   npm run build
+   npx wrangler pages deploy dist
+   ```
+2. Set `TMDB_API_KEY` as an Environment Variable / Secret in **Cloudflare Dashboard > Pages > Settings > Environment Variables**.
+3. Build command: `npm run build` · Build output directory: `dist`.
 
-1. Connect the repository to **Cloudflare Pages** (or deploy via `npm run pages:deploy`).
-2. Set the build command to `npm run build` and output directory to `dist`.
-3. Add `TMDB_API_KEY` under **Settings -> Environment variables** in your Cloudflare Pages dashboard (and redeploy if adding it for the first time).
+## License
+
+[MIT](LICENSE)

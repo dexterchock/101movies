@@ -16,7 +16,7 @@ const HIGH_PING_THRESHOLD_MS = 800;
 const DEFAULT_SITE_TITLE = "101Movies";
 const DEFAULT_SITE_DESC =
   "Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation and real-time TMDB integration.";
-const DEFAULT_SITE_IMAGE = "https://101movies.pages.dev/og-image.png?v=3";
+const DEFAULT_SITE_IMAGE = "https://101movies.pages.dev/og-image.png?v=4";
 
 function formatEpisodeLabel(rawName: string, index: number): string {
   const trimmed = rawName.trim();
@@ -334,27 +334,27 @@ export function mount(
     const shareDesc = cleanOverview
       ? `${metaParts.join(" · ")} — ${cleanOverview.slice(0, 220)}`
       : `Watch ${shareTitle} (${metaParts.join(" · ")}) on 101Movies.`;
-    const shareImage = details.backdrop_path
-      ? `https://image.tmdb.org/t/p/w1280${details.backdrop_path}`
-      : details.poster_path
-      ? `https://image.tmdb.org/t/p/w780${details.poster_path}`
-      : DEFAULT_SITE_IMAGE;
+    const ogTitle = releaseYear ? `${shareTitle} (${releaseYear})` : shareTitle;
+    const shareImage =
+      details.backdrop_path || details.poster_path
+        ? `${window.location.origin}/api/og/${type}/${id}?v=1`
+        : DEFAULT_SITE_IMAGE;
     const shareUrl = `${window.location.origin}/player/${type}/${id}`;
 
     document.title = `${shareTitle} · ${DEFAULT_SITE_TITLE}`;
-    setHeadMeta('meta[name="title"]', "content", shareTitle);
+    setHeadMeta('meta[name="title"]', "content", ogTitle);
     setHeadMeta('meta[name="description"]', "content", shareDesc);
     setHeadMeta(
       'meta[property="og:type"]',
       "content",
       type === "tv" ? "video.tv_show" : "video.movie"
     );
-    setHeadMeta('meta[property="og:title"]', "content", shareTitle);
+    setHeadMeta('meta[property="og:title"]', "content", ogTitle);
     setHeadMeta('meta[property="og:description"]', "content", shareDesc);
     setHeadMeta('meta[property="og:image"]', "content", shareImage);
-    setHeadMeta('meta[property="og:image:alt"]', "content", shareTitle);
+    setHeadMeta('meta[property="og:image:alt"]', "content", ogTitle);
     setHeadMeta('meta[property="og:url"]', "content", shareUrl);
-    setHeadMeta('meta[name="twitter:title"]', "content", shareTitle);
+    setHeadMeta('meta[name="twitter:title"]', "content", ogTitle);
     setHeadMeta('meta[name="twitter:description"]', "content", shareDesc);
     setHeadMeta('meta[name="twitter:image"]', "content", shareImage);
   }

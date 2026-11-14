@@ -342,7 +342,7 @@ export const api = {
 
     const controller = new AbortController();
     const promise = fetchJsonWithLocalFallback<MediaDetails>(
-      `/api/tmdb/${type}/${id}`,
+      `/api/tmdb/${type}/${id}?v=2`,
       (d) => Boolean(d && (d.id || d.title || d.name)),
       controller.signal
     )

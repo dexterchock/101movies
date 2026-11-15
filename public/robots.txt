@@ -2,4 +2,3 @@ User-agent: *
 Allow: /
 
 Sitemap: https://101movies.pages.dev/sitemap.xml
-Agentmap: https://101movies.pages.dev/.well-known/ard.json

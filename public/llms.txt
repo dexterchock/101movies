@@ -13,7 +13,7 @@
 ## Discovery & Metadata
 
 - [Sitemap](https://101movies.pages.dev/sitemap.xml): XML sitemap of primary routes.
-- [Robots Policy](https://101movies.pages.dev/robots.txt): Crawler directives and agent resource map pointer.
+- [Robots Policy](https://101movies.pages.dev/robots.txt): Crawler directives and sitemap reference.
 - [Agent Resource Discovery](https://101movies.pages.dev/.well-known/ard.json): ARD manifest describing discoverable site capabilities.
 
 ## API Endpoints

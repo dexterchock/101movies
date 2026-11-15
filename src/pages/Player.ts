@@ -337,7 +337,7 @@ export function mount(
     const ogTitle = releaseYear ? `${shareTitle} (${releaseYear})` : shareTitle;
     const shareImage =
       details.backdrop_path || details.poster_path
-        ? `${window.location.origin}/api/og/${type}/${id}?v=2`
+        ? `${window.location.origin}/api/og/${type}/${id}?v=3`
         : DEFAULT_SITE_IMAGE;
     const shareUrl = `${window.location.origin}/player/${type}/${id}`;
 

@@ -51,7 +51,7 @@ export const onRequestGet: PagesFunction = async (context) => {
   }
 
   const cache = typeof caches !== "undefined" ? (caches as any).default : null;
-  const cacheKey = new Request(`https://og-img.101movies.internal/v2/${rawType}/${id}`, {
+  const cacheKey = new Request(`https://og-img.101movies.internal/v3/${rawType}/${id}`, {
     method: "GET",
   });
 

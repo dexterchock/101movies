@@ -1,10 +1,5 @@
 export interface OgCardInput {
   type: "movie" | "tv";
-  title: string;
-  year?: string;
-  rating?: number;
-  runtime?: number;
-  genres?: string[];
   backdropPath?: string | null;
   posterPath?: string | null;
 }
@@ -80,15 +75,6 @@ export function buildBrandWordmarkSvg(options?: {
 
 const IMAGE_FETCH_TIMEOUT_MS = 2500;
 
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   const chunkSize = 0x8000;
@@ -114,179 +100,52 @@ async function fetchImageAsDataUri(url: string): Promise<string | null> {
   }
 }
 
-function wrapTextLines(
-  rawText: string,
-  maxCharsPerLine: number,
-  maxLines: number
-): string[] {
-  const clean = rawText.replace(/\s+/g, " ").trim();
-  if (!clean) return [];
-
-  const words = clean.split(" ");
-  const lines: string[] = [];
-  let current = "";
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const candidate = current ? `${current} ${word}` : word;
-    if (candidate.length <= maxCharsPerLine) {
-      current = candidate;
-      continue;
-    }
-
-    if (current) {
-      lines.push(current);
-      if (lines.length === maxLines) {
-        const prev = lines[maxLines - 1];
-        lines[maxLines - 1] =
-          prev.length >= maxCharsPerLine - 1
-            ? `${prev.slice(0, maxCharsPerLine - 3).trimEnd()}...`
-            : `${prev}...`;
-        return lines;
-      }
-      current = word;
-    } else {
-      lines.push(
-        maxLines === 1
-          ? `${word.slice(0, maxCharsPerLine - 3)}...`
-          : word.slice(0, maxCharsPerLine)
-      );
-      if (lines.length === maxLines) return lines;
-      current = "";
-    }
-  }
-
-  if (current) {
-    lines.push(current);
-  }
-  return lines.slice(0, maxLines);
-}
-
 export function extractOgCardInput(details: any, type: "movie" | "tv"): OgCardInput | null {
   if (!details || details.success === false) return null;
 
-  const enTitle = String(details.en_title || "").trim();
-  const rawTitle = String(details.title || details.name || "").trim();
-  const title = enTitle || rawTitle;
-  if (!title) return null;
+  const backdropPath = details.backdrop_path || null;
+  const posterPath = details.poster_path || null;
+  if (!backdropPath && !posterPath) return null;
 
-  const releaseDate = String(
-    details.release_date || details.first_air_date || ""
-  ).trim();
-  const year = releaseDate.length >= 4 ? releaseDate.slice(0, 4) : "";
-  const rating = Number(details.vote_average || 0);
-  const runtime = Number(details.runtime || 0);
-  const genres = Array.isArray(details.genres)
-    ? details.genres
-        .map((g: any) => String(g?.name || "").trim())
-        .filter(Boolean)
-        .slice(0, 3)
-    : [];
   return {
     type,
-    title,
-    year,
-    rating: Number.isFinite(rating) && rating > 0 ? rating : undefined,
-    runtime: Number.isFinite(runtime) && runtime > 0 ? runtime : undefined,
-    genres,
-    backdropPath: details.backdrop_path || null,
-    posterPath: details.poster_path || null,
+    backdropPath,
+    posterPath,
   };
 }
 
 export async function buildMovieOgSvg(input: OgCardInput): Promise<string> {
-  const backdropPromise = input.backdropPath
-    ? fetchImageAsDataUri(`https://image.tmdb.org/t/p/w1280${input.backdropPath}`)
+  const artworkUrl = input.backdropPath
+    ? `https://image.tmdb.org/t/p/w1280${input.backdropPath}`
     : input.posterPath
-    ? fetchImageAsDataUri(`https://image.tmdb.org/t/p/w780${input.posterPath}`)
-    : Promise.resolve(null);
+    ? `https://image.tmdb.org/t/p/w780${input.posterPath}`
+    : null;
 
-  const posterPromise = input.posterPath
-    ? fetchImageAsDataUri(`https://image.tmdb.org/t/p/w500${input.posterPath}`)
-    : Promise.resolve(null);
-
-  const [backdropUri, posterUri] = await Promise.all([backdropPromise, posterPromise]);
-
-  const hasPoster = Boolean(posterUri);
-  const titleLen = input.title.length;
-  const titleFontSize = titleLen <= 18 ? 64 : titleLen <= 34 ? 52 : 42;
-  const maxTitleChars = titleLen <= 18 ? 20 : titleLen <= 34 ? 25 : 31;
-  const titleLineHeight = Math.round(titleFontSize * 1.15);
-  const titleLines = wrapTextLines(input.title, maxTitleChars, 2);
-
-  // Layout vertical stack anchored cleanly above bottom margin
-  const metaParts: string[] = [];
-  if (input.year) metaParts.push(input.year);
-  if (input.runtime) metaParts.push(`${input.runtime} min`);
-  if (input.genres && input.genres.length > 0) metaParts.push(input.genres.join(", "));
-  const metaString = metaParts.join("  ·  ");
-
-  const hasMetaRow = Boolean(input.rating || metaString);
-  const bottomEdgeY = 560;
-  const metaCenterY = hasMetaRow ? bottomEdgeY - 18 : bottomEdgeY;
-  const lastTitleBaselineY = hasMetaRow ? metaCenterY - 40 : bottomEdgeY;
-  const firstTitleBaselineY =
-    lastTitleBaselineY - (Math.max(1, titleLines.length) - 1) * titleLineHeight;
-
-  const badgeWidth = input.rating ? 84 : 0;
-  const metaTextX = 64 + (input.rating ? badgeWidth + 16 : 0);
-
-  const ratingBadgeSvg = input.rating
-    ? `
-      <rect x="64" y="${metaCenterY - 17}" width="84" height="34" rx="17" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.28)" stroke-width="1"/>
-      <polygon points="81,${metaCenterY - 7} 83.2,${metaCenterY - 2.3} 88.4,${metaCenterY - 1.6} 84.6,${metaCenterY + 2} 85.5,${metaCenterY + 7.1} 81,${metaCenterY + 4.7} 76.5,${metaCenterY + 7.1} 77.4,${metaCenterY + 2} 73.6,${metaCenterY - 1.6} 78.8,${metaCenterY - 2.3}" fill="#FFFFFF"/>
-      <text x="95" y="${metaCenterY + 6}" font-family="Poppins" font-weight="700" font-size="17" fill="#FFFFFF">${input.rating.toFixed(1)}</text>
-    `
-    : "";
-
-  const metaTextSvg = metaString
-    ? `<text x="${metaTextX}" y="${metaCenterY + 6}" font-family="Poppins" font-weight="400" font-size="19" fill="rgba(255,255,255,0.84)">${escapeXml(metaString)}</text>`
-    : "";
-
-  const titleSvg = titleLines
-    .map(
-      (line, idx) =>
-        `<text x="64" y="${firstTitleBaselineY + idx * titleLineHeight}" font-family="Poppins" font-weight="700" font-size="${titleFontSize}" letter-spacing="-1.2" fill="#FFFFFF">${escapeXml(line)}</text>`
-    )
-    .join("");
-
-  const posterCardSvg = hasPoster
-    ? `
-      <defs>
-        <clipPath id="posterClip">
-          <rect x="904" y="138" width="232" height="348" rx="16"/>
-        </clipPath>
-      </defs>
-      <rect x="900" y="134" width="240" height="356" rx="18" fill="rgba(0,0,0,0.55)"/>
-      <g clip-path="url(#posterClip)">
-        <image href="${posterUri}" x="904" y="138" width="232" height="348" preserveAspectRatio="xMidYMid slice"/>
-      </g>
-      <rect x="904" y="138" width="232" height="348" rx="16" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
-    `
-    : "";
+  const backdropUri = artworkUrl ? await fetchImageAsDataUri(artworkUrl) : null;
 
   const typeLabel = input.type === "tv" ? "TV SERIES" : "MOVIE";
   const brandWordmark = buildBrandWordmarkSvg({
-    x: 64,
-    y: 52,
-    height: 22,
-    fill: "#EAEAE5",
+    x: 56,
+    y: 48,
+    height: 24,
+    fill: "#FFFFFF",
   });
 
   return `
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="leftScrim" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="rgba(6,6,8,0.95)"/>
-      <stop offset="48%" stop-color="rgba(6,6,8,0.78)"/>
-      <stop offset="76%" stop-color="rgba(6,6,8,0.42)"/>
-      <stop offset="100%" stop-color="rgba(6,6,8,0.58)"/>
+    <linearGradient id="topScrim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(5,5,7,0.78)"/>
+      <stop offset="22%" stop-color="rgba(5,5,7,0.34)"/>
+      <stop offset="48%" stop-color="rgba(5,5,7,0)"/>
+      <stop offset="86%" stop-color="rgba(5,5,7,0)"/>
+      <stop offset="100%" stop-color="rgba(5,5,7,0.35)"/>
     </linearGradient>
-    <linearGradient id="bottomScrim" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(6,6,8,0.32)"/>
-      <stop offset="42%" stop-color="rgba(6,6,8,0.12)"/>
-      <stop offset="78%" stop-color="rgba(6,6,8,0.72)"/>
-      <stop offset="100%" stop-color="rgba(6,6,8,0.96)"/>
+    <linearGradient id="sideVignette" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="rgba(5,5,7,0.32)"/>
+      <stop offset="18%" stop-color="rgba(5,5,7,0)"/>
+      <stop offset="82%" stop-color="rgba(5,5,7,0)"/>
+      <stop offset="100%" stop-color="rgba(5,5,7,0.28)"/>
     </linearGradient>
   </defs>
 
@@ -296,18 +155,13 @@ export async function buildMovieOgSvg(input: OgCardInput): Promise<string> {
       ? `<image href="${backdropUri}" x="0" y="0" width="1200" height="630" preserveAspectRatio="xMidYMid slice"/>`
       : ""
   }
-  <rect width="1200" height="630" fill="url(#leftScrim)"/>
-  <rect width="1200" height="630" fill="url(#bottomScrim)"/>
+  <rect width="1200" height="630" fill="url(#topScrim)"/>
+  <rect width="1200" height="630" fill="url(#sideVignette)"/>
 
-  <!-- Top-left brutalist brand wordmark & media-type label -->
+  <!-- Clean top-left brand wordmark & media-type label -->
   ${brandWordmark.markup}
-  <rect x="${64 + brandWordmark.width + 16}" y="54" width="1.5" height="18" fill="rgba(255,255,255,0.28)"/>
-  <text x="${64 + brandWordmark.width + 30}" y="68" font-family="Poppins" font-weight="700" font-size="13" letter-spacing="2.8" fill="rgba(255,255,255,0.56)">${typeLabel}</text>
-
-  ${posterCardSvg}
-  ${titleSvg}
-  ${ratingBadgeSvg}
-  ${metaTextSvg}
+  <rect x="${56 + brandWordmark.width + 16}" y="51" width="1.5" height="18" fill="rgba(255,255,255,0.36)"/>
+  <text x="${56 + brandWordmark.width + 30}" y="65" font-family="Poppins" font-weight="700" font-size="14" letter-spacing="2.8" fill="rgba(255,255,255,0.74)">${typeLabel}</text>
 </svg>
 `;
 }

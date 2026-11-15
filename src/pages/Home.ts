@@ -128,17 +128,18 @@ export function mount(container: HTMLElement): ViewCleanup {
         try {
           sessionStorage.setItem("home_movie_category", id);
         } catch {}
+        page = readSavedPage();
+        categoryTrack.setActive(id, true);
         loadMovies(id);
       } else {
         tvCategory = id;
         try {
           sessionStorage.setItem("home_tv_category", id);
         } catch {}
+        page = readSavedPage();
+        categoryTrack.setActive(id, true);
         loadTV(id);
       }
-      page = readSavedPage();
-      categoryTrack.setActive(id, true);
-      renderGrid();
     },
     signal,
   });
@@ -226,6 +227,9 @@ export function mount(container: HTMLElement): ViewCleanup {
   attachHorizontalSwipe(stage, goNext, goPrev, signal);
   attachWheelPagination(root, goNext, goPrev, signal);
 
+  let errorMovies = false;
+  let errorTV = false;
+
   function renderGrid() {
     if (signal.aborted) return;
     if (gridRenderAbort) {
@@ -235,6 +239,7 @@ export function mount(container: HTMLElement): ViewCleanup {
 
     const activeItems = mediaType === "movie" ? trendingMovies : trendingTV;
     const loading = mediaType === "movie" ? loadingMovies : loadingTV;
+    const hasError = mediaType === "movie" ? errorMovies : errorTV;
     const itemsPerPage = gridState.colsPerRow * gridState.rowsPerPage;
     const totalPages = Math.ceil(activeItems.length / itemsPerPage);
 
@@ -259,6 +264,17 @@ export function mount(container: HTMLElement): ViewCleanup {
 
     if (loading) {
       renderSkeletonCards(grid, itemsPerPage);
+      return;
+    }
+
+    if (activeItems.length === 0) {
+      const emptyWrap = document.createElement("div");
+      emptyWrap.className = "empty-state";
+      emptyWrap.style.gridColumn = "1 / -1";
+      emptyWrap.innerHTML = hasError
+        ? `<p class="empty-state-title">Unable to load titles</p><p class="empty-state-desc">Tap the selected category again to retry.</p>`
+        : `<p class="empty-state-title">No titles found</p><p class="empty-state-desc">Try switching categories or media type.</p>`;
+      grid.replaceChildren(emptyWrap);
       return;
     }
 
@@ -287,6 +303,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       movieFetchAbort.abort();
       movieFetchAbort = null;
     }
+    errorMovies = false;
     const cached = api.getCachedTrendingMovies(cat);
     if (cached) {
       trendingMovies = cached;
@@ -296,6 +313,7 @@ export function mount(container: HTMLElement): ViewCleanup {
     }
     movieFetchAbort = new AbortController();
     const reqSignal = movieFetchAbort.signal;
+    trendingMovies = [];
     loadingMovies = true;
     if (mediaType === "movie") renderGrid();
 
@@ -304,8 +322,13 @@ export function mount(container: HTMLElement): ViewCleanup {
       .then((data) => {
         if (signal.aborted || reqSignal.aborted) return;
         trendingMovies = data;
+        errorMovies = false;
       })
-      .catch(() => {})
+      .catch(() => {
+        if (signal.aborted || reqSignal.aborted) return;
+        trendingMovies = [];
+        errorMovies = true;
+      })
       .finally(() => {
         if (!signal.aborted && !reqSignal.aborted) {
           loadingMovies = false;
@@ -319,6 +342,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       tvFetchAbort.abort();
       tvFetchAbort = null;
     }
+    errorTV = false;
     const cached = api.getCachedTrendingTV(cat);
     if (cached) {
       trendingTV = cached;
@@ -328,6 +352,7 @@ export function mount(container: HTMLElement): ViewCleanup {
     }
     tvFetchAbort = new AbortController();
     const reqSignal = tvFetchAbort.signal;
+    trendingTV = [];
     loadingTV = true;
     if (mediaType === "tv") renderGrid();
 
@@ -336,8 +361,13 @@ export function mount(container: HTMLElement): ViewCleanup {
       .then((data) => {
         if (signal.aborted || reqSignal.aborted) return;
         trendingTV = data;
+        errorTV = false;
       })
-      .catch(() => {})
+      .catch(() => {
+        if (signal.aborted || reqSignal.aborted) return;
+        trendingTV = [];
+        errorTV = true;
+      })
       .finally(() => {
         if (!signal.aborted && !reqSignal.aborted) {
           loadingTV = false;

@@ -36,10 +36,32 @@ async function fetchJsonWithLocalFallback<T>(
 ): Promise<T> {
   if (isLocalhost() && canUseRemoteFallback && localTmdbConfigured === false) {
     const remoteRes = await fetch(`${REMOTE_API_ORIGIN}${path}`, { signal });
+    if (!remoteRes.ok) {
+      throw new Error(`HTTP ${remoteRes.status}`);
+    }
     return (await remoteRes.json()) as T;
   }
 
   const res = await fetch(path, { signal });
+  if (!res.ok) {
+    if (isLocalhost() && canUseRemoteFallback && res.status === 500) {
+      // Allow local fallback only when local dev server lacks TMDB key, without poisoning valid transient errors
+      let errData: any = null;
+      try {
+        errData = await res.json();
+      } catch {}
+      if (errData && !isConfiguredPayload(errData)) {
+        localTmdbConfigured = false;
+        const remoteRes = await fetch(`${REMOTE_API_ORIGIN}${path}`, { signal });
+        if (!remoteRes.ok) {
+          throw new Error(`HTTP ${remoteRes.status}`);
+        }
+        return (await remoteRes.json()) as T;
+      }
+    }
+    throw new Error(`HTTP ${res.status}`);
+  }
+
   const data = await res.json();
 
   if (
@@ -49,6 +71,9 @@ async function fetchJsonWithLocalFallback<T>(
   ) {
     localTmdbConfigured = false;
     const remoteRes = await fetch(`${REMOTE_API_ORIGIN}${path}`, { signal });
+    if (!remoteRes.ok) {
+      throw new Error(`HTTP ${remoteRes.status}`);
+    }
     return (await remoteRes.json()) as T;
   }
 
@@ -290,8 +315,8 @@ export const api = {
     const resolved = resolveGenreId("movie", genre);
     const query =
       resolved && resolved !== "all"
-        ? `?genre=${encodeURIComponent(resolved)}&v=3`
-        : "?v=3";
+        ? `?genre=${encodeURIComponent(resolved)}&v=4`
+        : "?v=4";
     const data = await fetchJsonWithLocalFallback<any>(
       `/api/tmdb/trending/movie${query}`,
       (d) => Array.isArray(d?.results) && d.results.length > 0,
@@ -316,8 +341,8 @@ export const api = {
     const resolved = resolveGenreId("tv", genre);
     const query =
       resolved && resolved !== "all"
-        ? `?genre=${encodeURIComponent(resolved)}&v=3`
-        : "?v=3";
+        ? `?genre=${encodeURIComponent(resolved)}&v=4`
+        : "?v=4";
     const data = await fetchJsonWithLocalFallback<any>(
       `/api/tmdb/trending/tv${query}`,
       (d) => Array.isArray(d?.results) && d.results.length > 0,
@@ -338,7 +363,7 @@ export const api = {
     if (cached) return cached;
 
     const data = await fetchJsonWithLocalFallback<any>(
-      `/api/tmdb/search?q=${encodeURIComponent(trimmed)}&v=3`,
+      `/api/tmdb/search?q=${encodeURIComponent(trimmed)}&v=4`,
       (d) => Array.isArray(d?.results) && d.results.length > 0,
       signal
     );
@@ -363,7 +388,7 @@ export const api = {
 
     const controller = new AbortController();
     const promise = fetchJsonWithLocalFallback<MediaDetails>(
-      `/api/tmdb/${type}/${id}?v=3`,
+      `/api/tmdb/${type}/${id}?v=4`,
       (d) => Boolean(d && (d.id || d.title || d.name)),
       controller.signal
     )
@@ -400,12 +425,12 @@ export const api = {
         ? `&genre=${encodeURIComponent(resolved)}`
         : "";
     const data = await fetchJsonWithLocalFallback<any>(
-      `/api/tmdb/discover/${type}?year=${year}${genreQuery}&v=3`,
+      `/api/tmdb/discover/${type}?year=${year}${genreQuery}&v=4`,
       (d) => Array.isArray(d?.results) && d.results.length > 0,
       signal
     );
     const items: MediaItem[] = data.results || [];
-    setBoundedCache(rankingsCache, cacheKey, items, 80);
+    if (items.length > 0) setBoundedCache(rankingsCache, cacheKey, items, 80);
     return items;
   },
 

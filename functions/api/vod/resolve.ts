@@ -25,7 +25,14 @@ export const onRequestGet: PagesFunction = async (context) => {
       disabledSiteIds,
       tmdbApiKey: apiKey,
     });
-    return Response.json(resolved);
+    const hasSources = Array.isArray(resolved?.sources) && resolved.sources.length > 0;
+    return Response.json(resolved, {
+      headers: {
+        "Cache-Control": hasSources
+          ? "public, s-maxage=1800, stale-while-revalidate=3600"
+          : "public, s-maxage=60",
+      },
+    });
   } catch (err: any) {
     console.error("Failed to resolve VOD streams:", err);
     return Response.json(

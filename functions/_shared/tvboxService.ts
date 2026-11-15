@@ -1,20 +1,10 @@
 import {
   computeTitleMatchScore,
-  extractAudioLangFromText,
   generateZhTitleVariants,
-  getAllVodSites,
-  parseSeasonInfo,
-  parseVodPlayGroups,
   setBoundedCache,
   stripYearSuffix,
   toSimplifiedChinese,
 } from "../../src/server/tvboxService";
-import type {
-  VodSite,
-  ResolvedStreamSource,
-  VodPlayGroup,
-  VodEpisode,
-} from "../../src/types";
 
 // Re-export everything from the original tvboxService
 export * from "../../src/server/tvboxService";
@@ -25,12 +15,44 @@ const availabilityCache = new Map<
   { available: boolean; primaryZhTitle?: string; expiresAt: number }
 >();
 
-// Top curated VOD providers for fast availability checks ordered by coverage and speed
+// Top curated VOD providers for fast availability checks ordered by coverage and low latency
 const FAST_PROBE_SITES: { id: string; url: string }[] = [
   { id: "bfzy", url: "https://bfzyapi.com/api.php/provide/vod" },
   { id: "hhzy", url: "https://hhzyapi.com/api.php/provide/vod" },
-  { id: "jisu", url: "https://jszyapi.com/api.php/provide/vod" },
 ];
+
+function consumeBudget(tracker: { used: number; max: number }): boolean {
+  if (tracker.used >= tracker.max) return false;
+  tracker.used++;
+  return true;
+}
+
+function hasPlayableStreamWithoutParsing(
+  vodPlayFrom: unknown,
+  vodPlayUrl: unknown
+): boolean {
+  const fromStr = String(vodPlayFrom || "").trim();
+  const urlStr = String(vodPlayUrl || "").trim();
+  if (!fromStr && !urlStr) return false;
+  if (!urlStr) return fromStr.length > 0;
+
+  // Lightweight episode check without allocating play-group objects
+  const groups = urlStr.split("$$$");
+  for (let g = 0; g < groups.length; g++) {
+    const items = groups[g].split("#");
+    for (let i = 0; i < items.length; i++) {
+      const part = items[i];
+      if (!part) continue;
+      const dollarIdx = part.indexOf("$");
+      const epName = dollarIdx >= 0 ? part.slice(0, dollarIdx) : "";
+      const epUrl = (dollarIdx >= 0 ? part.slice(dollarIdx + 1) : part).trim();
+      if (!epUrl.startsWith("http")) continue;
+      if (epName.includes("预告") || epName.includes("花絮")) continue;
+      return true;
+    }
+  }
+  return false;
+}
 
 async function probeVodSiteForMedia(
   siteUrl: string,
@@ -38,10 +60,12 @@ async function probeVodSiteForMedia(
   targetTitles: string[],
   targetYear?: string,
   mediaType: "movie" | "tv" = "movie",
+  useVideoList = false,
   timeoutMs = 2200
 ): Promise<boolean> {
   const sep = siteUrl.includes("?") ? "&" : "?";
-  const searchUrl = `${siteUrl}${sep}ac=videolist&wd=${encodeURIComponent(keyword)}`;
+  const ac = useVideoList ? "videolist" : "list";
+  const searchUrl = `${siteUrl}${sep}ac=${ac}&wd=${encodeURIComponent(keyword)}`;
 
   try {
     const res = await fetch(searchUrl, {
@@ -58,31 +82,25 @@ async function probeVodSiteForMedia(
     if (list.length === 0) return false;
 
     for (const item of list) {
-      const { bestEpisodes } = parseVodPlayGroups(
-        item.vod_play_from,
-        item.vod_play_url
-      );
-      if (bestEpisodes.length === 0) continue;
-
       const vodName = String(item.vod_name || "").trim();
       const vodSub = String(item.vod_sub || "").trim();
       const vodRemarks = String(item.vod_remarks || "").trim();
+      const vodPlayFrom = String(item.vod_play_from || "").trim();
       const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
       const vodYear = vodYearMatch ? vodYearMatch[0] : "";
 
       if (
+        !vodPlayFrom ||
         vodName.includes("解说") ||
         vodName.includes("预告") ||
         vodName.includes("短剧") ||
-        vodRemarks.includes("预告")
+        vodRemarks.includes("预告") ||
+        vodRemarks.includes("花絮") ||
+        vodRemarks.includes("先导") ||
+        vodRemarks.includes("电影解说")
       ) {
         continue;
       }
-
-      const hasNonTrailerEpisode = bestEpisodes.some(
-        (ep) => !ep.name.includes("预告") && !ep.name.includes("花絮")
-      );
-      if (!hasNonTrailerEpisode) continue;
 
       const titleScore = computeTitleMatchScore(
         vodName,
@@ -92,12 +110,18 @@ async function probeVodSiteForMedia(
       );
       if (titleScore < 140) continue;
 
-      // Year verification if available
       if (targetYear && vodYear) {
         const targetY = Number(targetYear);
         const vodY = Number(vodYear);
         const yearDiff = Math.abs(vodY - targetY);
         if (mediaType === "movie" && yearDiff > 2) continue;
+      }
+
+      if (
+        useVideoList &&
+        !hasPlayableStreamWithoutParsing(item.vod_play_from, item.vod_play_url)
+      ) {
+        continue;
       }
 
       return true;
@@ -131,7 +155,7 @@ export async function checkMediaHasPlayableStreams(
       ? toSimplifiedChinese(item.zh_title.trim())
       : undefined;
 
-  const tracker = budgetTracker || { used: 0, max: 44 };
+  const tracker = budgetTracker || { used: 0, max: 30 };
 
   const candidateTitles: string[] = [];
   const addTitle = (t?: string) => {
@@ -142,12 +166,12 @@ export async function checkMediaHasPlayableStreams(
 
   let probeQuery = "";
 
-  if (!primaryZhTitle && _tmdbApiKey && tracker.used < tracker.max - 2) {
-    tracker.used++;
+  // Only look up TMDB detail translations for the rare item lacking any CJK list title
+  if (!primaryZhTitle && _tmdbApiKey && tracker.used < tracker.max - 2 && consumeBudget(tracker)) {
     try {
       const metaRes = await fetch(
         `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${_tmdbApiKey}`,
-        { signal: AbortSignal.timeout(2500) }
+        { signal: AbortSignal.timeout(2200) }
       );
       if (metaRes.ok) {
         const metaData: any = await metaRes.json();
@@ -207,22 +231,23 @@ export async function checkMediaHasPlayableStreams(
   }
 
   const releaseYear = (item.release_date || item.first_air_date || "").slice(0, 4);
-
-  // Search keyword: prefer specific clean title + subtitle (e.g. 蜘蛛侠：英雄无归 / 生化危机：终章), fallback to clean title
   const cleanZh = primaryZhTitle ? primaryZhTitle.split(/[:：\s]/)[0].trim() : "";
   const primaryQuery = probeQuery || cleanZh || item.title || item.name || candidateTitles[0];
+  const hasCjkQuery = /[\u4e00-\u9fff]/.test(primaryQuery);
 
   let available = false;
+  let checkedAtLeastOneSite = false;
 
   for (const site of FAST_PROBE_SITES) {
-    if (tracker.used >= tracker.max) break;
-    tracker.used++;
+    if (!consumeBudget(tracker)) break;
+    checkedAtLeastOneSite = true;
     const found = await probeVodSiteForMedia(
       site.url,
       primaryQuery,
       candidateTitles,
       releaseYear,
-      type
+      type,
+      !hasCjkQuery
     );
     if (found) {
       available = true;
@@ -230,17 +255,19 @@ export async function checkMediaHasPlayableStreams(
     }
   }
 
-  const ttl = available ? 30 * 60 * 1000 : 15 * 60 * 1000;
-  setBoundedCache(
-    availabilityCache,
-    availKey,
-    {
-      available,
-      primaryZhTitle,
-      expiresAt: Date.now() + ttl,
-    },
-    500
-  );
+  if (available || checkedAtLeastOneSite) {
+    const ttl = available ? 30 * 60 * 1000 : 15 * 60 * 1000;
+    setBoundedCache(
+      availabilityCache,
+      availKey,
+      {
+        available,
+        primaryZhTitle,
+        expiresAt: Date.now() + ttl,
+      },
+      500
+    );
+  }
 
   return { available, primaryZhTitle };
 }
@@ -254,30 +281,44 @@ export async function filterItemsByServerAvailability(
   if (!Array.isArray(items) || items.length === 0) return [];
 
   const results: (any | null)[] = new Array(items.length).fill(null);
-  // Strict Cloudflare subrequest budget: max 44 out of 50 to guarantee zero subrequest errors
-  const budgetTracker = { used: 0, max: 44 };
+  // Strict Cloudflare subrequest budget: max 32 out of 50 (reserving room for TMDB & redirects)
+  const budgetTracker = { used: 0, max: 32 };
+  const maxAvailableItems = 20;
+  let availableCount = 0;
   let cursor = 0;
 
   const workers = Array.from(
     { length: Math.min(concurrency, items.length) },
     async () => {
       while (true) {
+        if (availableCount >= maxAvailableItems) break;
         const idx = cursor++;
         if (idx >= items.length) break;
         const item = items[idx];
 
-        if (budgetTracker.used >= budgetTracker.max) {
-          const cached = availabilityCache.get(
-            `${item.media_type || defaultType}:${item.id}`
-          );
-          if (cached?.available !== false) {
-            results[idx] = cached?.primaryZhTitle
-              ? {
-                  ...item,
-                  zh_title: cached.primaryZhTitle,
-                }
-              : item;
+        const cached = availabilityCache.get(
+          `${item.media_type || defaultType}:${item.id}`
+        );
+        if (cached && cached.expiresAt > Date.now()) {
+          if (cached.available) {
+            availableCount++;
+            results[idx] = {
+              ...item,
+              title:
+                item.is_chinese_origin && cached.primaryZhTitle
+                  ? cached.primaryZhTitle
+                  : item.title,
+              name:
+                item.is_chinese_origin && cached.primaryZhTitle
+                  ? cached.primaryZhTitle
+                  : item.name,
+              zh_title: cached.primaryZhTitle || item.zh_title,
+            };
           }
+          continue;
+        }
+
+        if (budgetTracker.used >= budgetTracker.max) {
           continue;
         }
 
@@ -289,6 +330,7 @@ export async function filterItemsByServerAvailability(
         );
 
         if (available) {
+          availableCount++;
           results[idx] = {
             ...item,
             title:
@@ -307,5 +349,5 @@ export async function filterItemsByServerAvailability(
   );
 
   await Promise.all(workers);
-  return results.filter(Boolean);
+  return results.filter(Boolean).slice(0, maxAvailableItems);
 }

@@ -171,22 +171,24 @@ export async function fetchTmdb(
     }
   }
 
-  const releasedCandidates = filterReleasedMedia(rawCombined, minVotes).slice(0, 28);
+  const releasedCandidates = filterReleasedMedia(rawCombined, minVotes).slice(0, 24);
   const verifiedResults = await filterItemsByServerAvailability(
     releasedCandidates,
     defaultType,
     apiKey
   );
 
-  setBoundedCache(
-    tmdbListCache,
-    endpoint,
-    {
-      results: verifiedResults,
-      expiresAt: Date.now() + 15 * 60 * 1000,
-    },
-    100
-  );
+  if (verifiedResults.length > 0) {
+    setBoundedCache(
+      tmdbListCache,
+      endpoint,
+      {
+        results: verifiedResults,
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      },
+      100
+    );
+  }
 
   return { page: 1, results: verifiedResults };
 }
@@ -251,22 +253,24 @@ export async function fetchTrendingHk(
     }
   }
 
-  const releasedCandidates = filterReleasedMedia(combined, 1).slice(0, 28);
+  const releasedCandidates = filterReleasedMedia(combined, 1).slice(0, 24);
   const results = await filterItemsByServerAvailability(
     releasedCandidates,
     type,
     apiKey
   );
 
-  setBoundedCache(
-    tmdbListCache,
-    hkCacheKey,
-    {
-      results,
-      expiresAt: Date.now() + 15 * 60 * 1000,
-    },
-    100
-  );
+  if (results.length > 0) {
+    setBoundedCache(
+      tmdbListCache,
+      hkCacheKey,
+      {
+        results,
+        expiresAt: Date.now() + 15 * 60 * 1000,
+      },
+      100
+    );
+  }
 
   return results;
 }

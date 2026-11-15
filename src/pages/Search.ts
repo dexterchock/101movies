@@ -222,7 +222,10 @@ export function mount(container: HTMLElement): ViewCleanup {
           cachedSearchResults = filtered;
           results = filtered;
         })
-        .catch(() => {})
+        .catch(() => {
+          if (signal.aborted || reqSignal.aborted) return;
+          results = [];
+        })
         .finally(() => {
           if (!signal.aborted && !reqSignal.aborted) {
             loading = false;

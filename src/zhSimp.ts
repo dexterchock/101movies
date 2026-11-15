@@ -14,10 +14,18 @@ for (let i = 0; i < TRAD_CHARS.length; i++) {
  */
 export function toSimplifiedChinese(input: string): string {
   if (!input) return "";
-  let out = "";
+  let result: string[] | null = null;
   for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
-    out += TRAD_TO_SIMP_MAP[ch] || ch;
+    const mapped =
+      input.charCodeAt(i) >= 0x3400 ? TRAD_TO_SIMP_MAP[input[i]] : undefined;
+    if (mapped !== undefined) {
+      if (!result) {
+        result = input.slice(0, i).split("");
+      }
+      result.push(mapped);
+    } else if (result) {
+      result.push(input[i]);
+    }
   }
-  return out;
+  return result ? result.join("") : input;
 }

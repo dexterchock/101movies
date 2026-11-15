@@ -128,7 +128,7 @@ export function mount(container: HTMLElement): ViewCleanup {
     leftAriaLabel: "Scroll categories left",
     rightAriaLabel: "Scroll categories right",
     onSelect: (id) => {
-      if (genre === id) return;
+      if (genre === id && !hasError) return;
       genre = id;
       savePage(0);
       genreTrack.setActive(id, true);
@@ -155,7 +155,7 @@ export function mount(container: HTMLElement): ViewCleanup {
     fixedVisibleCount: 3,
     onSelect: (id) => {
       const nextYear = parseInt(id, 10);
-      if (Number.isNaN(nextYear) || year === nextYear) return;
+      if (Number.isNaN(nextYear) || (year === nextYear && !hasError)) return;
       year = nextYear;
       savePage(0);
       yearTrack.setActive(id, true);
@@ -172,6 +172,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   root.append(topBar, stage);
   container.replaceChildren(root);
 
+  let hasError = false;
   let gridRenderAbort: AbortController | null = null;
   let fetchAbort: AbortController | null = null;
 
@@ -239,7 +240,14 @@ export function mount(container: HTMLElement): ViewCleanup {
     );
 
     if (!loading && items.length === 0) {
-      stage.innerHTML = `
+      stage.innerHTML = hasError
+        ? `
+        <div class="empty-state">
+          <p class="empty-state-title">Unable to load rankings for ${year}</p>
+          <p class="empty-state-desc">Tap the active year or category again to retry.</p>
+        </div>
+      `
+        : `
         <div class="empty-state">
           <p class="empty-state-title">No rankings found for ${year}</p>
           <p class="empty-state-desc">Try selecting a different year or switching categories.</p>
@@ -292,6 +300,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       fetchAbort = null;
     }
 
+    hasError = false;
     const cached = api.getCachedRankings(mediaType, year, genre);
     if (cached) {
       items = cached;
@@ -302,6 +311,7 @@ export function mount(container: HTMLElement): ViewCleanup {
 
     fetchAbort = new AbortController();
     const reqSignal = fetchAbort.signal;
+    items = [];
     loading = true;
     renderStage();
 
@@ -310,8 +320,13 @@ export function mount(container: HTMLElement): ViewCleanup {
       .then((data) => {
         if (signal.aborted || reqSignal.aborted) return;
         items = data;
+        hasError = false;
       })
-      .catch(() => {})
+      .catch(() => {
+        if (signal.aborted || reqSignal.aborted) return;
+        items = [];
+        hasError = true;
+      })
       .finally(() => {
         if (!signal.aborted && !reqSignal.aborted) {
           loading = false;

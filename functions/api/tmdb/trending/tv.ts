@@ -25,7 +25,10 @@ export const onRequestGet: PagesFunction = async (context) => {
         },
         {
           headers: {
-            "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+            "Cache-Control":
+              results.length > 0
+                ? "public, s-maxage=3600, stale-while-revalidate=86400"
+                : "public, s-maxage=60",
           },
         }
       );
@@ -52,9 +55,12 @@ export const onRequestGet: PagesFunction = async (context) => {
     } else {
       data = await fetchTmdb("/trending/tv/week", "tv", apiKey);
     }
+    const hasResults = Array.isArray(data?.results) && data.results.length > 0;
     return Response.json(data, {
       headers: {
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        "Cache-Control": hasResults
+          ? "public, s-maxage=3600, stale-while-revalidate=86400"
+          : "public, s-maxage=60",
       },
     });
   } catch (err: any) {

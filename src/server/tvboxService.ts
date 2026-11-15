@@ -865,11 +865,7 @@ async function searchSingleVodSite(
     const validCandidates: ScoredCandidate[] = [];
 
     for (const item of list) {
-      const { playGroups, bestEpisodes } = parseVodPlayGroups(
-        item.vod_play_from,
-        item.vod_play_url
-      );
-      if (bestEpisodes.length === 0) continue;
+      if (!item.vod_play_url) continue;
 
       const vodName = String(item.vod_name || "").trim();
       const vodSub = String(item.vod_sub || "").trim();
@@ -885,12 +881,6 @@ async function searchSingleVodSite(
         vodName.includes("短剧") ||
         vodRemarks.includes("预告")
       ) {
-        continue;
-      }
-      const hasNonTrailerEpisode = bestEpisodes.some(
-        (ep) => !ep.name.includes("预告") && !ep.name.includes("花絮")
-      );
-      if (!hasNonTrailerEpisode) {
         continue;
       }
 
@@ -946,6 +936,19 @@ async function searchSingleVodSite(
             continue;
           }
         }
+      }
+
+      const { playGroups, bestEpisodes } = parseVodPlayGroups(
+        item.vod_play_from,
+        item.vod_play_url
+      );
+      if (bestEpisodes.length === 0) continue;
+
+      const hasNonTrailerEpisode = bestEpisodes.some(
+        (ep) => !ep.name.includes("预告") && !ep.name.includes("花絮")
+      );
+      if (!hasNonTrailerEpisode) {
+        continue;
       }
 
       if (mediaType === "tv" && bestEpisodes.length > 1) {
@@ -1340,7 +1343,7 @@ async function getTmdbCandidateMetadata(
     primaryZhTitle,
     expiresAt: Date.now() + 60 * 60 * 1000,
   };
-  tmdbMetadataCache.set(cacheKey, meta);
+  setBoundedCache(tmdbMetadataCache, cacheKey, meta, 500);
   return meta;
 }
 
@@ -1385,11 +1388,16 @@ export async function resolveStreamsForMedia(params: {
       releaseYear,
       sources: [],
     };
-    availabilityCache.set(`${type}:${tmdbId}`, {
-      available: false,
-      primaryZhTitle: meta.primaryZhTitle,
-      expiresAt: Date.now() + 30 * 60 * 1000,
-    });
+    setBoundedCache(
+      availabilityCache,
+      `${type}:${tmdbId}`,
+      {
+        available: false,
+        primaryZhTitle: meta.primaryZhTitle,
+        expiresAt: Date.now() + 30 * 60 * 1000,
+      },
+      1000
+    );
     return emptyRes;
   }
 
@@ -1412,17 +1420,22 @@ export async function resolveStreamsForMedia(params: {
   let matchedSources: ResolvedStreamSource[] = [];
   const matchedBaseSiteIds = new Set<string>();
   const maxKeywordsToTry = Math.min(searchKeywords.length, 3);
+  const MAX_VOD_SUBREQUESTS = 26;
+  let vodSubrequestsUsed = 0;
 
   for (let kIdx = 0; kIdx < maxKeywordsToTry; kIdx++) {
+    if (vodSubrequestsUsed >= MAX_VOD_SUBREQUESTS) break;
+    if (kIdx > 0 && matchedBaseSiteIds.size >= 5) break;
+    if (kIdx > 1 && matchedBaseSiteIds.size > 0) break;
+
     const kw = searchKeywords[kIdx];
-    const remainingSites = activeSites.filter(
-      (s) => !matchedBaseSiteIds.has(s.id)
-    );
+    const remainingBudget = MAX_VOD_SUBREQUESTS - vodSubrequestsUsed;
+    const remainingSites = activeSites
+      .filter((s) => !matchedBaseSiteIds.has(s.id))
+      .slice(0, remainingBudget);
     if (remainingSites.length === 0) break;
 
-    if (kIdx > 0 && matchedBaseSiteIds.size >= 6 && !/[\u4e00-\u9fff]/.test(kw)) {
-      break;
-    }
+    vodSubrequestsUsed += remainingSites.length;
 
     const settled = await Promise.allSettled(
       remainingSites.map(async (site) => {
@@ -1476,15 +1489,25 @@ export async function resolveStreamsForMedia(params: {
   };
 
   const ttl = matchedSources.length > 0 ? 30 * 60 * 1000 : 15 * 60 * 1000;
-  resolvedStreamsCache.set(cacheKey, {
-    data: response,
-    expiresAt: Date.now() + ttl,
-  });
-  availabilityCache.set(`${type}:${tmdbId}`, {
-    available: matchedSources.length > 0,
-    primaryZhTitle: meta.primaryZhTitle,
-    expiresAt: Date.now() + ttl,
-  });
+  setBoundedCache(
+    resolvedStreamsCache,
+    cacheKey,
+    {
+      data: response,
+      expiresAt: Date.now() + ttl,
+    },
+    300
+  );
+  setBoundedCache(
+    availabilityCache,
+    `${type}:${tmdbId}`,
+    {
+      available: matchedSources.length > 0,
+      primaryZhTitle: meta.primaryZhTitle,
+      expiresAt: Date.now() + ttl,
+    },
+    1000
+  );
 
   return response;
 }

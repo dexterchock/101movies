@@ -13,23 +13,31 @@ export const onRequestGet: PagesFunction = async (context) => {
       ? `first_air_date_year=${encodeURIComponent(year)}`
       : `primary_release_year=${encodeURIComponent(year)}`;
 
+  const isHk = genre.toLowerCase() === "hk";
   let genreParam = "";
-  if (genre.toLowerCase() === "hk") {
+  if (isHk) {
     genreParam = "&with_origin_country=HK";
   } else if (genre && genre !== "all") {
     const resolvedGenre = resolveTmdbGenre(type, genre);
     genreParam = `&with_genres=${encodeURIComponent(resolvedGenre)}`;
   }
 
+  const minVotes = isHk ? 1 : 3;
+  const discoverMinVotes = isHk ? 1 : 10;
+
   try {
     const data = await fetchTmdb(
-      `/discover/${type}?sort_by=popularity.desc&vote_count.gte=10&${yearParam}${genreParam}`,
+      `/discover/${type}?sort_by=popularity.desc&vote_count.gte=${discoverMinVotes}&${yearParam}${genreParam}`,
       type,
-      apiKey
+      apiKey,
+      minVotes
     );
+    const hasResults = Array.isArray(data?.results) && data.results.length > 0;
     return Response.json(data, {
       headers: {
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+        "Cache-Control": hasResults
+          ? "public, s-maxage=3600, stale-while-revalidate=86400"
+          : "public, s-maxage=60",
       },
     });
   } catch (err: any) {

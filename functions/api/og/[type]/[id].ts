@@ -44,14 +44,14 @@ export const onRequestGet: PagesFunction = async (context) => {
   const rawType = String(context.params.type || "").toLowerCase();
   const id = String(context.params.id || "").trim();
   const reqUrl = new URL(context.request.url);
-  const fallbackUrl = `${reqUrl.origin}/og-image.png?v=4`;
+  const fallbackUrl = `${reqUrl.origin}/og-image.png?v=5`;
 
   if ((rawType !== "movie" && rawType !== "tv") || !/^\d+$/.test(id)) {
     return Response.redirect(fallbackUrl, 302);
   }
 
   const cache = typeof caches !== "undefined" ? (caches as any).default : null;
-  const cacheKey = new Request(`https://og-img.101movies.internal/v1/${rawType}/${id}`, {
+  const cacheKey = new Request(`https://og-img.101movies.internal/v2/${rawType}/${id}`, {
     method: "GET",
   });
 

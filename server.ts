@@ -362,7 +362,7 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
   app.get("/api/og/:type/:id", async (req, res) => {
     const rawType = String(req.params.type || "").toLowerCase();
     const id = String(req.params.id || "").trim();
-    const fallbackUrl = "/og-image.png?v=4";
+    const fallbackUrl = "/og-image.png?v=5";
 
     if ((rawType !== "movie" && rawType !== "tv") || !/^\d+$/.test(id) || !TMDB_API_KEY) {
       return res.redirect(302, fallbackUrl);

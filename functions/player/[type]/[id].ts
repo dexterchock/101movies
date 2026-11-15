@@ -49,8 +49,8 @@ function buildOgMetadata(
   const displayTitle = year ? `${title} (${year})` : title;
   const imageUrl =
     details.backdrop_path || details.poster_path
-      ? `${origin}/api/og/${type}/${id}?v=1`
-      : `${origin}/og-image.png?v=4`;
+      ? `${origin}/api/og/${type}/${id}?v=2`
+      : `${origin}/og-image.png?v=5`;
 
   return {
     title: displayTitle,
@@ -89,7 +89,7 @@ async function getCachedOrFreshOgMetadata(
   if (!apiKey) return null;
 
   const cache = typeof caches !== "undefined" ? (caches as any).default : null;
-  const cacheUrl = `https://og-meta.101movies.internal/v2/${type}/${id}`;
+  const cacheUrl = `https://og-meta.101movies.internal/v3/${type}/${id}`;
   const cacheReq = new Request(cacheUrl, { method: "GET" });
 
   if (cache) {

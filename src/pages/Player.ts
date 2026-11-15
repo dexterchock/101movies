@@ -16,7 +16,7 @@ const HIGH_PING_THRESHOLD_MS = 800;
 const DEFAULT_SITE_TITLE = "101Movies";
 const DEFAULT_SITE_DESC =
   "Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation and real-time TMDB integration.";
-const DEFAULT_SITE_IMAGE = "https://101movies.pages.dev/og-image.png?v=4";
+const DEFAULT_SITE_IMAGE = "https://101movies.pages.dev/og-image.png?v=5";
 
 function formatEpisodeLabel(rawName: string, index: number): string {
   const trimmed = rawName.trim();
@@ -337,7 +337,7 @@ export function mount(
     const ogTitle = releaseYear ? `${shareTitle} (${releaseYear})` : shareTitle;
     const shareImage =
       details.backdrop_path || details.poster_path
-        ? `${window.location.origin}/api/og/${type}/${id}?v=1`
+        ? `${window.location.origin}/api/og/${type}/${id}?v=2`
         : DEFAULT_SITE_IMAGE;
     const shareUrl = `${window.location.origin}/player/${type}/${id}`;
 

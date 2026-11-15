@@ -1,0 +1,24 @@
+# 101Movies
+
+> High-definition movie and TV show discovery and streaming web app with smart TV remote navigation, TMDB metadata integration, regional/genre rankings, and local watch history.
+
+## Pages
+
+- [Trending](https://101movies.pages.dev/): Discover trending movies and TV shows by category and region.
+- [Rankings](https://101movies.pages.dev/rankings): Browse ranked movies and TV series filtered by category and release year.
+- [Search](https://101movies.pages.dev/search): Search movies and TV shows by title.
+- [History](https://101movies.pages.dev/history): View locally saved watch history.
+- [Saved](https://101movies.pages.dev/saved): View locally bookmarked movies and TV series.
+
+## Discovery & Metadata
+
+- [Sitemap](https://101movies.pages.dev/sitemap.xml): XML sitemap of primary routes.
+- [Robots Policy](https://101movies.pages.dev/robots.txt): Crawler directives and agent resource map pointer.
+- [Agent Resource Discovery](https://101movies.pages.dev/.well-known/ard.json): ARD manifest describing discoverable site capabilities.
+
+## API Endpoints
+
+- [Trending Movies API](https://101movies.pages.dev/api/tmdb/trending/movie): Real-time trending movies feed.
+- [Trending TV API](https://101movies.pages.dev/api/tmdb/trending/tv): Real-time trending TV series feed.
+- [Discover API](https://101movies.pages.dev/api/tmdb/discover/movie): Discover movies by region, genre, and year.
+- [Search API](https://101movies.pages.dev/api/tmdb/search): Query TMDB catalog by keyword (`?q=`).

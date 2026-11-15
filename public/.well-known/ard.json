@@ -1,0 +1,33 @@
+{
+  "specVersion": "1.0",
+  "entries": [
+    {
+      "identifier": "urn:air:101movies.pages.dev:web:catalog",
+      "displayName": "101Movies Discovery & Streaming Guide",
+      "description": "Structured markdown overview and routes for browsing trending movies, TV shows, rankings, and search on 101Movies.",
+      "type": "text/markdown; profile=\"urn:air:agent-skills\"",
+      "url": "https://101movies.pages.dev/llms.txt",
+      "capabilities": [
+        "trending-movies",
+        "trending-tv-shows",
+        "rankings-filter",
+        "media-search"
+      ],
+      "tags": [
+        "movies",
+        "tv-shows",
+        "tmdb",
+        "streaming",
+        "smart-tv"
+      ],
+      "representativeQueries": [
+        "Browse trending movies and TV shows on 101Movies",
+        "Filter ranked movies and series by category and release year",
+        "Search for a movie or TV series on 101Movies"
+      ],
+      "trustManifest": {
+        "identity": "101movies.pages.dev"
+      }
+    }
+  ]
+}

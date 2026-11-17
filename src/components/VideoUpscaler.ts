@@ -124,14 +124,6 @@ function loadWeights(path: string): Promise<unknown> {
   return promise;
 }
 
-/**
- * Preloads the WebSR runtime script without creating GPU resources yet.
- */
-export function preloadUpscalerRuntime(): void {
-  if (!isDesktopUpscaleSupported()) return;
-  loadWebSR().catch(() => {});
-}
-
 export interface VideoUpscalerOptions {
   container: HTMLElement;
   video: HTMLVideoElement;
@@ -365,7 +357,7 @@ export function createVideoUpscaler(
         if (gpu) {
           try {
             const weights = await loadWeights(
-              `/upscaler/weights/cnn-2x-m-${activeStyle}.json`
+              `/upscaler/weights/cnn-2x-l-${activeStyle}.json`
             );
             if (destroyed || !enabled || seq !== sessionSeq) {
               gpu.destroy();
@@ -373,7 +365,7 @@ export function createVideoUpscaler(
             }
             nextEngine = new WebSR({
               canvas: nextCanvas,
-              network_name: "anime4k/cnn-2x-m",
+              network_name: "anime4k/cnn-2x-l",
               weights,
               gpu,
             });
@@ -502,23 +494,15 @@ export function createVideoUpscaler(
       const nextStyle: UpscaleStyle = isAnim ? "an" : "rl";
       if (style === nextStyle) return;
       style = nextStyle;
-      if (!enabled || !engine || !backend) return;
+      if (!enabled || !engine) return;
 
       const seq = sessionSeq;
-      const activeBackend = backend;
-      const weightsUrl =
-        activeBackend === "webgpu"
-          ? `/upscaler/weights/cnn-2x-m-${style}.json`
-          : `/upscaler/weights/cnn-2x-l-${style}.json`;
+      const weightsUrl = `/upscaler/weights/cnn-2x-l-${style}.json`;
 
       loadWeights(weightsUrl)
         .then((weights) => {
           if (destroyed || !enabled || seq !== sessionSeq || !engine) return;
-          if (activeBackend === "webgpu") {
-            (engine as WebSRType).switchNetwork("anime4k/cnn-2x-m", weights);
-          } else {
-            (engine as WebSRWebGLType).switchNetwork("anime4k/cnn-2x-l", weights);
-          }
+          engine.switchNetwork("anime4k/cnn-2x-l", weights);
           renderSingleFrame(seq);
         })
         .catch(() => {});

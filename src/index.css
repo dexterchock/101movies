@@ -1887,20 +1887,13 @@ svg {
   overflow: hidden;
 }
 
-.upscale-btn.is-active,
-.upscale-btn.is-active:hover,
-.upscale-btn.is-active:focus {
-  background-color: #ffffff;
-  border-color: #ffffff;
-  color: #000000;
+.upscale-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-.upscale-btn.is-active:hover {
-  background-color: #f4f4f5;
-}
-
-.upscale-btn.is-active:focus-visible {
-  box-shadow: 0 0 0 2px #000000, 0 0 0 4px rgba(255, 255, 255, 0.85);
+.upscale-btn:disabled:hover .back-btn-inner {
+  transform: none;
 }
 
 .player-video-wrap:fullscreen,
@@ -1949,54 +1942,6 @@ svg {
     rgba(0, 0, 0, 0.35) calc(100% - 70px),
     transparent calc(100% - 56px)
   );
-}
-
-.player-upscale-fs-btn {
-  display: none;
-  position: absolute;
-  right: 18px;
-  bottom: 84px;
-  z-index: 4;
-  width: 38px;
-  height: 38px;
-  border-radius: 9999px;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(23, 23, 23, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  cursor: pointer;
-  outline: none;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 220ms ease, background-color 220ms ease,
-    border-color 220ms ease, transform 220ms ease;
-}
-
-.player-video-wrap.is-upscaling .player-upscale-fs-btn {
-  display: flex;
-}
-
-.player-video-wrap.is-upscaling.is-controls-visible .player-upscale-fs-btn,
-.player-video-wrap.is-upscaling .player-upscale-fs-btn:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.player-upscale-fs-btn:hover {
-  background-color: rgba(38, 38, 38, 0.92);
-  border-color: rgba(255, 255, 255, 0.36);
-  transform: scale(1.06);
-}
-
-.player-upscale-fs-btn:focus-visible {
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
-}
-
-.player-upscale-fs-icon {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
 }
 
 .player-hero {

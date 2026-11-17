@@ -1,5 +1,4 @@
 import Hls from "hls.js";
-import { icons } from "../icons";
 import {
   createVideoUpscaler,
   isDesktopUpscaleSupported,
@@ -9,7 +8,6 @@ import {
 export interface HlsPlayerOptions {
   src: string;
   initialTime?: number;
-  upscaleEnabled?: boolean;
   isAnimation?: boolean;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: () => void;
@@ -19,7 +17,7 @@ export interface HlsPlayerOptions {
 export interface HlsPlayerController {
   destroy: () => void;
   getVideoElement: () => HTMLVideoElement;
-  setUpscaleEnabled: (enabled: boolean) => void;
+  enterUpscaleFullscreen: () => void;
   setUpscaleAnimation: (isAnimation: boolean) => void;
 }
 
@@ -37,9 +35,8 @@ export function createHlsPlayer(
   video.className = "player-video";
   container.replaceChildren(video);
 
-  let fsBtn: HTMLButtonElement | null = null;
   let upscaler: VideoUpscalerController | null = null;
-  let upscalerActive = false;
+  let isUpscaleMode = false;
   let controlsTimer: ReturnType<typeof setTimeout> | null = null;
   let pointerInControlsZone = false;
 
@@ -58,42 +55,31 @@ export function createHlsPlayer(
       ? `/api/vod/proxy?url=${encodeURIComponent(options.src)}`
       : options.src;
 
-  const updateFsBtnIcon = () => {
-    if (!fsBtn) return;
-    const isFs = Boolean(
-      document.fullscreenElement || (document as any).webkitFullscreenElement
-    );
-    fsBtn.setAttribute(
-      "aria-label",
-      isFs ? "Exit full screen" : "Enter full screen"
-    );
-    fsBtn.innerHTML = isFs
-      ? icons.minimize("player-upscale-fs-icon", 18)
-      : icons.maximize("player-upscale-fs-icon", 18);
+  const exitCurrentFullscreen = () => {
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    } else if ((document as any).webkitExitFullscreen) {
+      (document as any).webkitExitFullscreen();
+    }
   };
 
-  const toggleFullscreen = () => {
-    const target: HTMLElement = upscalerActive ? container : video;
+  const toggleNormalFullscreen = () => {
     const fsEl =
       document.fullscreenElement || (document as any).webkitFullscreenElement;
     if (!fsEl) {
-      if (target.requestFullscreen) {
+      if (video.requestFullscreen) {
         try {
-          target
+          video
             .requestFullscreen({ navigationUI: "hide" } as FullscreenOptions)
             .catch(() => {});
         } catch {
-          target.requestFullscreen().catch(() => {});
+          video.requestFullscreen().catch(() => {});
         }
-      } else if ((target as any).webkitRequestFullscreen) {
-        (target as any).webkitRequestFullscreen();
+      } else if ((video as any).webkitRequestFullscreen) {
+        (video as any).webkitRequestFullscreen();
       }
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      } else if ((document as any).webkitExitFullscreen) {
-        (document as any).webkitExitFullscreen();
-      }
+      exitCurrentFullscreen();
     }
   };
 
@@ -104,10 +90,7 @@ export function createHlsPlayer(
       controlsTimer = null;
     }
     const shouldStayVisible =
-      video.paused ||
-      video.ended ||
-      pointerInControlsZone ||
-      Boolean(fsBtn && document.activeElement === fsBtn);
+      video.paused || video.ended || pointerInControlsZone;
 
     if (keepOpen || shouldStayVisible) {
       container.classList.add("is-controls-visible");
@@ -123,40 +106,58 @@ export function createHlsPlayer(
     }
   };
 
-  if (isDesktopUpscaleSupported()) {
-    fsBtn = document.createElement("button");
-    fsBtn.type = "button";
-    fsBtn.className = "player-upscale-fs-btn";
-    fsBtn.tabIndex = 0;
-    updateFsBtnIcon();
-    fsBtn.addEventListener("mousedown", (e) => e.stopPropagation(), { signal });
-    fsBtn.addEventListener(
-      "click",
-      (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleFullscreen();
-        fsBtn?.blur();
-      },
-      { signal }
-    );
-    container.appendChild(fsBtn);
+  const disableUpscaleFullscreen = () => {
+    isUpscaleMode = false;
+    container.classList.remove("is-upscaling");
+    upscaler?.setEnabled(false);
+  };
 
+  const enterUpscaleFullscreen = () => {
+    if (destroyed || !upscaler) return;
+    const fsEl =
+      document.fullscreenElement || (document as any).webkitFullscreenElement;
+    if (fsEl === container) {
+      isUpscaleMode = true;
+      upscaler.setEnabled(true);
+      return;
+    }
+    if (fsEl) {
+      disableUpscaleFullscreen();
+      return;
+    }
+
+    isUpscaleMode = true;
+    upscaler.setEnabled(true);
+    if (container.requestFullscreen) {
+      try {
+        container
+          .requestFullscreen({ navigationUI: "hide" } as FullscreenOptions)
+          .catch(() => {
+            disableUpscaleFullscreen();
+          });
+      } catch {
+        container.requestFullscreen().catch(() => {
+          disableUpscaleFullscreen();
+        });
+      }
+    } else if ((container as any).webkitRequestFullscreen) {
+      (container as any).webkitRequestFullscreen();
+    } else {
+      disableUpscaleFullscreen();
+    }
+  };
+
+  if (isDesktopUpscaleSupported()) {
     upscaler = createVideoUpscaler({
       container,
       video,
-      initialEnabled: Boolean(options.upscaleEnabled),
+      initialEnabled: false,
       isAnimation: Boolean(options.isAnimation),
       onActiveChange: (active) => {
-        upscalerActive = active;
-        container.classList.toggle("is-upscaling", active);
-        if (active) {
-          video.setAttribute("controlsList", "nofullscreen");
+        container.classList.toggle("is-upscaling", active && isUpscaleMode);
+        if (active && isUpscaleMode) {
           syncControlsVisibility(true);
-        } else {
-          video.removeAttribute("controlsList");
         }
-        updateFsBtnIcon();
       },
       onTaintedSource: () => {
         if (destroyed || useProxy) return;
@@ -321,17 +322,30 @@ export function createHlsPlayer(
     { signal }
   );
 
-  // When upscaling is active, capture double-click so container (with canvas) enters fullscreen
+  // Double-click exits Upscale Fullscreen cleanly (triggers fullscreenchange -> auto-off)
   container.addEventListener(
     "dblclick",
     (e) => {
-      if (!upscalerActive) return;
-      if (fsBtn && fsBtn.contains(e.target as Node)) return;
+      if (!isUpscaleMode) return;
       e.preventDefault();
       e.stopPropagation();
-      toggleFullscreen();
+      exitCurrentFullscreen();
     },
     { capture: true, signal }
+  );
+
+  video.addEventListener(
+    "enterpictureinpicture",
+    () => {
+      if (!isUpscaleMode) return;
+      disableUpscaleFullscreen();
+      const fsEl =
+        document.fullscreenElement || (document as any).webkitFullscreenElement;
+      if (fsEl === container) {
+        exitCurrentFullscreen();
+      }
+    },
+    { signal }
   );
 
   video.addEventListener("play", () => syncControlsVisibility(false), { signal });
@@ -365,7 +379,17 @@ export function createHlsPlayer(
   );
 
   const handleFullscreenChange = () => {
-    updateFsBtnIcon();
+    const fsEl =
+      document.fullscreenElement || (document as any).webkitFullscreenElement;
+    if (isUpscaleMode) {
+      if (!fsEl) {
+        disableUpscaleFullscreen();
+      } else if (fsEl === video) {
+        // Native fullscreen button clicked while inside container fullscreen -> exit cleanly
+        disableUpscaleFullscreen();
+        exitCurrentFullscreen();
+      }
+    }
     syncControlsVisibility(true);
     setTimeout(releaseFocus, 100);
     setTimeout(releaseFocus, 400);
@@ -374,6 +398,13 @@ export function createHlsPlayer(
   document.addEventListener("webkitfullscreenchange", handleFullscreenChange, {
     signal,
   });
+  document.addEventListener(
+    "fullscreenerror",
+    () => {
+      if (isUpscaleMode) disableUpscaleFullscreen();
+    },
+    { signal }
+  );
 
   window.addEventListener(
     "keydown",
@@ -417,7 +448,7 @@ export function createHlsPlayer(
         video.currentTime = Math.max(0, video.currentTime - 10);
       } else if (e.code === "KeyF") {
         e.preventDefault();
-        toggleFullscreen();
+        toggleNormalFullscreen();
       } else if (e.code === "KeyM") {
         e.preventDefault();
         video.muted = !video.muted;
@@ -430,10 +461,7 @@ export function createHlsPlayer(
 
   return {
     getVideoElement: () => video,
-    setUpscaleEnabled(enabled: boolean) {
-      if (destroyed) return;
-      upscaler?.setEnabled(enabled);
-    },
+    enterUpscaleFullscreen,
     setUpscaleAnimation(isAnimation: boolean) {
       if (destroyed) return;
       upscaler?.setAnimation(isAnimation);
@@ -441,6 +469,7 @@ export function createHlsPlayer(
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      isUpscaleMode = false;
       if (idleTimer) {
         clearTimeout(idleTimer);
         idleTimer = null;
@@ -452,8 +481,6 @@ export function createHlsPlayer(
       ac.abort();
       upscaler?.destroy();
       upscaler = null;
-      fsBtn?.remove();
-      fsBtn = null;
       container.classList.remove("is-upscaling", "is-controls-visible");
       destroyHlsInstance();
       try {

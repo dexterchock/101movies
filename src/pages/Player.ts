@@ -3,7 +3,6 @@ import { createHlsPlayer, HlsPlayerController } from "../components/HlsPlayer";
 import {
   isAnimationTitle,
   isDesktopUpscaleSupported,
-  preloadUpscalerRuntime,
 } from "../components/VideoUpscaler";
 import { icons } from "../icons";
 import {
@@ -259,7 +258,6 @@ export function mount(
   let currentPlayedUrl = "";
   let renderedHeroKey = "";
   let backdropLoaded = false;
-  let upscaleEnabled = false;
 
   // Build static outer shell
   const root = document.createElement("div");
@@ -282,35 +280,44 @@ export function mount(
   backBtnWrap.appendChild(backBtn);
 
   let upscaleBtn: HTMLButtonElement | null = null;
-  const syncUpscaleBtn = () => {
+  const syncUpscaleBtnAvailability = () => {
     if (!upscaleBtn) return;
-    upscaleBtn.classList.toggle("is-active", upscaleEnabled);
-    upscaleBtn.setAttribute("aria-pressed", upscaleEnabled ? "true" : "false");
+    const canLaunch = isPlaying || sources.length > 0;
+    upscaleBtn.disabled = !canLaunch;
   };
 
   if (isDesktopUpscaleSupported()) {
     upscaleBtn = document.createElement("button");
     upscaleBtn.type = "button";
     upscaleBtn.className = "back-btn upscale-btn";
-    upscaleBtn.setAttribute("aria-label", "Toggle video upscaler");
-    upscaleBtn.setAttribute("aria-pressed", "false");
+    upscaleBtn.setAttribute("aria-label", "Upscale Fullscreen");
     upscaleBtn.tabIndex = 0;
-    upscaleBtn.innerHTML = `<span class="back-btn-inner">${icons.sparkles(
+    upscaleBtn.innerHTML = `<span class="back-btn-inner">${icons.maximize(
       "back-btn-icon",
       18
-    )}<span>Upscale</span></span>`;
+    )}<span>Upscale Fullscreen</span></span>`;
+    syncUpscaleBtnAvailability();
     upscaleBtn.addEventListener("mousedown", (e) => e.stopPropagation(), {
       signal,
     });
     upscaleBtn.addEventListener(
       "click",
       () => {
-        upscaleEnabled = !upscaleEnabled;
-        syncUpscaleBtn();
-        if (upscaleEnabled) {
-          preloadUpscalerRuntime();
+        if (!isPlaying) {
+          if (sources.length === 0) return;
+          if (savedProgress !== null) {
+            handleResumeClick();
+          } else {
+            startPlaybackWithProgress(
+              0,
+              activeSeasonIndex,
+              activeEpisodeIndex,
+              0
+            );
+          }
         }
-        hlsController?.setUpscaleEnabled(upscaleEnabled);
+        hlsController?.enterUpscaleFullscreen();
+        upscaleBtn?.blur();
       },
       { signal }
     );
@@ -667,6 +674,7 @@ export function mount(
 
   function syncStage() {
     if (signal.aborted) return;
+    syncUpscaleBtnAvailability();
     const derived = getDerivedState();
 
     // Playing state: maintain active HLS video instance unless URL changed
@@ -688,7 +696,6 @@ export function mount(
       hlsController = createHlsPlayer(videoWrap, {
         src: derived.activeStreamUrl,
         initialTime: initialSeekTime,
-        upscaleEnabled,
         isAnimation: isAnimationTitle(details),
         onTimeUpdate: handleTimeUpdate,
         onError: handleStreamError,
@@ -1427,6 +1434,7 @@ export function mount(
         if (signal.aborted) return;
         sources = [];
         resolving = false;
+        syncUpscaleBtnAvailability();
         renderBottomBar();
       });
   }

@@ -1,8 +1,16 @@
 import Hls from "hls.js";
+import { icons } from "../icons";
+import {
+  createVideoUpscaler,
+  isDesktopUpscaleSupported,
+  VideoUpscalerController,
+} from "./VideoUpscaler";
 
 export interface HlsPlayerOptions {
   src: string;
   initialTime?: number;
+  upscaleEnabled?: boolean;
+  isAnimation?: boolean;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: () => void;
   onQualityDetected?: (quality: string) => void;
@@ -11,6 +19,8 @@ export interface HlsPlayerOptions {
 export interface HlsPlayerController {
   destroy: () => void;
   getVideoElement: () => HTMLVideoElement;
+  setUpscaleEnabled: (enabled: boolean) => void;
+  setUpscaleAnimation: (isAnimation: boolean) => void;
 }
 
 export function createHlsPlayer(
@@ -27,6 +37,12 @@ export function createHlsPlayer(
   video.className = "player-video";
   container.replaceChildren(video);
 
+  let fsBtn: HTMLButtonElement | null = null;
+  let upscaler: VideoUpscalerController | null = null;
+  let upscalerActive = false;
+  let controlsTimer: ReturnType<typeof setTimeout> | null = null;
+  let pointerInControlsZone = false;
+
   let hls: Hls | null = null;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let destroyed = false;
@@ -41,6 +57,116 @@ export function createHlsPlayer(
     useProxy
       ? `/api/vod/proxy?url=${encodeURIComponent(options.src)}`
       : options.src;
+
+  const updateFsBtnIcon = () => {
+    if (!fsBtn) return;
+    const isFs = Boolean(
+      document.fullscreenElement || (document as any).webkitFullscreenElement
+    );
+    fsBtn.setAttribute(
+      "aria-label",
+      isFs ? "Exit full screen" : "Enter full screen"
+    );
+    fsBtn.innerHTML = isFs
+      ? icons.minimize("player-upscale-fs-icon", 18)
+      : icons.maximize("player-upscale-fs-icon", 18);
+  };
+
+  const toggleFullscreen = () => {
+    const target: HTMLElement = upscalerActive ? container : video;
+    const fsEl =
+      document.fullscreenElement || (document as any).webkitFullscreenElement;
+    if (!fsEl) {
+      if (target.requestFullscreen) {
+        try {
+          target
+            .requestFullscreen({ navigationUI: "hide" } as FullscreenOptions)
+            .catch(() => {});
+        } catch {
+          target.requestFullscreen().catch(() => {});
+        }
+      } else if ((target as any).webkitRequestFullscreen) {
+        (target as any).webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if ((document as any).webkitExitFullscreen) {
+        (document as any).webkitExitFullscreen();
+      }
+    }
+  };
+
+  const syncControlsVisibility = (keepOpen = false) => {
+    if (destroyed) return;
+    if (controlsTimer) {
+      clearTimeout(controlsTimer);
+      controlsTimer = null;
+    }
+    const shouldStayVisible =
+      video.paused ||
+      video.ended ||
+      pointerInControlsZone ||
+      Boolean(fsBtn && document.activeElement === fsBtn);
+
+    if (keepOpen || shouldStayVisible) {
+      container.classList.add("is-controls-visible");
+      if (!shouldStayVisible) {
+        controlsTimer = setTimeout(() => {
+          if (!destroyed && !video.paused && !video.ended && !pointerInControlsZone) {
+            container.classList.remove("is-controls-visible");
+          }
+        }, 2500);
+      }
+    } else {
+      container.classList.remove("is-controls-visible");
+    }
+  };
+
+  if (isDesktopUpscaleSupported()) {
+    fsBtn = document.createElement("button");
+    fsBtn.type = "button";
+    fsBtn.className = "player-upscale-fs-btn";
+    fsBtn.tabIndex = 0;
+    updateFsBtnIcon();
+    fsBtn.addEventListener("mousedown", (e) => e.stopPropagation(), { signal });
+    fsBtn.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFullscreen();
+        fsBtn?.blur();
+      },
+      { signal }
+    );
+    container.appendChild(fsBtn);
+
+    upscaler = createVideoUpscaler({
+      container,
+      video,
+      initialEnabled: Boolean(options.upscaleEnabled),
+      isAnimation: Boolean(options.isAnimation),
+      onActiveChange: (active) => {
+        upscalerActive = active;
+        container.classList.toggle("is-upscaling", active);
+        if (active) {
+          video.setAttribute("controlsList", "nofullscreen");
+          syncControlsVisibility(true);
+        } else {
+          video.removeAttribute("controlsList");
+        }
+        updateFsBtnIcon();
+      },
+      onTaintedSource: () => {
+        if (destroyed || useProxy) return;
+        pendingSeek = video.currentTime || pendingSeek;
+        useProxy = true;
+        video.crossOrigin = "anonymous";
+        startPlayback();
+      },
+    });
+  }
 
   const applyInitialSeekAndPlay = () => {
     if (destroyed) return;
@@ -172,6 +298,46 @@ export function createHlsPlayer(
     } catch {}
   };
 
+  const updateControlsHoverZone = (e: PointerEvent) => {
+    const rect = container.getBoundingClientRect();
+    pointerInControlsZone = rect.height > 0 && rect.bottom - e.clientY <= 96;
+    syncControlsVisibility(true);
+  };
+
+  container.addEventListener("pointermove", updateControlsHoverZone, { signal });
+  container.addEventListener(
+    "pointerdown",
+    (e) => {
+      updateControlsHoverZone(e);
+    },
+    { signal }
+  );
+  container.addEventListener(
+    "pointerleave",
+    () => {
+      pointerInControlsZone = false;
+      syncControlsVisibility(false);
+    },
+    { signal }
+  );
+
+  // When upscaling is active, capture double-click so container (with canvas) enters fullscreen
+  container.addEventListener(
+    "dblclick",
+    (e) => {
+      if (!upscalerActive) return;
+      if (fsBtn && fsBtn.contains(e.target as Node)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggleFullscreen();
+    },
+    { capture: true, signal }
+  );
+
+  video.addEventListener("play", () => syncControlsVisibility(false), { signal });
+  video.addEventListener("pause", () => syncControlsVisibility(true), { signal });
+  video.addEventListener("ended", () => syncControlsVisibility(true), { signal });
+
   video.addEventListener(
     "pointermove",
     () => {
@@ -199,6 +365,8 @@ export function createHlsPlayer(
   );
 
   const handleFullscreenChange = () => {
+    updateFsBtnIcon();
+    syncControlsVisibility(true);
     setTimeout(releaseFocus, 100);
     setTimeout(releaseFocus, 400);
   };
@@ -249,19 +417,7 @@ export function createHlsPlayer(
         video.currentTime = Math.max(0, video.currentTime - 10);
       } else if (e.code === "KeyF") {
         e.preventDefault();
-        if (!document.fullscreenElement) {
-          if (video.requestFullscreen) {
-            video.requestFullscreen().catch(() => {});
-          } else if ((video as any).webkitRequestFullscreen) {
-            (video as any).webkitRequestFullscreen();
-          }
-        } else {
-          if (document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-          } else if ((document as any).webkitExitFullscreen) {
-            (document as any).webkitExitFullscreen();
-          }
-        }
+        toggleFullscreen();
       } else if (e.code === "KeyM") {
         e.preventDefault();
         video.muted = !video.muted;
@@ -274,6 +430,14 @@ export function createHlsPlayer(
 
   return {
     getVideoElement: () => video,
+    setUpscaleEnabled(enabled: boolean) {
+      if (destroyed) return;
+      upscaler?.setEnabled(enabled);
+    },
+    setUpscaleAnimation(isAnimation: boolean) {
+      if (destroyed) return;
+      upscaler?.setAnimation(isAnimation);
+    },
     destroy() {
       if (destroyed) return;
       destroyed = true;
@@ -281,7 +445,16 @@ export function createHlsPlayer(
         clearTimeout(idleTimer);
         idleTimer = null;
       }
+      if (controlsTimer) {
+        clearTimeout(controlsTimer);
+        controlsTimer = null;
+      }
       ac.abort();
+      upscaler?.destroy();
+      upscaler = null;
+      fsBtn?.remove();
+      fsBtn = null;
+      container.classList.remove("is-upscaling", "is-controls-visible");
       destroyHlsInstance();
       try {
         video.pause();

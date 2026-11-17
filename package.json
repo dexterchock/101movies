@@ -25,6 +25,8 @@
     "@cloudflare/workers-types": "^5.20261109.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
+    "@websr/webgl": "^0.1.0",
+    "@websr/websr": "^0.1.1",
     "esbuild": "^0.25.0",
     "terser": "^5.51.2",
     "tsx": "^4.21.0",

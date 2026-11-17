@@ -1,5 +1,10 @@
 import { api, prewarmStreamManifests } from "../api";
 import { createHlsPlayer, HlsPlayerController } from "../components/HlsPlayer";
+import {
+  isAnimationTitle,
+  isDesktopUpscaleSupported,
+  preloadUpscalerRuntime,
+} from "../components/VideoUpscaler";
 import { icons } from "../icons";
 import {
   MediaDetails,
@@ -254,6 +259,7 @@ export function mount(
   let currentPlayedUrl = "";
   let renderedHeroKey = "";
   let backdropLoaded = false;
+  let upscaleEnabled = false;
 
   // Build static outer shell
   const root = document.createElement("div");
@@ -274,6 +280,42 @@ export function mount(
   backBtn.addEventListener("mousedown", (e) => e.stopPropagation(), { signal });
   backBtn.addEventListener("click", handleBack, { signal });
   backBtnWrap.appendChild(backBtn);
+
+  let upscaleBtn: HTMLButtonElement | null = null;
+  const syncUpscaleBtn = () => {
+    if (!upscaleBtn) return;
+    upscaleBtn.classList.toggle("is-active", upscaleEnabled);
+    upscaleBtn.setAttribute("aria-pressed", upscaleEnabled ? "true" : "false");
+  };
+
+  if (isDesktopUpscaleSupported()) {
+    upscaleBtn = document.createElement("button");
+    upscaleBtn.type = "button";
+    upscaleBtn.className = "back-btn upscale-btn";
+    upscaleBtn.setAttribute("aria-label", "Toggle video upscaler");
+    upscaleBtn.setAttribute("aria-pressed", "false");
+    upscaleBtn.tabIndex = 0;
+    upscaleBtn.innerHTML = `<span class="back-btn-inner">${icons.sparkles(
+      "back-btn-icon",
+      18
+    )}<span>Upscale</span></span>`;
+    upscaleBtn.addEventListener("mousedown", (e) => e.stopPropagation(), {
+      signal,
+    });
+    upscaleBtn.addEventListener(
+      "click",
+      () => {
+        upscaleEnabled = !upscaleEnabled;
+        syncUpscaleBtn();
+        if (upscaleEnabled) {
+          preloadUpscalerRuntime();
+        }
+        hlsController?.setUpscaleEnabled(upscaleEnabled);
+      },
+      { signal }
+    );
+    backBtnWrap.appendChild(upscaleBtn);
+  }
 
   const stageEl = document.createElement("div");
   stageEl.className = "player-stage";
@@ -646,6 +688,8 @@ export function mount(
       hlsController = createHlsPlayer(videoWrap, {
         src: derived.activeStreamUrl,
         initialTime: initialSeekTime,
+        upscaleEnabled,
+        isAnimation: isAnimationTitle(details),
         onTimeUpdate: handleTimeUpdate,
         onError: handleStreamError,
         onQualityDetected: (q) => {
@@ -1292,6 +1336,12 @@ export function mount(
     "keydown",
     (e) => {
       if (e.key === "Escape" || e.key === "BrowserBack" || e.key === "GoBack") {
+        if (
+          document.fullscreenElement ||
+          (document as any).webkitFullscreenElement
+        ) {
+          return;
+        }
         e.preventDefault();
         if (isEpisodePopoverOpen) {
           isEpisodePopoverOpen = false;
@@ -1344,6 +1394,7 @@ export function mount(
       .then((data) => {
         if (signal.aborted) return;
         details = data;
+        hlsController?.setUpscaleAnimation(isAnimationTitle(details));
         syncHeadMeta();
         syncStage();
         renderBottomBar();

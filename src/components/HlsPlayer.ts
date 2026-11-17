@@ -37,6 +37,7 @@ export function createHlsPlayer(
 
   let upscaler: VideoUpscalerController | null = null;
   let isUpscaleMode = false;
+  let exitingAllFullscreen = false;
   let controlsTimer: ReturnType<typeof setTimeout> | null = null;
   let pointerInControlsZone = false;
 
@@ -114,6 +115,7 @@ export function createHlsPlayer(
 
   const enterUpscaleFullscreen = () => {
     if (destroyed || !upscaler) return;
+    exitingAllFullscreen = false;
     const fsEl =
       document.fullscreenElement || (document as any).webkitFullscreenElement;
     if (fsEl === container) {
@@ -381,11 +383,18 @@ export function createHlsPlayer(
   const handleFullscreenChange = () => {
     const fsEl =
       document.fullscreenElement || (document as any).webkitFullscreenElement;
-    if (isUpscaleMode) {
+    if (exitingAllFullscreen) {
+      if (!fsEl) {
+        exitingAllFullscreen = false;
+      } else {
+        exitCurrentFullscreen();
+      }
+    } else if (isUpscaleMode) {
       if (!fsEl) {
         disableUpscaleFullscreen();
       } else if (fsEl === video) {
-        // Native fullscreen button clicked while inside container fullscreen -> exit cleanly
+        // Native fullscreen button pushed <video> on top of container; pop the whole stack
+        exitingAllFullscreen = true;
         disableUpscaleFullscreen();
         exitCurrentFullscreen();
       }

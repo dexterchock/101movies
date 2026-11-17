@@ -280,42 +280,29 @@ export function mount(
   backBtnWrap.appendChild(backBtn);
 
   let upscaleBtn: HTMLButtonElement | null = null;
-  const syncUpscaleBtnAvailability = () => {
+  const syncUpscaleBtnVisibility = (isPlayerMounted: boolean) => {
     if (!upscaleBtn) return;
-    const canLaunch = isPlaying || sources.length > 0;
-    upscaleBtn.disabled = !canLaunch;
+    upscaleBtn.hidden = !isPlayerMounted;
   };
 
   if (isDesktopUpscaleSupported()) {
     upscaleBtn = document.createElement("button");
     upscaleBtn.type = "button";
     upscaleBtn.className = "back-btn upscale-btn";
-    upscaleBtn.setAttribute("aria-label", "Upscale Fullscreen");
+    upscaleBtn.setAttribute("aria-label", "Upscale in fullscreen");
     upscaleBtn.tabIndex = 0;
     upscaleBtn.innerHTML = `<span class="back-btn-inner">${icons.maximize(
       "back-btn-icon",
       18
-    )}<span>Upscale Fullscreen</span></span>`;
-    syncUpscaleBtnAvailability();
+    )}<span>Upscale</span></span>`;
+    upscaleBtn.hidden = true;
     upscaleBtn.addEventListener("mousedown", (e) => e.stopPropagation(), {
       signal,
     });
     upscaleBtn.addEventListener(
       "click",
       () => {
-        if (!isPlaying) {
-          if (sources.length === 0) return;
-          if (savedProgress !== null) {
-            handleResumeClick();
-          } else {
-            startPlaybackWithProgress(
-              0,
-              activeSeasonIndex,
-              activeEpisodeIndex,
-              0
-            );
-          }
-        }
+        if (!isPlaying) return;
         hlsController?.enterUpscaleFullscreen();
         upscaleBtn?.blur();
       },
@@ -674,11 +661,12 @@ export function mount(
 
   function syncStage() {
     if (signal.aborted) return;
-    syncUpscaleBtnAvailability();
     const derived = getDerivedState();
+    const isPlayerMounted = Boolean(isPlaying && derived.activeStreamUrl);
+    syncUpscaleBtnVisibility(isPlayerMounted);
 
     // Playing state: maintain active HLS video instance unless URL changed
-    if (isPlaying && derived.activeStreamUrl) {
+    if (isPlayerMounted && derived.activeStreamUrl) {
       if (hlsController && currentPlayedUrl === derived.activeStreamUrl) {
         return;
       }
@@ -1434,7 +1422,6 @@ export function mount(
         if (signal.aborted) return;
         sources = [];
         resolving = false;
-        syncUpscaleBtnAvailability();
         renderBottomBar();
       });
   }

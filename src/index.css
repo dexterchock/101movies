@@ -1887,13 +1887,8 @@ svg {
   overflow: hidden;
 }
 
-.upscale-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.upscale-btn:disabled:hover .back-btn-inner {
-  transform: none;
+.upscale-btn[hidden] {
+  display: none;
 }
 
 .player-video-wrap:fullscreen,

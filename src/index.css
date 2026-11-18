@@ -1887,9 +1887,25 @@ svg {
   flex: 1 1 0%;
   min-height: 0;
   width: 100%;
+  margin-top: 56px;
+  margin-top: calc(env(safe-area-inset-top, 0px) + 56px);
   position: relative;
   background-color: #000000;
   overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .player-video-wrap {
+    margin-top: 74px;
+    margin-top: calc(env(safe-area-inset-top, 0px) + 74px);
+  }
+}
+
+@media (min-width: 768px) {
+  .player-video-wrap {
+    margin-top: 82px;
+    margin-top: calc(env(safe-area-inset-top, 0px) + 82px);
+  }
 }
 
 .upscale-btn[hidden] {
@@ -1898,6 +1914,7 @@ svg {
 
 .player-video-wrap:fullscreen,
 .player-video-wrap:-webkit-full-screen {
+  margin-top: 0;
   width: 100vw;
   height: 100vh;
   background-color: #000000;
@@ -2254,6 +2271,7 @@ svg {
   gap: 6px;
   flex: 1 1 0%;
   min-width: 0;
+  min-height: 46px;
 }
 
 .server-bar-row {
@@ -2462,6 +2480,10 @@ svg {
   justify-content: flex-end;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.player-actions-right:empty {
+  display: none;
 }
 
 .resume-pill {
@@ -2684,12 +2706,19 @@ svg {
   .server-bar {
     justify-content: flex-start;
     gap: 8px;
+    min-height: 50px;
+  }
+
+  .server-pill,
+  .resume-pill,
+  .episodes-trigger-btn,
+  .skeleton-pill {
+    height: 42px;
   }
 
   .server-pill,
   .resume-pill,
   .episodes-trigger-btn {
-    height: 42px;
     padding: 0 16px;
   }
 
@@ -2743,7 +2772,7 @@ svg {
 }
 
 .skeleton-pill {
-  height: 42px;
+  height: 38px;
   width: 112px;
   border-radius: 9999px;
   background-color: rgba(255, 255, 255, 0.06);

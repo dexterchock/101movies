@@ -979,11 +979,17 @@ export function mount(
 
     if (resolving) {
       const row = document.createElement("div");
-      row.className = "server-pills-list";
-      row.style.overflow = "hidden";
-      row.innerHTML = Array.from({ length: 4 })
+      row.className = "server-bar-row";
+      row.style.maxWidth = "100%";
+      const list = document.createElement("div");
+      list.className = "server-pills-list";
+      list.style.overflow = "hidden";
+      list.style.minWidth = "0";
+      list.style.flex = "1 1 0%";
+      list.innerHTML = Array.from({ length: 4 })
         .map(() => `<div class="skeleton-pill animate-pulse"></div>`)
         .join("");
+      row.appendChild(list);
       serverBarEl.replaceChildren(row);
       return;
     }
@@ -1141,12 +1147,13 @@ export function mount(
       activeSeasonIndex === (savedProgress.seasonIndex ?? 0) &&
       activeEpisodeIndex === (savedProgress.episodeIndex ?? 0);
 
-    const showResumePill =
-      !resolving &&
-      sources.length > 0 &&
+    const hasPendingResume =
       savedProgress !== null &&
       resumeLabel !== null &&
       !isAlreadyPlayingSavedSpot;
+
+    const showResumePill =
+      !resolving && sources.length > 0 && hasPendingResume;
 
     const frag = document.createDocumentFragment();
 
@@ -1165,7 +1172,13 @@ export function mount(
 
     popoverWrapRef = null;
 
-    if (resolving && type === "tv") {
+    if (resolving) {
+      if (hasPendingResume) {
+        const skelResume = document.createElement("div");
+        skelResume.className = "skeleton-pill animate-pulse";
+        skelResume.style.width = "136px";
+        frag.appendChild(skelResume);
+      }
       const skelBtn = document.createElement("div");
       skelBtn.className = "skeleton-pill animate-pulse";
       skelBtn.style.width = "128px";

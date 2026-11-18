@@ -60,7 +60,7 @@ async function probeVodSiteForMedia(
   targetTitles: string[],
   targetYear?: string,
   mediaType: "movie" | "tv" = "movie",
-  useVideoList = false,
+  useVideoList = true,
   timeoutMs = 2200
 ): Promise<boolean> {
   const sep = siteUrl.includes("?") ? "&" : "?";
@@ -113,8 +113,16 @@ async function probeVodSiteForMedia(
       if (targetYear && vodYear) {
         const targetY = Number(targetYear);
         const vodY = Number(vodYear);
-        const yearDiff = Math.abs(vodY - targetY);
-        if (mediaType === "movie" && yearDiff > 2) continue;
+        if (
+          mediaType === "movie" &&
+          Number.isFinite(targetY) &&
+          Number.isFinite(vodY) &&
+          targetY > 0 &&
+          vodY > 0 &&
+          Math.abs(vodY - targetY) > 2
+        ) {
+          continue;
+        }
       }
 
       if (
@@ -233,7 +241,6 @@ export async function checkMediaHasPlayableStreams(
   const releaseYear = (item.release_date || item.first_air_date || "").slice(0, 4);
   const cleanZh = primaryZhTitle ? primaryZhTitle.split(/[:：\s]/)[0].trim() : "";
   const primaryQuery = probeQuery || cleanZh || item.title || item.name || candidateTitles[0];
-  const hasCjkQuery = /[\u4e00-\u9fff]/.test(primaryQuery);
 
   let available = false;
   let checkedAtLeastOneSite = false;
@@ -247,7 +254,7 @@ export async function checkMediaHasPlayableStreams(
       candidateTitles,
       releaseYear,
       type,
-      !hasCjkQuery
+      true
     );
     if (found) {
       available = true;

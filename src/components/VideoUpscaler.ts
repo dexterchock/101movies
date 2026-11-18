@@ -372,7 +372,7 @@ export function createVideoUpscaler(
         if (gpu) {
           try {
             const weights = await loadWeights(
-              `/upscaler/weights/cnn-2x-l-${activeStyle}.json`
+              `/upscaler/weights/cnn-2x-m-${activeStyle}.json`
             );
             if (destroyed || !enabled || seq !== sessionSeq) {
               gpu.destroy();
@@ -380,7 +380,7 @@ export function createVideoUpscaler(
             }
             nextEngine = new WebSR({
               canvas: nextCanvas,
-              network_name: "anime4k/cnn-2x-l",
+              network_name: "anime4k/cnn-2x-m",
               weights,
               gpu,
               tier: { tier: 3, isMobile: false } as any,
@@ -523,12 +523,32 @@ export function createVideoUpscaler(
       if (!enabled || !engine) return;
 
       const seq = sessionSeq;
-      const weightsUrl = `/upscaler/weights/cnn-2x-l-${style}.json`;
+      const activeBackend = backend;
+      const useWebGL = activeBackend === "webgl";
+      const weightsUrl = useWebGL
+        ? `/upscaler/weights/cnn-2x-l-${style}.json`
+        : `/upscaler/weights/cnn-2x-m-${style}.json`;
 
       loadWeights(weightsUrl)
         .then((weights) => {
-          if (destroyed || !enabled || seq !== sessionSeq || !engine) return;
-          engine.switchNetwork("anime4k/cnn-2x-l", weights);
+          if (
+            destroyed ||
+            !enabled ||
+            seq !== sessionSeq ||
+            !engine ||
+            backend !== activeBackend
+          ) {
+            return;
+          }
+          if (useWebGL) {
+            engine.switchNetwork("anime4k/cnn-2x-l", weights);
+          } else {
+            (
+              engine as {
+                switchNetwork(network: "anime4k/cnn-2x-m", weights: unknown): void;
+              }
+            ).switchNetwork("anime4k/cnn-2x-m", weights);
+          }
           renderSingleFrame(seq);
         })
         .catch(() => {});

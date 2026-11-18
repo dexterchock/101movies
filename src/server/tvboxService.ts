@@ -680,15 +680,12 @@ export function generateZhTitleVariants(rawZh?: string): {
       variants.add(base + num + sub);
       variants.add(base + num);
     }
-    variants.add(base);
-    variants.add(sub);
   } else {
     // Check trailing sequel number: e.g. "生化危机6" or "蜘蛛侠3"
     const trailMatch = simp.match(/^(.+?)\s*([0-9一二两三四五六七八九十]+)$/);
     if (trailMatch) {
       const base = trailMatch[1].trim();
       probeKeyword = base;
-      variants.add(base);
       variants.add(base + " " + trailMatch[2].trim());
     }
   }

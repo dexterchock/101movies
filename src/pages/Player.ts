@@ -12,6 +12,7 @@ import {
   WatchProgress,
 } from "../types";
 import { escapeHtml, isInWatchLater, toggleWatchLater } from "../utils";
+import { flushHistoryProgressSync, queueHistoryProgressSync } from "../sync";
 import type { ViewCleanup } from "./Home";
 
 // VOD APIs responding >= 800ms indicate high latency / slow stream segment delivery
@@ -452,7 +453,8 @@ export function mount(
 
   function persistWatchHistory(
     mediaDetails: MediaDetails | null,
-    progressUpdate: WatchProgress
+    progressUpdate: WatchProgress,
+    syncImmediately = false
   ) {
     if (!mediaDetails) return;
     try {
@@ -481,10 +483,12 @@ export function mount(
         JSON.stringify(history.slice(0, 20))
       );
       savedProgress = mergedProgress;
+      queueHistoryProgressSync(syncImmediately);
     } catch {}
   }
 
   function handleBack() {
+    flushHistoryProgressSync(true);
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
@@ -546,14 +550,18 @@ export function mount(
     currentVideoTime = seekTime;
     isPlaying = true;
 
-    persistWatchHistory(details, {
-      sourceId: targetServer.sourceId,
-      seasonNumber: seasonGroup?.seasonNumber,
-      seasonIndex: clampedSeasonIdx,
-      episodeIndex: clampedEpIdx,
-      episodeLabel: epLabel,
-      currentTime: seekTime,
-    });
+    persistWatchHistory(
+      details,
+      {
+        sourceId: targetServer.sourceId,
+        seasonNumber: seasonGroup?.seasonNumber,
+        seasonIndex: clampedSeasonIdx,
+        episodeIndex: clampedEpIdx,
+        episodeLabel: epLabel,
+        currentTime: seekTime,
+      },
+      true
+    );
 
     syncStage();
     renderBottomBar();
@@ -1441,6 +1449,7 @@ export function mount(
 
   return {
     destroy() {
+      flushHistoryProgressSync(true);
       ac.abort();
       resizeObserver?.disconnect();
       resizeObserver = null;

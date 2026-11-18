@@ -1,5 +1,7 @@
 import { createMediaCard } from "../components/MediaCard";
+import { openSyncModal, type SyncModalController } from "../components/SyncModal";
 import { icons } from "../icons";
+import { isDeviceSynced, pullSyncState } from "../sync";
 import { MediaItem } from "../types";
 import {
   GRID_COLS_CLASS,
@@ -70,7 +72,7 @@ export function mountSavedCollection(
   let page = readSavedPage();
 
   let gridState = observeResponsiveGrid(
-    false,
+    true,
     (next) => {
       gridState = next;
       updateFilterToggle();
@@ -83,7 +85,7 @@ export function mountSavedCollection(
   root.className = "browse-page";
 
   const topBar = document.createElement("div");
-  topBar.className = "top-bar top-bar--single-row";
+  topBar.className = "top-bar top-bar--collection";
 
   const filterGroup = document.createElement("div");
   filterGroup.className = "capsule-group top-bar-left";
@@ -123,6 +125,38 @@ export function mountSavedCollection(
   const rightWrap = document.createElement("div");
   rightWrap.className = "top-bar-right";
 
+  let activeSyncModal: SyncModalController | null = null;
+  const syncBtn = document.createElement("button");
+  syncBtn.type = "button";
+  syncBtn.className = "sync-btn";
+  syncBtn.tabIndex = 0;
+
+  const updateSyncButton = () => {
+    const synced = isDeviceSynced();
+    syncBtn.classList.toggle("is-synced", synced);
+    syncBtn.setAttribute(
+      "aria-label",
+      synced ? "Device sync active" : "Sync across devices"
+    );
+    syncBtn.innerHTML = synced
+      ? `<span class="sync-btn-inner"><span class="sync-btn-dot" aria-hidden="true"></span><span>Synced</span></span>`
+      : `<span class="sync-btn-inner">${icons.refreshCw("", 14)}<span>Sync</span></span>`;
+  };
+  updateSyncButton();
+
+  syncBtn.addEventListener(
+    "click",
+    () => {
+      if (activeSyncModal) return;
+      activeSyncModal = openSyncModal(() => {
+        activeSyncModal = null;
+        updateSyncButton();
+        syncBtn.focus({ preventScroll: true });
+      });
+    },
+    { signal }
+  );
+
   const clearBtn = document.createElement("button");
   clearBtn.type = "button";
   clearBtn.className = "clear-history-btn";
@@ -158,7 +192,7 @@ export function mountSavedCollection(
   nextBtn.setAttribute("aria-label", "Next page");
   nextBtn.innerHTML = icons.chevronRight("page-nav-icon");
 
-  rightWrap.append(prevBtn, nextBtn);
+  rightWrap.append(syncBtn, prevBtn, nextBtn);
   topBar.append(filterGroup, rightWrap);
 
   const stage = document.createElement("div");
@@ -180,7 +214,8 @@ export function mountSavedCollection(
   }
 
   function updateFilterToggle() {
-    const tabW = gridState.isMobileView ? 58 : 84;
+    const winW = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const tabW = winW < 520 ? 58 : winW < 768 ? 72 : 84;
     const activeIdx = Math.max(
       0,
       FILTER_OPTIONS.findIndex((opt) => opt.id === filterType)
@@ -308,11 +343,26 @@ export function mountSavedCollection(
     stage.replaceChildren(grid);
   }
 
+  window.addEventListener(
+    "sync-state-updated",
+    () => {
+      if (signal.aborted) return;
+      items = config.loadItems();
+      updateSyncButton();
+      renderStage();
+    },
+    { signal }
+  );
+  window.addEventListener("resize", updateFilterToggle, { signal });
+
   updateFilterToggle();
   renderStage();
+  void pullSyncState();
 
   return {
     destroy() {
+      activeSyncModal?.destroy();
+      activeSyncModal = null;
       ac.abort();
       gridRenderAbort?.abort();
       container.replaceChildren();

@@ -14,6 +14,12 @@ import {
   resolveTmdbGenre,
 } from "./functions/_shared/tmdb";
 import {
+  handleCreateSyncCode,
+  handleGetSyncState,
+  handlePairSyncCode,
+  handleUpdateSyncState,
+} from "./functions/_shared/syncService";
+import {
   AWESOME_ZHUIJU_TVBOX_CONFIGS,
   filterItemsByServerAvailability,
   getAllVodSites,
@@ -397,6 +403,57 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
     } catch (err) {
       console.error("[og-image] render failed:", err);
       return res.redirect(302, fallbackUrl);
+    }
+  });
+
+  // Device Sync Routes (uses in-memory fallback when Cloudflare D1 is absent)
+  app.post("/api/sync/code", async (req, res) => {
+    try {
+      const result = await handleCreateSyncCode({}, req.body);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(result.status).json(result.body);
+    } catch (err: any) {
+      return res
+        .status(500)
+        .json({ ok: false, error: err?.message || "Failed to generate pairing code" });
+    }
+  });
+
+  app.post("/api/sync/pair", async (req, res) => {
+    try {
+      const result = await handlePairSyncCode({}, req.body);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(result.status).json(result.body);
+    } catch (err: any) {
+      return res
+        .status(500)
+        .json({ ok: false, error: err?.message || "Failed to pair device" });
+    }
+  });
+
+  app.get("/api/sync/state", async (req, res) => {
+    try {
+      const groupId = String(req.query.groupId || "");
+      const since = req.query.since ? String(req.query.since) : undefined;
+      const result = await handleGetSyncState({}, groupId, since);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(result.status).json(result.body);
+    } catch (err: any) {
+      return res
+        .status(500)
+        .json({ ok: false, error: err?.message || "Failed to load sync state" });
+    }
+  });
+
+  app.post("/api/sync/state", async (req, res) => {
+    try {
+      const result = await handleUpdateSyncState({}, req.body);
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(result.status).json(result.body);
+    } catch (err: any) {
+      return res
+        .status(500)
+        .json({ ok: false, error: err?.message || "Failed to update sync state" });
     }
   });
 

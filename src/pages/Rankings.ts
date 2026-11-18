@@ -177,7 +177,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   let fetchAbort: AbortController | null = null;
 
   const updateMediaToggle = () => {
-    const tabW = gridState.isCompactHeader ? 72 : 88;
+    const tabW = gridState.isMobileView ? 72 : gridState.isCompactHeader ? 68 : 88;
     const idx = mediaType === "tv" ? 1 : 0;
     mediaIndicator.style.width = `${tabW}px`;
     mediaIndicator.style.transform = `translate3d(${idx * (tabW + 4)}px, 0, 0)`;

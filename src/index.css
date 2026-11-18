@@ -302,6 +302,34 @@ svg {
   gap: 8px;
 }
 
+.top-bar--collection {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.top-bar--collection .top-bar-right {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.top-bar--collection .sync-btn {
+  margin-right: auto;
+}
+
+@media (min-width: 520px) {
+  .top-bar--collection {
+    flex-wrap: nowrap;
+  }
+
+  .top-bar--collection .top-bar-right {
+    width: auto;
+  }
+
+  .top-bar--collection .sync-btn {
+    margin-right: 0;
+  }
+}
+
 @media (min-width: 640px) {
   .top-bar {
     flex-wrap: nowrap;
@@ -454,6 +482,14 @@ svg {
     left: 50%;
     transform: translateX(-50%);
   }
+
+  .top-bar--rankings .top-bar-center {
+    position: static;
+    left: auto;
+    transform: none;
+    flex: 1 1 0%;
+    min-width: 0;
+  }
 }
 
 /* Scrollable Pill Track Switcher */
@@ -527,6 +563,9 @@ svg {
 
 .top-bar-center > .pill-switcher {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .pill-track--category {
@@ -560,7 +599,8 @@ svg {
   }
 
   .pill-track--category {
-    flex: none;
+    flex: 0 1 auto;
+    min-width: 0;
     width: 196px;
   }
 }
@@ -894,6 +934,80 @@ svg {
   }
 
   .clear-history-btn-inner {
+    gap: 6px;
+  }
+}
+
+/* Collection Device Sync Button */
+.sync-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  border-radius: 9999px;
+  background-color: rgba(23, 23, 23, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  outline: none;
+  transition: color 300ms ease, background-color 300ms ease, border-color 300ms ease;
+}
+
+.sync-btn:hover {
+  color: #ffffff;
+  background-color: rgba(38, 38, 38, 0.85);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.sync-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.sync-btn.is-synced {
+  color: #86efac;
+  background-color: rgba(20, 83, 45, 0.35);
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.sync-btn.is-synced:hover {
+  color: #bbf7d0;
+  background-color: rgba(20, 83, 45, 0.52);
+  border-color: rgba(74, 222, 128, 0.5);
+}
+
+.sync-btn-inner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.sync-btn:hover .sync-btn-inner {
+  transform: scale(1.05);
+}
+
+.sync-btn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background-color: #4ade80;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .sync-btn {
+    height: 46px;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  .sync-btn-inner {
     gap: 6px;
   }
 }
@@ -2813,6 +2927,317 @@ svg {
 }
 
 /* =========================================================
+   Device Sync Modal
+   ========================================================= */
+
+.sync-modal-panel {
+  max-width: 440px;
+}
+
+.sync-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sync-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sync-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  flex-shrink: 0;
+}
+
+.sync-modal-heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.sync-modal-subheading {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.sync-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background-color: rgba(23, 23, 23, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  outline: none;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+.sync-modal-close:hover {
+  background-color: rgba(38, 38, 38, 0.9);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.sync-modal-close:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.sync-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sync-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background-color: rgba(20, 83, 45, 0.3);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  color: #bbf7d0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sync-status-banner[hidden] {
+  display: none;
+}
+
+.sync-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background-color: #4ade80;
+  flex-shrink: 0;
+}
+
+.sync-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sync-section[hidden] {
+  display: none;
+}
+
+.sync-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sync-section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.sync-expiry {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.sync-code-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.38em;
+  padding-left: 0.38em;
+  color: #ffffff;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.sync-code-display.is-loading {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.sync-hint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+}
+
+.sync-hint.is-error {
+  color: #fca5a5;
+}
+
+.sync-divider {
+  height: 1px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.sync-divider[hidden] {
+  display: none;
+}
+
+.sync-code-input {
+  width: 100%;
+  height: 58px;
+  border-radius: 16px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.38em;
+  padding-left: 0.38em;
+  text-align: center;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+.sync-code-input::placeholder {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+.sync-code-input:focus {
+  border-color: rgba(255, 255, 255, 0.75);
+  background-color: rgba(255, 255, 255, 0.09);
+}
+
+.sync-code-input.is-pairing {
+  opacity: 0.65;
+}
+
+.sync-feedback {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  min-height: 16px;
+}
+
+.sync-feedback.is-pending {
+  color: #ffffff;
+}
+
+.sync-feedback.is-error {
+  color: #f87171;
+}
+
+.sync-disconnect-section {
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sync-disconnect-section[hidden] {
+  display: none;
+}
+
+.sync-stop-btn {
+  width: 100%;
+  height: 44px;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+.sync-stop-btn:hover {
+  background-color: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+}
+
+.sync-stop-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.sync-stop-btn[hidden] {
+  display: none;
+}
+
+.sync-choices-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-choices-row[hidden] {
+  display: none;
+}
+
+.sync-choice-btn {
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+.sync-choice-btn:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.sync-choice-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.sync-choice-btn--danger {
+  background-color: rgba(69, 10, 10, 0.65);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.sync-choice-btn--danger:hover {
+  background-color: rgba(127, 29, 29, 0.78);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fecaca;
+}
+
+/* =========================================================
    Legacy Smart TV (:focus & Compositor Fallbacks when :focus-visible is unsupported)
    ========================================================= */
 
@@ -2921,6 +3346,13 @@ html.no-focus-visible .clear-history-btn:focus {
   box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.85);
 }
 
+html.no-focus-visible .sync-btn:focus,
+html.no-focus-visible .sync-modal-close:focus,
+html.no-focus-visible .sync-stop-btn:focus,
+html.no-focus-visible .sync-choice-btn:focus {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
 html.no-focus-visible .media-card-remove:focus {
   opacity: 1;
 }
@@ -2970,6 +3402,18 @@ html.no-focus-visible .episodes-trigger-btn:focus {
 
   .clear-history-btn-inner > * + * {
     margin-left: 4px;
+  }
+
+  .sync-btn-inner > * + * {
+    margin-left: 5px;
+  }
+
+  .sync-modal-body > * + * {
+    margin-top: 18px;
+  }
+
+  .sync-choices-row > * + * {
+    margin-left: 8px;
   }
 
   .media-card > * + *,

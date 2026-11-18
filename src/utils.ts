@@ -1,5 +1,6 @@
 import type { MediaItem } from "./types";
 import { icons } from "./icons";
+import { pushSyncState } from "./sync";
 
 const WATCH_HISTORY_KEY = "watch_history";
 const WATCH_LATER_KEY = "watch_later";
@@ -39,6 +40,7 @@ export function loadWatchHistory(): MediaItem[] {
 
 export function clearWatchHistory(): void {
   clearStoredMediaList(WATCH_HISTORY_KEY);
+  void pushSyncState({ history: [], historyMode: "replace" });
 }
 
 export function loadWatchLater(): MediaItem[] {
@@ -47,6 +49,7 @@ export function loadWatchLater(): MediaItem[] {
 
 export function clearWatchLater(): void {
   clearStoredMediaList(WATCH_LATER_KEY);
+  void pushSyncState({ saved: [], savedMode: "replace" });
 }
 
 export function isInWatchLater(
@@ -108,6 +111,8 @@ export function toggleWatchLater(item: MediaItem): boolean {
       localStorage.removeItem(WATCH_LATER_KEY);
     }
   } catch {}
+
+  void pushSyncState({ saved: updated, savedMode: "replace" });
 
   return !exists;
 }
@@ -274,14 +279,18 @@ export function removeFromWatchHistory(
   prev: MediaItem[],
   itemToRemove: MediaItem
 ): MediaItem[] {
-  return removeFromStoredMediaList(WATCH_HISTORY_KEY, prev, itemToRemove);
+  const updated = removeFromStoredMediaList(WATCH_HISTORY_KEY, prev, itemToRemove);
+  void pushSyncState({ history: updated, historyMode: "replace" });
+  return updated;
 }
 
 export function removeFromWatchLater(
   prev: MediaItem[],
   itemToRemove: MediaItem
 ): MediaItem[] {
-  return removeFromStoredMediaList(WATCH_LATER_KEY, prev, itemToRemove);
+  const updated = removeFromStoredMediaList(WATCH_LATER_KEY, prev, itemToRemove);
+  void pushSyncState({ saved: updated, savedMode: "replace" });
+  return updated;
 }
 
 /**
@@ -654,6 +663,18 @@ export function createPillTrack(opts: {
   window.addEventListener("resize", () => centerTrack(false), {
     signal: opts.signal,
   });
+
+  let lastTrackWidth = track.clientWidth;
+  if (typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(() => {
+      if (track.clientWidth !== lastTrackWidth) {
+        lastTrackWidth = track.clientWidth;
+        centerTrack(false);
+      }
+    });
+    ro.observe(track);
+    opts.signal.addEventListener("abort", () => ro.disconnect(), { once: true });
+  }
 
   updateVisualState();
   requestAnimationFrame(() => centerTrack(false));

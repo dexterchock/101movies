@@ -14,12 +14,16 @@ export const onRequest: PagesFunction = async (context) => {
   const isGet = context.request.method === "GET";
   const url = new URL(context.request.url);
 
+  const isCacheableApiGet =
+    isGet &&
+    !url.pathname.includes("/vod/proxy") &&
+    !url.pathname.includes("/sync/");
+
   // Cloudflare native edge cache
   const cache = typeof caches !== "undefined" ? (caches as any).default : null;
-  const cacheKey =
-    isGet && !url.pathname.includes("/vod/proxy")
-      ? new Request(context.request.url, { method: "GET" })
-      : null;
+  const cacheKey = isCacheableApiGet
+    ? new Request(context.request.url, { method: "GET" })
+    : null;
 
   if (cache && cacheKey) {
     try {
@@ -42,7 +46,7 @@ export const onRequest: PagesFunction = async (context) => {
   headers.set("Access-Control-Allow-Origin", "*");
 
   // Apply Edge Caching headers if successful GET response
-  if (isGet && response.status === 200 && !url.pathname.includes("/vod/proxy")) {
+  if (isCacheableApiGet && response.status === 200) {
     headers.set("X-Cache-Status", "MISS");
     if (url.pathname.includes("/tmdb/")) {
       headers.set(

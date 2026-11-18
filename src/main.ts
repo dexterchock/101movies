@@ -2,6 +2,7 @@ import "./polyfills";
 import "./index.css";
 import { icons } from "./icons";
 import { initRouter } from "./router";
+import { pullSyncState } from "./sync";
 
 // Polyfill smooth-scroll options API on older Smart TV Chromium engines (WebOS / Tizen)
 if (typeof window !== "undefined") {
@@ -250,12 +251,14 @@ function attachSpatialNavigation() {
     const dir = dirMap[e.key];
     if (!dir) return;
 
-    // Inside search text input: keep ArrowLeft/ArrowRight for caret movement
+    // Inside text input: keep ArrowLeft/ArrowRight/ArrowUp for caret except Sync code input ArrowUp
     if (
       active instanceof HTMLInputElement ||
       active instanceof HTMLTextAreaElement
     ) {
-      if (dir === "left" || dir === "right" || dir === "up") {
+      const allowArrowUp =
+        dir === "up" && active.classList.contains("sync-code-input");
+      if (!allowArrowUp && (dir === "left" || dir === "right" || dir === "up")) {
         return;
       }
     }
@@ -280,6 +283,38 @@ function attachSpatialNavigation() {
       scrollFocusTargetWithinTrack(next);
     }
   });
+}
+
+const BUNDLE_CHECK_INTERVAL_MS = 60_000;
+let lastBundleCheckAt = 0;
+
+function getCurrentBundlePath(): string | null {
+  const scripts = document.querySelectorAll<HTMLScriptElement>("script[src]");
+  for (let i = 0; i < scripts.length; i++) {
+    const m = scripts[i].src.match(/\/assets\/index-[^"'?#]+\.js/);
+    if (m) return m[0];
+  }
+  return null;
+}
+
+async function checkForNewBundle(currentPath: string): Promise<void> {
+  if (currentPath.startsWith("/player/")) return;
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+  const current = getCurrentBundlePath();
+  if (!current) return;
+  const now = Date.now();
+  if (now - lastBundleCheckAt < BUNDLE_CHECK_INTERVAL_MS) return;
+  lastBundleCheckAt = now;
+
+  try {
+    const res = await fetch("/", { cache: "no-store" });
+    if (!res.ok) return;
+    const html = await res.text();
+    const m = html.match(/\/assets\/index-[^"'?#]+\.js/);
+    if (m && m[0] !== current) {
+      window.location.reload();
+    }
+  } catch {}
 }
 
 function bootstrap() {
@@ -351,11 +386,22 @@ function bootstrap() {
   }
 
   window.addEventListener("resize", updateBottomNav);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      void checkForNewBundle(currentPath);
+      void pullSyncState();
+    }
+  });
   attachSpatialNavigation();
+  void pullSyncState(true);
 
   initRouter(mainStage, (pathname) => {
     currentPath = pathname;
     updateBottomNav();
+    void checkForNewBundle(currentPath);
+    if (pathname === "/history" || pathname === "/saved" || pathname === "/watch-later") {
+      void pullSyncState();
+    }
   });
 }
 

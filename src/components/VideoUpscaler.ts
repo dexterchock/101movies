@@ -153,6 +153,7 @@ export function createVideoUpscaler(
 
   let canvas: HTMLCanvasElement | null = null;
   let engine: UpscaleEngine | null = null;
+  let gpuDevice: any = null;
   let backend: "webgpu" | "webgl" | null = null;
   let sessionSeq = 0;
 
@@ -201,14 +202,24 @@ export function createVideoUpscaler(
     notifyActive(false);
 
     const activeEngine = engine;
+    const activeGpu = gpuDevice;
     const activeCanvas = canvas;
     engine = null;
+    gpuDevice = null;
     canvas = null;
     backend = null;
 
     const finalize = () => {
       if (activeEngine) {
+        try {
+          (activeEngine as any).context?.cleanup?.();
+        } catch {}
         activeEngine.destroy().catch(() => {});
+      }
+      if (activeGpu) {
+        try {
+          activeGpu.destroy?.();
+        } catch {}
       }
       if (activeCanvas) {
         activeCanvas.remove();
@@ -277,13 +288,14 @@ export function createVideoUpscaler(
       .finally(() => {
         isRendering = false;
         inFlightRender = null;
-        if (
-          rerenderPending &&
-          !destroyed &&
-          enabled &&
-          seq === sessionSeq &&
-          engine
-        ) {
+        if (destroyed || !enabled || seq !== sessionSeq || !engine) {
+          rerenderPending = false;
+          return;
+        }
+        if (!video.paused && !video.ended) {
+          rerenderPending = false;
+          scheduleNextFrame(seq);
+        } else if (rerenderPending) {
           rerenderPending = false;
           renderSingleFrame(seq);
         }
@@ -292,6 +304,7 @@ export function createVideoUpscaler(
 
   const scheduleNextFrame = (seq: number) => {
     if (destroyed || !enabled || seq !== sessionSeq || !engine) return;
+    if (isRendering && !video.paused && !video.ended) return;
     cancelScheduledFrame();
 
     if (video.paused || video.ended) {
@@ -304,18 +317,12 @@ export function createVideoUpscaler(
         rvfcId = null;
         if (destroyed || !enabled || seq !== sessionSeq) return;
         renderSingleFrame(seq);
-        if (!video.paused && !video.ended) {
-          scheduleNextFrame(seq);
-        }
       });
     } else {
       rafId = requestAnimationFrame(() => {
         rafId = null;
         if (destroyed || !enabled || seq !== sessionSeq) return;
         renderSingleFrame(seq);
-        if (!video.paused && !video.ended) {
-          scheduleNextFrame(seq);
-        }
       });
     }
   };
@@ -342,6 +349,7 @@ export function createVideoUpscaler(
       nextCanvas.setAttribute("aria-hidden", "true");
 
       let nextEngine: UpscaleEngine | null = null;
+      let nextGpu: any = null;
       let nextBackend: "webgpu" | "webgl" | null = null;
 
       if (WebSR) {
@@ -352,7 +360,14 @@ export function createVideoUpscaler(
           gpu = false;
         }
 
-        if (destroyed || !enabled || seq !== sessionSeq) return;
+        if (destroyed || !enabled || seq !== sessionSeq) {
+          if (gpu) {
+            try {
+              gpu.destroy();
+            } catch {}
+          }
+          return;
+        }
 
         if (gpu) {
           try {
@@ -368,7 +383,9 @@ export function createVideoUpscaler(
               network_name: "anime4k/cnn-2x-l",
               weights,
               gpu,
+              tier: { tier: 3, isMobile: false } as any,
             });
+            nextGpu = gpu;
             nextBackend = "webgpu";
             gpu.lost
               ?.then(() => {
@@ -382,6 +399,7 @@ export function createVideoUpscaler(
               gpu.destroy();
             } catch {}
             nextEngine = null;
+            nextGpu = null;
           }
         }
       }
@@ -410,18 +428,26 @@ export function createVideoUpscaler(
           gl,
           network_name: "anime4k/cnn-2x-l",
           weights,
+          tier: { tier: 3, isMobile: false } as any,
         });
         nextBackend = "webgl";
       }
 
       if (destroyed || !enabled || seq !== sessionSeq || !nextEngine) {
+        try {
+          (nextEngine as any)?.context?.cleanup?.();
+        } catch {}
         nextEngine?.destroy().catch(() => {});
+        try {
+          nextGpu?.destroy?.();
+        } catch {}
         return;
       }
 
       container.appendChild(nextCanvas);
       canvas = nextCanvas;
       engine = nextEngine;
+      gpuDevice = nextGpu;
       backend = nextBackend;
 
       renderSingleFrame(seq);

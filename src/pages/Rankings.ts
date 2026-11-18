@@ -121,7 +121,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   const genreTrack = createPillTrack({
     items: MEDIA_CATEGORIES,
     activeId: genre,
-    pillWidth: gridState.isCompactHeader
+    pillWidth: gridState.isMobileView
       ? GENRE_PILL_WIDTH_MOBILE
       : GENRE_PILL_WIDTH_DESKTOP,
     trackClass: "pill-track--category",
@@ -145,7 +145,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   const yearTrack = createPillTrack({
     items: ALL_YEARS.map((y) => ({ id: String(y), label: String(y) })),
     activeId: String(year),
-    pillWidth: gridState.isCompactHeader
+    pillWidth: gridState.isMobileView
       ? YEAR_PILL_WIDTH_MOBILE
       : YEAR_PILL_WIDTH_DESKTOP,
     trackClass: "pill-track--year",
@@ -177,7 +177,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   let fetchAbort: AbortController | null = null;
 
   const updateMediaToggle = () => {
-    const tabW = gridState.isMobileView ? 72 : gridState.isCompactHeader ? 68 : 88;
+    const tabW = gridState.isMobileView ? 72 : 88;
     const idx = mediaType === "tv" ? 1 : 0;
     mediaIndicator.style.width = `${tabW}px`;
     mediaIndicator.style.transform = `translate3d(${idx * (tabW + 4)}px, 0, 0)`;
@@ -194,11 +194,11 @@ export function mount(container: HTMLElement): ViewCleanup {
   const updateControlWidths = () => {
     updateMediaToggle();
     genreTrack.setPillWidth(
-      gridState.isCompactHeader ? GENRE_PILL_WIDTH_MOBILE : GENRE_PILL_WIDTH_DESKTOP,
+      gridState.isMobileView ? GENRE_PILL_WIDTH_MOBILE : GENRE_PILL_WIDTH_DESKTOP,
       false
     );
     yearTrack.setPillWidth(
-      gridState.isCompactHeader ? YEAR_PILL_WIDTH_MOBILE : YEAR_PILL_WIDTH_DESKTOP,
+      gridState.isMobileView ? YEAR_PILL_WIDTH_MOBILE : YEAR_PILL_WIDTH_DESKTOP,
       false
     );
   };

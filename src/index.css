@@ -645,6 +645,12 @@ svg {
   width: 60px;
 }
 
+@media (min-width: 640px) {
+  .pill-track--year {
+    width: 64px;
+  }
+}
+
 @media (min-width: 960px) {
   .pill-track--year {
     width: 200px;
@@ -738,58 +744,20 @@ svg {
   }
 }
 
-/* Compact Rankings top bar on tablet portrait (640px-959px) and adjusted desktop widths
-   so the wider year switcher on the right never collides with the centered categories. */
-@media (min-width: 640px) and (max-width: 959px) {
-  .top-bar--rankings .capsule-group,
-  .top-bar--rankings .pill-switcher {
-    height: 38px;
-    padding: 2px;
-  }
-
-  .top-bar--rankings .capsule-indicator {
-    top: 2px;
-    bottom: 2px;
-    left: 2px;
-  }
-
-  .top-bar--rankings .top-bar-right {
-    height: 38px;
-  }
-
-  .top-bar--rankings .capsule-btn,
-  .top-bar--rankings .pill-btn {
-    height: 30px;
-    font-size: 12px;
-  }
-
-  .top-bar--rankings .pill-arrow-btn {
-    width: 30px;
-    height: 30px;
-  }
-
-  .top-bar--rankings .pill-arrow-icon {
-    width: 16px;
-    height: 16px;
-  }
-
-  .top-bar--rankings .pill-track,
-  .top-bar--rankings .pill-track-inner {
-    height: 30px;
-  }
-
+/* Responsive Rankings category track widths across tablet and desktop viewports */
+@media (min-width: 640px) and (max-width: 719px) {
   .top-bar--rankings .pill-track--category {
-    width: 148px;
+    width: 134px;
   }
 }
 
-@media (min-width: 660px) and (max-width: 959px) {
+@media (min-width: 720px) and (max-width: 839px) {
   .top-bar--rankings .pill-track--category {
-    width: 224px;
+    width: 196px;
   }
 }
 
-@media (min-width: 960px) {
+@media (min-width: 840px) {
   .top-bar--rankings .pill-track--category {
     width: 260px;
   }

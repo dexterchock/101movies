@@ -1461,7 +1461,6 @@ svg {
   min-height: 0;
   position: relative;
   isolation: isolate;
-  transform: translateZ(0);
   border-radius: 12px;
   overflow: hidden;
   background-color: #111111;
@@ -1483,16 +1482,12 @@ svg {
   height: 100%;
   display: block;
   object-fit: cover;
-  transform: translate3d(0, 0, 0) scale(1);
-  will-change: transform;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  transform: scale(1);
   transition: transform 300ms ease-out;
 }
 
-.media-card:hover .media-card-img,
 .media-card:focus .media-card-img {
-  transform: translate3d(0, 0, 0) scale(1.05);
+  transform: scale(1.05);
 }
 
 .media-card-fallback {
@@ -1505,16 +1500,33 @@ svg {
   padding: 12px;
   text-align: center;
   background-color: rgba(23, 23, 23, 0.9);
-  transform: translate3d(0, 0, 0) scale(1);
-  will-change: transform;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+  transform: scale(1);
   transition: transform 300ms ease-out;
 }
 
-.media-card:hover .media-card-fallback,
 .media-card:focus .media-card-fallback {
-  transform: translate3d(0, 0, 0) scale(1.05);
+  transform: scale(1.05);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .media-card-poster {
+    transform: translateZ(0);
+  }
+
+  .media-card-img,
+  .media-card-fallback {
+    transform: translate3d(0, 0, 0) scale(1);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .media-card:hover .media-card-img,
+  .media-card:focus .media-card-img,
+  .media-card:hover .media-card-fallback,
+  .media-card:focus .media-card-fallback {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
 }
 
 .media-card-fallback-icon {

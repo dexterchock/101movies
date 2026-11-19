@@ -1,9 +1,59 @@
-import Hls from "hls.js";
+import type HlsType from "hls.js";
 import {
   createVideoUpscaler,
   isDesktopUpscaleSupported,
   VideoUpscalerController,
 } from "./VideoUpscaler";
+
+declare global {
+  interface Window {
+    Hls?: typeof HlsType;
+  }
+}
+
+const HLS_SCRIPT_URL = "/vendor/hls-1.6.16.min.js";
+let hlsLoadPromise: Promise<typeof HlsType | null> | null = null;
+
+function hasStandardMSE(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    (typeof (window as any).MediaSource === "function" ||
+      typeof (window as any).WebKitMediaSource === "function")
+  );
+}
+
+/**
+ * Lazy-loads the standalone Hls.js ES5 bundle when standard MSE playback is
+ * available, skipping mobile Safari/iOS where native HLS is used.
+ */
+export function preloadHlsLibrary(): Promise<typeof HlsType | null> {
+  if (!hasStandardMSE() || typeof document === "undefined") {
+    return Promise.resolve(null);
+  }
+  if (window.Hls) {
+    return Promise.resolve(window.Hls);
+  }
+  if (hlsLoadPromise) {
+    return hlsLoadPromise;
+  }
+
+  hlsLoadPromise = new Promise<typeof HlsType | null>((resolve) => {
+    const script = document.createElement("script");
+    script.src = HLS_SCRIPT_URL;
+    script.async = true;
+    script.onload = () => {
+      resolve(window.Hls ?? null);
+    };
+    script.onerror = () => {
+      hlsLoadPromise = null;
+      script.remove();
+      resolve(null);
+    };
+    document.head.appendChild(script);
+  });
+
+  return hlsLoadPromise;
+}
 
 export interface HlsPlayerOptions {
   src: string;
@@ -41,9 +91,10 @@ export function createHlsPlayer(
   let controlsTimer: ReturnType<typeof setTimeout> | null = null;
   let pointerInControlsZone = false;
 
-  let hls: Hls | null = null;
+  let hls: HlsType | null = null;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let destroyed = false;
+  let playbackGen = 0;
   let pendingSeek = options.initialTime ?? 0;
 
   let useProxy =
@@ -166,7 +217,7 @@ export function createHlsPlayer(
         pendingSeek = video.currentTime || pendingSeek;
         useProxy = true;
         video.crossOrigin = "anonymous";
-        startPlayback();
+        void startPlayback();
       },
     });
   }
@@ -222,8 +273,9 @@ export function createHlsPlayer(
     }
   };
 
-  const startPlayback = () => {
+  const startPlayback = async () => {
     if (destroyed || !options.src) return;
+    const gen = ++playbackGen;
     destroyHlsInstance();
     const effectiveSrc = getEffectiveSrc();
     const isMp4 =
@@ -235,6 +287,7 @@ export function createHlsPlayer(
       video.addEventListener(
         "loadedmetadata",
         () => {
+          if (destroyed || gen !== playbackGen) return;
           applyInitialSeekAndPlay();
           handleVideoDims();
         },
@@ -243,7 +296,12 @@ export function createHlsPlayer(
       return;
     }
 
-    if (Hls.isSupported()) {
+    const Hls = hasStandardMSE()
+      ? window.Hls || (await preloadHlsLibrary())
+      : null;
+    if (destroyed || gen !== playbackGen) return;
+
+    if (Hls && Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -256,6 +314,7 @@ export function createHlsPlayer(
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+        if (destroyed || gen !== playbackGen) return;
         applyInitialSeekAndPlay();
         if (Array.isArray(data.levels) && data.levels.length > 0) {
           const maxW = Math.max(...data.levels.map((l) => l.width || 0));
@@ -265,11 +324,11 @@ export function createHlsPlayer(
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
-        if (destroyed || !data.fatal) return;
+        if (destroyed || gen !== playbackGen || !data.fatal) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !useProxy) {
           destroyHlsInstance();
           useProxy = true;
-          startPlayback();
+          void startPlayback();
         } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
           hls?.recoverMediaError();
         } else {
@@ -281,11 +340,14 @@ export function createHlsPlayer(
       video.addEventListener(
         "loadedmetadata",
         () => {
+          if (destroyed || gen !== playbackGen) return;
           applyInitialSeekAndPlay();
           handleVideoDims();
         },
         { once: true, signal }
       );
+    } else {
+      options.onError?.();
     }
   };
 
@@ -466,7 +528,7 @@ export function createHlsPlayer(
     { signal }
   );
 
-  startPlayback();
+  void startPlayback();
 
   return {
     getVideoElement: () => video,
@@ -478,6 +540,7 @@ export function createHlsPlayer(
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      playbackGen++;
       isUpscaleMode = false;
       if (idleTimer) {
         clearTimeout(idleTimer);

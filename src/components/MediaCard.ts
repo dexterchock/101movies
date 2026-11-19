@@ -9,11 +9,27 @@ export interface MediaCardOptions {
   className?: string;
   onRemove?: (e: MouseEvent) => void;
   removeLabel?: string;
+  colsPerRow?: number;
+  isPriority?: boolean;
   signal: AbortSignal;
 }
 
+function buildPosterSizes(cols: number): string {
+  const c = Math.max(2, Math.round(cols));
+  return `(min-width: 768px) calc((100vw - ${64 + (c - 1) * 28}px) / ${c}), (min-width: 640px) calc((100vw - ${48 + (c - 1) * 20}px) / ${c}), calc((100vw - ${32 + (c - 1) * 12}px) / ${c})`;
+}
+
 export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
-  const { item, rank, className, onRemove, removeLabel = "Remove from history", signal } = options;
+  const {
+    item,
+    rank,
+    className,
+    onRemove,
+    removeLabel = "Remove from history",
+    colsPerRow = 6,
+    isPriority = false,
+    signal,
+  } = options;
   const type = resolveMediaItemType(item);
   const title =
     item.is_chinese_origin && item.zh_title
@@ -45,12 +61,16 @@ export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
 
   if (item.poster_path) {
     const img = document.createElement("img");
-    img.src = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
     img.alt = title;
-    img.loading = "lazy";
     img.decoding = "async";
     img.referrerPolicy = "no-referrer";
     img.className = "media-card-img";
+    if (isPriority) {
+      img.setAttribute("fetchpriority", "high");
+    }
+    img.sizes = buildPosterSizes(colsPerRow);
+    img.srcset = `https://image.tmdb.org/t/p/w342${item.poster_path} 342w, https://image.tmdb.org/t/p/w500${item.poster_path} 500w`;
+    img.src = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
     img.addEventListener(
       "error",
       () => {

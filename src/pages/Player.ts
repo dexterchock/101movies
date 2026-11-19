@@ -1,5 +1,9 @@
 import { api, prewarmStreamManifests } from "../api";
-import { createHlsPlayer, HlsPlayerController } from "../components/HlsPlayer";
+import {
+  createHlsPlayer,
+  HlsPlayerController,
+  preloadHlsLibrary,
+} from "../components/HlsPlayer";
 import {
   isAnimationTitle,
   isDesktopUpscaleSupported,
@@ -805,7 +809,7 @@ export function mount(
       let ambientImg: HTMLImageElement | null = null;
       if (!hasWideBackdrop) {
         ambientImg = document.createElement("img");
-        ambientImg.src = backdropUrl;
+        ambientImg.src = `https://image.tmdb.org/t/p/w342${backdropPath}`;
         ambientImg.alt = "";
         ambientImg.setAttribute("aria-hidden", "true");
         ambientImg.referrerPolicy = "no-referrer";
@@ -1393,6 +1397,7 @@ export function mount(
   syncStage();
   renderBottomBar();
   updateServerBarWidth();
+  void preloadHlsLibrary();
 
   // Pre-warm primary m3u8 manifest if sources came from prefetch cache
   if (sources.length > 0) {

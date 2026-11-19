@@ -488,6 +488,7 @@ export function createPillTrack(opts: {
 
   const indicator = document.createElement("div");
   indicator.className = "pill-indicator";
+  indicator.setAttribute("aria-hidden", "true");
   indicator.style.width = `${pillWidth}px`;
   inner.appendChild(indicator);
 

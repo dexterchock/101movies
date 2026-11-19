@@ -337,10 +337,12 @@ export function mount(container: HTMLElement): ViewCleanup {
       const placeholderCount = Math.max(0, itemsPerPage - visibleResults.length);
 
       const frag = document.createDocumentFragment();
-      visibleResults.forEach((item) => {
+      visibleResults.forEach((item, index) => {
         frag.appendChild(
           createMediaCard({
             item,
+            colsPerRow: gridState.colsPerRow,
+            isPriority: index < gridState.colsPerRow,
             signal: gridRenderAbort!.signal,
           })
         );

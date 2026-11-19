@@ -89,6 +89,7 @@ export function mount(container: HTMLElement): ViewCleanup {
 
   const mediaIndicator = document.createElement("div");
   mediaIndicator.className = "capsule-indicator";
+  mediaIndicator.setAttribute("aria-hidden", "true");
   mediaToggle.appendChild(mediaIndicator);
 
   const mediaBtns = new Map<"movie" | "tv", HTMLButtonElement>();
@@ -279,6 +280,8 @@ export function mount(container: HTMLElement): ViewCleanup {
         createMediaCard({
           item,
           rank: page * itemsPerPage + index + 1,
+          colsPerRow: gridState.colsPerRow,
+          isPriority: index < gridState.colsPerRow,
           signal: gridRenderAbort!.signal,
         })
       );

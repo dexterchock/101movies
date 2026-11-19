@@ -77,6 +77,7 @@ export function mount(container: HTMLElement): ViewCleanup {
 
   const mediaIndicator = document.createElement("div");
   mediaIndicator.className = "capsule-indicator";
+  mediaIndicator.setAttribute("aria-hidden", "true");
   mediaToggle.appendChild(mediaIndicator);
 
   const mediaBtns = new Map<"movie" | "tv", HTMLButtonElement>();
@@ -101,7 +102,13 @@ export function mount(container: HTMLElement): ViewCleanup {
           mediaType === "movie" ? movieCategory : tvCategory,
           true
         );
-        renderGrid();
+        if (mediaType === "movie" && !moviesRequested) {
+          void loadMovies(movieCategory);
+        } else if (mediaType === "tv" && !tvRequested) {
+          void loadTV(tvCategory);
+        } else {
+          renderGrid();
+        }
       },
       { signal }
     );
@@ -177,6 +184,9 @@ export function mount(container: HTMLElement): ViewCleanup {
   let gridRenderAbort: AbortController | null = null;
   let movieFetchAbort: AbortController | null = null;
   let tvFetchAbort: AbortController | null = null;
+  let moviesRequested = false;
+  let tvRequested = false;
+  let inactivePreloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   const updateMediaToggle = () => {
     const tabW = gridState.isMobileView ? 72 : 88;
@@ -286,10 +296,12 @@ export function mount(container: HTMLElement): ViewCleanup {
     const placeholderCount = Math.max(0, itemsPerPage - visibleItems.length);
 
     const frag = document.createDocumentFragment();
-    visibleItems.forEach((item) => {
+    visibleItems.forEach((item, index) => {
       frag.appendChild(
         createMediaCard({
           item,
+          colsPerRow: gridState.colsPerRow,
+          isPriority: index < gridState.colsPerRow,
           signal: gridRenderAbort!.signal,
         })
       );
@@ -298,7 +310,8 @@ export function mount(container: HTMLElement): ViewCleanup {
     grid.replaceChildren(frag);
   }
 
-  function loadMovies(cat: string) {
+  function loadMovies(cat: string): Promise<void> {
+    moviesRequested = true;
     if (movieFetchAbort) {
       movieFetchAbort.abort();
       movieFetchAbort = null;
@@ -309,7 +322,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       trendingMovies = cached;
       loadingMovies = false;
       if (mediaType === "movie") renderGrid();
-      return;
+      return Promise.resolve();
     }
     movieFetchAbort = new AbortController();
     const reqSignal = movieFetchAbort.signal;
@@ -317,7 +330,7 @@ export function mount(container: HTMLElement): ViewCleanup {
     loadingMovies = true;
     if (mediaType === "movie") renderGrid();
 
-    api
+    return api
       .getTrendingMovies(cat, reqSignal)
       .then((data) => {
         if (signal.aborted || reqSignal.aborted) return;
@@ -337,7 +350,8 @@ export function mount(container: HTMLElement): ViewCleanup {
       });
   }
 
-  function loadTV(cat: string) {
+  function loadTV(cat: string): Promise<void> {
+    tvRequested = true;
     if (tvFetchAbort) {
       tvFetchAbort.abort();
       tvFetchAbort = null;
@@ -348,7 +362,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       trendingTV = cached;
       loadingTV = false;
       if (mediaType === "tv") renderGrid();
-      return;
+      return Promise.resolve();
     }
     tvFetchAbort = new AbortController();
     const reqSignal = tvFetchAbort.signal;
@@ -356,7 +370,7 @@ export function mount(container: HTMLElement): ViewCleanup {
     loadingTV = true;
     if (mediaType === "tv") renderGrid();
 
-    api
+    return api
       .getTrendingTV(cat, reqSignal)
       .then((data) => {
         if (signal.aborted || reqSignal.aborted) return;
@@ -378,12 +392,27 @@ export function mount(container: HTMLElement): ViewCleanup {
 
   updateControlWidths();
   renderGrid();
-  loadMovies(movieCategory);
-  loadTV(tvCategory);
+  const activeLoad =
+    mediaType === "movie"
+      ? loadMovies(movieCategory)
+      : loadTV(tvCategory);
+  void activeLoad.finally(() => {
+    if (signal.aborted) return;
+    inactivePreloadTimer = setTimeout(() => {
+      inactivePreloadTimer = null;
+      if (signal.aborted) return;
+      if (!tvRequested) void loadTV(tvCategory);
+      if (!moviesRequested) void loadMovies(movieCategory);
+    }, 150);
+  });
 
   return {
     destroy() {
       ac.abort();
+      if (inactivePreloadTimer !== null) {
+        clearTimeout(inactivePreloadTimer);
+        inactivePreloadTimer = null;
+      }
       gridRenderAbort?.abort();
       movieFetchAbort?.abort();
       tvFetchAbort?.abort();

@@ -94,6 +94,7 @@ export function mountSavedCollection(
 
   const filterIndicator = document.createElement("div");
   filterIndicator.className = "capsule-indicator";
+  filterIndicator.setAttribute("aria-hidden", "true");
   filterGroup.appendChild(filterIndicator);
 
   const filterBtns = new Map<CollectionFilter, HTMLButtonElement>();
@@ -325,10 +326,12 @@ export function mountSavedCollection(
     const placeholderCount = Math.max(0, itemsPerPage - visibleItems.length);
 
     const frag = document.createDocumentFragment();
-    visibleItems.forEach((item) => {
+    visibleItems.forEach((item, index) => {
       frag.appendChild(
         createMediaCard({
           item,
+          colsPerRow: gridState.colsPerRow,
+          isPriority: index < gridState.colsPerRow,
           signal: gridRenderAbort!.signal,
           removeLabel: config.removeLabel,
           onRemove: () => {

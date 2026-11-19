@@ -336,6 +336,7 @@ function bootstrap() {
 
   const indicator = document.createElement("div");
   indicator.className = "bottom-nav-indicator";
+  indicator.setAttribute("aria-hidden", "true");
   bottomNav.appendChild(indicator);
 
   const linkEls = NAV_ITEMS.map((item) => {

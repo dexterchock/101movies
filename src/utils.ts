@@ -217,7 +217,6 @@ export interface ResponsiveGridState {
   rowsPerPage: number;
   maxGridHeight?: number;
   isMobileView: boolean;
-  isCompactHeader: boolean;
 }
 
 export function getResponsiveGridState(twoRowMobileHeader = false): ResponsiveGridState {
@@ -229,7 +228,6 @@ export function getResponsiveGridState(twoRowMobileHeader = false): ResponsiveGr
     rowsPerPage: layout.rows,
     maxGridHeight: layout.maxGridHeight,
     isMobileView: w < 640,
-    isCompactHeader: w < 960,
   };
 }
 
@@ -245,8 +243,7 @@ export function observeResponsiveGrid(
       next.colsPerRow !== current.colsPerRow ||
       next.rowsPerPage !== current.rowsPerPage ||
       next.maxGridHeight !== current.maxGridHeight ||
-      next.isMobileView !== current.isMobileView ||
-      next.isCompactHeader !== current.isCompactHeader
+      next.isMobileView !== current.isMobileView
     ) {
       current = next;
       onChange(next);

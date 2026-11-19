@@ -2863,7 +2863,7 @@ svg {
 }
 
 /* =========================================================
-   TVBox Source Center Modal (Optional Utility Modal)
+   Shared Modal Backdrop & Panel
    ========================================================= */
 
 .modal-backdrop {
@@ -2915,6 +2915,10 @@ svg {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+
+.sync-modal-title-wrap > div {
   min-width: 0;
 }
 
@@ -3376,8 +3380,28 @@ html.no-focus-visible .episodes-trigger-btn:focus {
     margin-left: 5px;
   }
 
-  .sync-modal-body > * + * {
+  .sync-modal-header > * + * {
+    margin-left: 12px;
+  }
+
+  .sync-modal-title-wrap > * + * {
+    margin-left: 12px;
+  }
+
+  .sync-modal-body > :not([hidden]) ~ :not([hidden]) {
     margin-top: 18px;
+  }
+
+  .sync-status-banner > * + * {
+    margin-left: 8px;
+  }
+
+  .sync-section > * + * {
+    margin-top: 10px;
+  }
+
+  .sync-section-row > * + * {
+    margin-left: 8px;
   }
 
   .sync-choices-row > * + * {
@@ -3416,6 +3440,10 @@ html.no-focus-visible .episodes-trigger-btn:focus {
 
   .player-bottom-bar > * + * {
     margin-top: 8px;
+  }
+
+  .server-bar > * + * {
+    margin-top: 6px;
   }
 
   .server-bar-row > * + * {
@@ -3470,6 +3498,11 @@ html.no-focus-visible .episodes-trigger-btn:focus {
       margin-left: 8px;
     }
 
+    .top-bar > .top-bar-center {
+      margin-left: 12px;
+      margin-right: 12px;
+    }
+
     .media-card > * + *,
     .media-card-placeholder > * + * {
       margin-top: 8px;
@@ -3482,6 +3515,10 @@ html.no-focus-visible .episodes-trigger-btn:focus {
     .player-bottom-bar > * + * {
       margin-top: 0;
       margin-left: 24px;
+    }
+
+    .server-bar > * + * {
+      margin-top: 8px;
     }
 
     .server-pill-inner > * + *,

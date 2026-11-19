@@ -22,8 +22,17 @@ export function mount(container: HTMLElement): ViewCleanup {
   const ac = new AbortController();
   const { signal } = ac;
 
-  let query = cachedSearchQuery;
-  let results: MediaItem[] = cachedSearchResults;
+  const urlQuery =
+    typeof window !== "undefined"
+      ? (new URLSearchParams(window.location.search).get("q") || "").trim()
+      : "";
+
+  let query = urlQuery || cachedSearchQuery;
+  let results: MediaItem[] = urlQuery
+    ? urlQuery === cachedSearchQuery && cachedSearchResults.length > 0
+      ? cachedSearchResults
+      : []
+    : cachedSearchResults;
   let loading = false;
   let page = 0;
 
@@ -137,6 +146,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       loading = false;
       page = 0;
       input.value = "";
+      syncSearchUrl("");
       syncClearButton();
       renderStage();
       focusInputWithoutScroll();
@@ -165,6 +175,61 @@ export function mount(container: HTMLElement): ViewCleanup {
   attachHorizontalSwipe(stage, goNext, goPrev, signal);
   attachWheelPagination(root, goNext, goPrev, signal);
 
+  function syncSearchUrl(raw: string) {
+    if (typeof window === "undefined") return;
+    const trimmed = raw.trim();
+    const nextPath = trimmed
+      ? `/search?q=${encodeURIComponent(trimmed)}`
+      : "/search";
+    const curPath = `${window.location.pathname}${window.location.search}`;
+    if (curPath !== nextPath) {
+      window.history.replaceState(window.history.state, "", nextPath);
+    }
+    try {
+      sessionStorage.setItem("last_browse_path", nextPath);
+    } catch {}
+  }
+
+  function executeSearch(trimmed: string) {
+    if (signal.aborted || !trimmed) return;
+    if (searchAbort) {
+      searchAbort.abort();
+      searchAbort = null;
+    }
+
+    loading = true;
+    renderStage();
+
+    const reqAbort = new AbortController();
+    searchAbort = reqAbort;
+    const reqSignal = reqAbort.signal;
+
+    api
+      .search(trimmed, reqSignal)
+      .then((data) => {
+        if (signal.aborted || reqSignal.aborted) return;
+        const filtered = data.filter(
+          (item) =>
+            item.media_type === "movie" ||
+            item.media_type === "tv" ||
+            !item.media_type
+        );
+        cachedSearchQuery = trimmed;
+        cachedSearchResults = filtered;
+        results = filtered;
+      })
+      .catch(() => {
+        if (signal.aborted || reqSignal.aborted) return;
+        results = [];
+      })
+      .finally(() => {
+        if (!signal.aborted && !reqSignal.aborted) {
+          loading = false;
+          renderStage();
+        }
+      });
+  }
+
   function handleQueryChange(nextVal: string) {
     query = nextVal;
     syncClearButton();
@@ -182,6 +247,7 @@ export function mount(container: HTMLElement): ViewCleanup {
     if (trimmed === cachedSearchQuery && cachedSearchResults.length > 0) {
       results = cachedSearchResults;
       loading = false;
+      syncSearchUrl(trimmed);
       renderStage();
       return;
     }
@@ -193,6 +259,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       cachedSearchResults = [];
       results = [];
       loading = false;
+      syncSearchUrl("");
       renderStage();
       return;
     }
@@ -203,35 +270,8 @@ export function mount(container: HTMLElement): ViewCleanup {
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
       if (signal.aborted) return;
-
-      const reqAbort = new AbortController();
-      searchAbort = reqAbort;
-      const reqSignal = reqAbort.signal;
-
-      api
-        .search(trimmed, reqSignal)
-        .then((data) => {
-          if (signal.aborted || reqSignal.aborted) return;
-          const filtered = data.filter(
-            (item) =>
-              item.media_type === "movie" ||
-              item.media_type === "tv" ||
-              !item.media_type
-          );
-          cachedSearchQuery = trimmed;
-          cachedSearchResults = filtered;
-          results = filtered;
-        })
-        .catch(() => {
-          if (signal.aborted || reqSignal.aborted) return;
-          results = [];
-        })
-        .finally(() => {
-          if (!signal.aborted && !reqSignal.aborted) {
-            loading = false;
-            renderStage();
-          }
-        });
+      syncSearchUrl(trimmed);
+      executeSearch(trimmed);
     }, 400);
   }
 
@@ -326,10 +366,19 @@ export function mount(container: HTMLElement): ViewCleanup {
   }
 
   syncClearButton();
-  renderStage();
+
+  if (
+    urlQuery &&
+    (urlQuery !== cachedSearchQuery || cachedSearchResults.length === 0)
+  ) {
+    syncSearchUrl(urlQuery);
+    executeSearch(urlQuery);
+  } else {
+    renderStage();
+  }
 
   // Auto-focus empty search input on mount without scrolling container
-  if (cachedSearchResults.length === 0) {
+  if (query.trim().length === 0 && results.length === 0) {
     focusInputWithoutScroll();
   }
 

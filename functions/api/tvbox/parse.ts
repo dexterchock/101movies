@@ -2,6 +2,7 @@ import {
   getAllVodSites,
   parseTvboxConfig,
 } from "../../_shared/tvboxService";
+import { validateProxyTargetUrl } from "../../_shared/vodProxy";
 
 export const onRequestPost: PagesFunction = async (context) => {
   try {
@@ -16,7 +17,14 @@ export const onRequestPost: PagesFunction = async (context) => {
         { status: 400 }
       );
     }
-    const result = await parseTvboxConfig(url.trim(), name || "Custom TVBox");
+    const validation = validateProxyTargetUrl(url.trim());
+    if ("reason" in validation) {
+      return Response.json({ error: validation.reason }, { status: 400 });
+    }
+    const result = await parseTvboxConfig(
+      validation.url.toString(),
+      name || "Custom TVBox"
+    );
     return Response.json({
       result,
       sites: getAllVodSites(),

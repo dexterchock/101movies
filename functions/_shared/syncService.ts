@@ -1,6 +1,8 @@
 import type { MediaItem, WatchProgress } from "../../src/types";
 
 export const PAIRING_CODE_TTL_MS = 5 * 60 * 1000;
+const UNPAIRED_GROUP_TTL_MS = 24 * 60 * 60 * 1000;
+const GROUP_ID_RE = /^[a-zA-Z0-9_-]{8,64}$/;
 const MAX_HISTORY_ITEMS = 20;
 const MAX_SAVED_ITEMS = 60;
 
@@ -285,6 +287,21 @@ async function dbDeleteExpiredCodes(env: SyncEnv, now: number): Promise<void> {
   await env.DB.prepare("DELETE FROM sync_codes WHERE expires_at <= ?").bind(now).run();
 }
 
+async function dbDeleteStaleUnpairedGroups(env: SyncEnv, cutoff: number): Promise<void> {
+  if (!env?.DB) {
+    const store = getMemoryStore();
+    for (const [k, v] of store.groups.entries()) {
+      if (v.paired === 0 && v.updated_at <= cutoff) store.groups.delete(k);
+    }
+    return;
+  }
+  await env.DB.prepare(
+    "DELETE FROM sync_groups WHERE paired = 0 AND updated_at <= ?"
+  )
+    .bind(cutoff)
+    .run();
+}
+
 async function dbGetCode(env: SyncEnv, code: string): Promise<SyncCodeRow | null> {
   if (!env?.DB) {
     return getMemoryStore().codes.get(code) || null;
@@ -356,10 +373,12 @@ export async function handleCreateSyncCode(
   const expiresAt = now + PAIRING_CODE_TTL_MS;
   const incomingHistory = sanitizeMediaList(body.history, MAX_HISTORY_ITEMS);
   const incomingSaved = sanitizeMediaList(body.saved, MAX_SAVED_ITEMS);
-  const requestedGroupId =
+  const rawGroupId =
     typeof body.groupId === "string" ? body.groupId.trim() : "";
+  const requestedGroupId = GROUP_ID_RE.test(rawGroupId) ? rawGroupId : "";
 
   await dbDeleteExpiredCodes(env, now);
+  await dbDeleteStaleUnpairedGroups(env, now - UNPAIRED_GROUP_TTL_MS);
 
   let row: SyncGroupRow | null = requestedGroupId
     ? await dbGetGroup(env, requestedGroupId)

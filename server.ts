@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import fs from "node:fs/promises";
+import { Readable } from "node:stream";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { Resvg } from "@cf-wasm/resvg/node";
@@ -19,6 +20,10 @@ import {
   handlePairSyncCode,
   handleUpdateSyncState,
 } from "./functions/_shared/syncService";
+import {
+  handleVodProxyRequest,
+  validateProxyTargetUrl,
+} from "./functions/_shared/vodProxy";
 import {
   AWESOME_ZHUIJU_TVBOX_CONFIGS,
   filterItemsByServerAvailability,
@@ -470,7 +475,14 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
     if (!url || typeof url !== "string") {
       return res.status(400).json({ error: "Missing TVBox configuration URL" });
     }
-    const result = await parseTvboxConfig(url.trim(), name || "Custom TVBox");
+    const validation = validateProxyTargetUrl(url.trim());
+    if ("reason" in validation) {
+      return res.status(400).json({ error: validation.reason });
+    }
+    const result = await parseTvboxConfig(
+      validation.url.toString(),
+      name || "Custom TVBox"
+    );
     res.json({
       result,
       sites: getAllVodSites(),
@@ -511,73 +523,38 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
 
   // HLS M3U8 & Media Segment CORS Proxy
   app.get("/api/vod/proxy", async (req, res) => {
-    const targetUrl = req.query.url as string;
-    if (!targetUrl || !targetUrl.startsWith("http")) {
-      return res.status(400).send("Invalid proxy URL");
+    const proto = req.protocol || "http";
+    const host = req.get("host") || `localhost:${PORT}`;
+    const reqOrigin = `${proto}://${host}`;
+    const targetUrl = typeof req.query.url === "string" ? req.query.url : "";
+
+    const proxyRes = await handleVodProxyRequest({
+      targetUrl,
+      reqOrigin,
+      rangeHeader: req.get("range") || null,
+      timeoutMs: 12000,
+    });
+
+    res.status(proxyRes.status);
+    proxyRes.headers.forEach((val, key) => {
+      res.setHeader(key, val);
+    });
+
+    if (!proxyRes.body) {
+      return res.end();
     }
 
-    try {
-      const upstream = await fetch(targetUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          Accept: "*/*",
-        },
-        signal: AbortSignal.timeout(12000),
-      });
-
-      if (!upstream.ok) {
-        return res.status(upstream.status).send(`Upstream HTTP ${upstream.status}`);
+    const nodeStream = Readable.fromWeb(proxyRes.body as any);
+    req.on("close", () => {
+      nodeStream.destroy();
+    });
+    nodeStream.on("error", () => {
+      if (!res.headersSent) {
+        res.status(502);
       }
-
-      const contentType = upstream.headers.get("content-type") || "";
-      const isM3u8 =
-        targetUrl.toLowerCase().includes(".m3u8") ||
-        contentType.includes("mpegurl") ||
-        contentType.includes("x-mpegurl");
-
-      res.setHeader("Access-Control-Allow-Origin", "*");
-
-      if (isM3u8) {
-        const text = await upstream.text();
-        const baseUrl = new URL(targetUrl);
-        const rewritten = text
-          .split(/\r?\n/)
-          .map((line) => {
-            const trimmed = line.trim();
-            if (!trimmed) return line;
-            if (trimmed.startsWith("#")) {
-              // Rewrite URI="..." inside #EXT-X-KEY or #EXT-X-MAP if present
-              return trimmed.replace(/URI="([^"]+)"/g, (_, uri) => {
-                try {
-                  const abs = new URL(uri, baseUrl).toString();
-                  return `URI="/api/vod/proxy?url=${encodeURIComponent(abs)}"`;
-                } catch {
-                  return `URI="${uri}"`;
-                }
-              });
-            }
-            try {
-              const absUrl = new URL(trimmed, baseUrl).toString();
-              return `/api/vod/proxy?url=${encodeURIComponent(absUrl)}`;
-            } catch {
-              return line;
-            }
-          })
-          .join("\n");
-
-        res.setHeader("Content-Type", "application/vnd.apple.mpegurl; charset=utf-8");
-        return res.send(rewritten);
-      }
-
-      if (contentType) {
-        res.setHeader("Content-Type", contentType);
-      }
-      const arrayBuf = await upstream.arrayBuffer();
-      return res.send(Buffer.from(arrayBuf));
-    } catch (err: any) {
-      return res.status(502).send(err?.message || "Proxy fetch failed");
-    }
+      res.end();
+    });
+    nodeStream.pipe(res);
   });
 
   if (process.env.NODE_ENV !== "production") {

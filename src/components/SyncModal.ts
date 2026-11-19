@@ -31,6 +31,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   let pairing = false;
   let pairError = "";
   let confirmingStop = false;
+  let codeFetchAc: AbortController | null = null;
 
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
@@ -158,6 +159,8 @@ export function openSyncModal(onClose: () => void): SyncModalController {
 
   const destroy = () => {
     ac.abort();
+    codeFetchAc?.abort();
+    codeFetchAc = null;
     window.clearInterval(countdownTimer);
     window.clearInterval(pollTimer);
     backdrop.remove();
@@ -175,7 +178,11 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   window.addEventListener(
     "keydown",
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (
+        e.key === "Escape" ||
+        e.keyCode === 10009 ||
+        e.key === "XF86Back"
+      ) {
         e.preventDefault();
         handleClose();
       }
@@ -247,13 +254,17 @@ export function openSyncModal(onClose: () => void): SyncModalController {
 
   async function fetchFreshCode() {
     if (signal.aborted) return;
+    codeFetchAc?.abort();
+    const reqAc = new AbortController();
+    codeFetchAc = reqAc;
+
     loadingCode = true;
     codeError = "";
     updateCountdownAndCode();
 
     try {
-      const res = await requestSyncCode(signal);
-      if (signal.aborted) return;
+      const res = await requestSyncCode(reqAc.signal);
+      if (signal.aborted || reqAc.signal.aborted) return;
       code = res.code;
       pendingGroupId = res.groupId;
       expiresAt = res.expiresAt;
@@ -261,10 +272,20 @@ export function openSyncModal(onClose: () => void): SyncModalController {
       codeError = "";
       renderMode();
     } catch (err: any) {
-      if (signal.aborted || err?.name === "AbortError") return;
+      if (
+        signal.aborted ||
+        reqAc.signal.aborted ||
+        err?.name === "AbortError"
+      ) {
+        return;
+      }
       loadingCode = false;
       codeError = err?.message || "Could not reach sync server.";
       updateCountdownAndCode();
+    } finally {
+      if (codeFetchAc === reqAc) {
+        codeFetchAc = null;
+      }
     }
   }
 
@@ -286,12 +307,15 @@ export function openSyncModal(onClose: () => void): SyncModalController {
       return;
     }
 
+    const alreadyTransitioned = synced;
     confirmingStop = false;
     synced = true;
     codeInput.value = "";
     renderMode();
-    // Generate a fresh 4-digit code tied to the newly joined group so user can add another device
-    void fetchFreshCode();
+    if (!alreadyTransitioned) {
+      // Generate a fresh 4-digit code tied to the newly joined group so user can add another device
+      void fetchFreshCode();
+    }
   }
 
   codeInput.addEventListener(
@@ -348,7 +372,9 @@ export function openSyncModal(onClose: () => void): SyncModalController {
       const nowSynced = isDeviceSynced();
       if (nowSynced !== synced) {
         synced = nowSynced;
+        pairing = false;
         confirmingStop = false;
+        codeInput.value = "";
         renderMode();
         if (synced) {
           void fetchFreshCode();
@@ -370,7 +396,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   const pollTimer = window.setInterval(() => {
     if (signal.aborted || synced || !pendingGroupId || pairing) return;
     void checkPendingGroupPaired(pendingGroupId, signal).then((becamePaired) => {
-      if (becamePaired && !signal.aborted) {
+      if (becamePaired && !signal.aborted && !synced) {
         synced = true;
         confirmingStop = false;
         renderMode();

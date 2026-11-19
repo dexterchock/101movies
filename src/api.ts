@@ -1,29 +1,17 @@
 import {
   MediaItem,
   MediaDetails,
-  TvboxConfigItem,
-  VodSite,
   VodResolveResponse,
   ResolvedStreamSource,
   resolveGenreId,
 } from "./types";
 
 const REMOTE_API_ORIGIN = "https://101movies.pages.dev";
-const DISABLED_SITES_KEY = "tvbox_disabled_sites";
 
 function isLocalhost(): boolean {
   if (typeof window === "undefined") return false;
   const host = window.location.hostname;
   return host === "localhost" || host === "127.0.0.1";
-}
-
-function getStoredDisabledSiteIds(): string[] {
-  try {
-    const raw = localStorage.getItem(DISABLED_SITES_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
 }
 
 let localTmdbConfigured: boolean | null = null;
@@ -434,48 +422,6 @@ export const api = {
     return items;
   },
 
-  async getTvboxConfigs(signal?: AbortSignal): Promise<{
-    configs: TvboxConfigItem[];
-    sites: VodSite[];
-  }> {
-    const res = await fetch("/api/tvbox/configs", { signal });
-    return res.json();
-  },
-
-  async parseTvboxConfig(
-    url: string,
-    name?: string,
-    signal?: AbortSignal
-  ): Promise<{
-    result: {
-      ok: boolean;
-      type: "single" | "multi" | "unknown";
-      totalSites: number;
-      extractedSites: VodSite[];
-      subRepos?: { name: string; url: string }[];
-      message?: string;
-    };
-    sites: VodSite[];
-  }> {
-    const res = await fetch("/api/tvbox/parse", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, name }),
-      signal,
-    });
-    return res.json();
-  },
-
-  async pingVodSite(
-    siteId: string,
-    signal?: AbortSignal
-  ): Promise<{ id: string; ok: boolean; latencyMs: number }> {
-    const res = await fetch(`/api/vod/ping/${encodeURIComponent(siteId)}`, {
-      signal,
-    });
-    return res.json();
-  },
-
   async resolveVodStreams(
     type: "movie" | "tv",
     id: string,
@@ -541,9 +487,8 @@ export const api = {
    * and pre-warms the primary .m3u8 manifest.
    */
   prefetchMediaIntent(type: "movie" | "tv", id: string): void {
-    const disabledIds = getStoredDisabledSiteIds();
     this.getDetails(type, id).catch(() => {});
-    this.resolveVodStreams(type, id, undefined, disabledIds)
+    this.resolveVodStreams(type, id)
       .then((res) => {
         if (res?.sources?.length) {
           prewarmStreamManifests(res.sources);

@@ -1,22 +1,28 @@
 export const onRequest: PagesFunction = async (context) => {
+  const url = new URL(context.request.url);
+  const isVodProxy = url.pathname.includes("/vod/proxy");
+
   if (context.request.method === "OPTIONS") {
+    const optHeaders: Record<string, string> = {
+      "Access-Control-Allow-Origin": isVodProxy ? url.origin : "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, Range",
+      "Access-Control-Max-Age": "86400",
+    };
+    if (isVodProxy) {
+      optHeaders["Vary"] = "Origin";
+    }
     return new Response(null, {
       status: 204,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, Range",
-        "Access-Control-Max-Age": "86400",
-      },
+      headers: optHeaders,
     });
   }
 
   const isGet = context.request.method === "GET";
-  const url = new URL(context.request.url);
 
   const isCacheableApiGet =
     isGet &&
-    !url.pathname.includes("/vod/proxy") &&
+    !isVodProxy &&
     !url.pathname.includes("/sync/");
 
   // Cloudflare native edge cache
@@ -43,7 +49,9 @@ export const onRequest: PagesFunction = async (context) => {
 
   const response = await context.next();
   const headers = new Headers(response.headers);
-  headers.set("Access-Control-Allow-Origin", "*");
+  if (!isVodProxy) {
+    headers.set("Access-Control-Allow-Origin", "*");
+  }
 
   // Apply Edge Caching headers if successful GET response
   if (isCacheableApiGet && response.status === 200) {

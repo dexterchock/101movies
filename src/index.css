@@ -492,6 +492,15 @@ svg {
   }
 }
 
+@media (min-width: 1760px) {
+  .top-bar--rankings .top-bar-center {
+    flex: none;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
 /* Scrollable Pill Track Switcher */
 .pill-switcher {
   display: flex;
@@ -611,9 +620,27 @@ svg {
   }
 }
 
-@media (min-width: 1200px) {
+@media (min-width: 1024px) {
+  .pill-track--category {
+    width: 348px;
+  }
+}
+
+@media (min-width: 1120px) {
   .pill-track--category {
     width: 436px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .pill-track--category {
+    width: 524px;
+  }
+}
+
+@media (min-width: 1300px) {
+  .pill-track--category {
+    width: 612px;
   }
 }
 
@@ -623,7 +650,13 @@ svg {
   }
 }
 
-@media (min-width: 1500px) {
+@media (min-width: 1480px) {
+  .pill-track--category {
+    width: 788px;
+  }
+}
+
+@media (min-width: 1560px) {
   .pill-track--category {
     width: 876px;
   }
@@ -631,18 +664,16 @@ svg {
 
 @media (min-width: 1650px) {
   .pill-track--category {
-    width: 964px;
-  }
-}
-
-@media (min-width: 1800px) {
-  .pill-track--category {
     width: 1052px;
+  }
+
+  .top-bar-center .pill-arrow-btn {
+    display: none;
   }
 }
 
 .pill-track--year {
-  width: 60px;
+  width: 54px;
 }
 
 @media (min-width: 640px) {
@@ -744,7 +775,7 @@ svg {
   }
 }
 
-/* Responsive Rankings category track widths across tablet and desktop viewports */
+/* Responsive Rankings category track widths on tablet viewports before desktop alignment */
 @media (min-width: 640px) and (max-width: 719px) {
   .top-bar--rankings .pill-track--category {
     width: 134px;
@@ -757,33 +788,9 @@ svg {
   }
 }
 
-@media (min-width: 840px) {
+@media (min-width: 840px) and (max-width: 1023px) {
   .top-bar--rankings .pill-track--category {
     width: 260px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .top-bar--rankings .pill-track--category {
-    width: 436px;
-  }
-}
-
-@media (min-width: 1400px) {
-  .top-bar--rankings .pill-track--category {
-    width: 612px;
-  }
-}
-
-@media (min-width: 1600px) {
-  .top-bar--rankings .pill-track--category {
-    width: 788px;
-  }
-}
-
-@media (min-width: 1800px) {
-  .top-bar--rankings .pill-track--category {
-    width: 964px;
   }
 }
 
@@ -1443,8 +1450,8 @@ svg {
   position: relative;
 }
 
-.media-card:hover,
-.media-card:focus {
+.media-card:focus,
+.media-card:focus-visible {
   z-index: 30;
 }
 
@@ -1454,6 +1461,7 @@ svg {
   min-height: 0;
   position: relative;
   isolation: isolate;
+  transform: translateZ(0);
   border-radius: 12px;
   overflow: hidden;
   background-color: #111111;
@@ -1475,14 +1483,16 @@ svg {
   height: 100%;
   display: block;
   object-fit: cover;
-  border-radius: 11px;
-  transform: scale(1);
+  transform: translate3d(0, 0, 0) scale(1);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   transition: transform 300ms ease-out;
 }
 
 .media-card:hover .media-card-img,
 .media-card:focus .media-card-img {
-  transform: scale(1.05);
+  transform: translate3d(0, 0, 0) scale(1.05);
 }
 
 .media-card-fallback {
@@ -1494,15 +1504,17 @@ svg {
   justify-content: center;
   padding: 12px;
   text-align: center;
-  border-radius: 11px;
   background-color: rgba(23, 23, 23, 0.9);
-  transform: scale(1);
+  transform: translate3d(0, 0, 0) scale(1);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   transition: transform 300ms ease-out;
 }
 
 .media-card:hover .media-card-fallback,
 .media-card:focus .media-card-fallback {
-  transform: scale(1.05);
+  transform: translate3d(0, 0, 0) scale(1.05);
 }
 
 .media-card-fallback-icon {
@@ -1529,7 +1541,6 @@ svg {
   right: 0;
   bottom: 0;
   left: 0;
-  border-radius: 11px;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 50%, transparent 100%);
   opacity: 0.6;
   transition: opacity 300ms ease-out;
@@ -3291,6 +3302,7 @@ html.no-focus-visible .media-card-badge,
 html.no-focus-visible .media-card-remove {
   transform: none !important;
   transition: none !important;
+  will-change: auto !important;
 }
 
 html.no-focus-visible .media-card:hover .media-card-poster {
@@ -3542,6 +3554,20 @@ html.no-focus-visible .episodes-trigger-btn:focus {
   @media (min-width: 768px) {
     .bottom-nav-link-inner > * + * {
       margin-left: 8px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .top-bar:not(.top-bar--rankings) > .top-bar-center {
+      margin-left: 0;
+      margin-right: 0;
+    }
+  }
+
+  @media (min-width: 1760px) {
+    .top-bar--rankings > .top-bar-center {
+      margin-left: 0;
+      margin-right: 0;
     }
   }
 }

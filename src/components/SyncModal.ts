@@ -51,25 +51,20 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   const titleWrap = document.createElement("div");
   titleWrap.className = "sync-modal-title-wrap";
 
-  const iconCircle = document.createElement("div");
-  iconCircle.className = "sync-modal-icon";
-  iconCircle.innerHTML = icons.refreshCw("", 17);
-
-  const titleText = document.createElement("div");
   const h3 = document.createElement("h3");
   h3.className = "sync-modal-heading";
-  h3.textContent = "Device Sync";
+  h3.innerHTML = `${icons.refreshCw("sync-modal-heading-icon", 17)}<span>Device Sync</span>`;
+
   const subtitle = document.createElement("p");
   subtitle.className = "sync-modal-subheading";
-  titleText.append(h3, subtitle);
-  titleWrap.append(iconCircle, titleText);
+  titleWrap.append(h3, subtitle);
 
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.className = "sync-modal-close";
   closeBtn.setAttribute("aria-label", "Close sync dialog");
   closeBtn.tabIndex = 0;
-  closeBtn.innerHTML = icons.x("", 18);
+  closeBtn.innerHTML = icons.x("sync-modal-close-icon", 18);
 
   header.append(titleWrap, closeBtn);
 
@@ -137,7 +132,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   const stopBtn = document.createElement("button");
   stopBtn.type = "button";
   stopBtn.className = "sync-stop-btn";
-  stopBtn.textContent = "Stop Syncing";
+  stopBtn.innerHTML = `<span class="sync-action-btn-inner">Stop Syncing</span>`;
 
   const choicesRow = document.createElement("div");
   choicesRow.className = "sync-choices-row";
@@ -145,12 +140,12 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   const keepBtn = document.createElement("button");
   keepBtn.type = "button";
   keepBtn.className = "sync-choice-btn";
-  keepBtn.textContent = "Keep local copy";
+  keepBtn.innerHTML = `<span class="sync-action-btn-inner">Keep local copy</span>`;
 
   const clearDisconnectBtn = document.createElement("button");
   clearDisconnectBtn.type = "button";
   clearDisconnectBtn.className = "sync-choice-btn sync-choice-btn--danger";
-  clearDisconnectBtn.textContent = "Clear & disconnect";
+  clearDisconnectBtn.innerHTML = `<span class="sync-action-btn-inner">Clear &amp; disconnect</span>`;
 
   choicesRow.append(keepBtn, clearDisconnectBtn);
   disconnectSection.append(stopBtn, choicesRow);

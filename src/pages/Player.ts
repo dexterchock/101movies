@@ -1376,6 +1376,52 @@ export function mount(
     { signal }
   );
 
+  // Allow mouse-wheel / trackpad scrolling to flip server pages (< >), matching browse page wheel pagination
+  let lastServerWheelTime = 0;
+  const SERVER_WHEEL_COOLDOWN_MS = 280;
+  root.addEventListener(
+    "wheel",
+    (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return;
+      if (resolving || sources.length === 0) return;
+
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.(".episodes-popover, .modal-backdrop")) {
+        return;
+      }
+      // While video is playing, only wheel-paginate servers when pointer is over the bottom server bar
+      if (isPlaying && !target?.closest?.(".player-bottom-bar")) {
+        return;
+      }
+
+      const delta =
+        Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (Math.abs(delta) < 15) return;
+
+      const now = Date.now();
+      if (now - lastServerWheelTime < SERVER_WHEEL_COOLDOWN_MS) return;
+
+      const serverPages = buildServerPages(
+        sources,
+        serverBarWidth,
+        detectedQualities
+      );
+      const totalServerPages = serverPages.length;
+      if (totalServerPages <= 1) return;
+
+      if (delta > 0 && serverPage < totalServerPages - 1) {
+        lastServerWheelTime = now;
+        serverPage += 1;
+        renderServerBar();
+      } else if (delta < 0 && serverPage > 0) {
+        lastServerWheelTime = now;
+        serverPage -= 1;
+        renderServerBar();
+      }
+    },
+    { passive: true, signal }
+  );
+
   // Observe server bar width for responsive single-row server pagination
   let resizeObserver: ResizeObserver | null = null;
   const updateServerBarWidth = () => {

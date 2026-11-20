@@ -2939,36 +2939,30 @@ svg {
 
 .sync-modal-title-wrap {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
   min-width: 0;
-}
-
-.sync-modal-title-wrap > div {
-  min-width: 0;
-}
-
-.sync-modal-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 9999px;
-  background-color: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  flex-shrink: 0;
 }
 
 .sync-modal-heading {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 16px;
   font-weight: 700;
   color: #ffffff;
 }
 
+.sync-modal-heading-icon {
+  width: 17px;
+  height: 17px;
+  color: rgba(255, 255, 255, 0.72);
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 .sync-modal-subheading {
-  margin: 2px 0 0 0;
+  margin: 4px 0 0 0;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.55);
 }
@@ -2986,16 +2980,34 @@ svg {
   cursor: pointer;
   flex-shrink: 0;
   outline: none;
-  transition: background-color 200ms ease, border-color 200ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease,
+    transform 250ms ease;
 }
 
 .sync-modal-close:hover {
   background-color: rgba(38, 38, 38, 0.9);
   border-color: rgba(255, 255, 255, 0.3);
+  transform: scale(1.06);
 }
 
 .sync-modal-close:focus-visible {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+  transform: scale(1.06);
+}
+
+.sync-modal-close:active {
+  transform: scale(0.96);
+}
+
+.sync-modal-close-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.sync-modal-close:hover .sync-modal-close-icon,
+.sync-modal-close:focus-visible .sync-modal-close-icon {
+  transform: scale(1.18);
 }
 
 .sync-modal-body {
@@ -3160,6 +3172,9 @@ svg {
 }
 
 .sync-stop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 44px;
   border-radius: 9999px;
@@ -3170,17 +3185,24 @@ svg {
   font-weight: 600;
   cursor: pointer;
   outline: none;
-  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease,
+    color 250ms ease, transform 250ms ease;
 }
 
 .sync-stop-btn:hover {
   background-color: rgba(255, 255, 255, 0.13);
   border-color: rgba(255, 255, 255, 0.32);
   color: #ffffff;
+  transform: scale(1.02);
 }
 
 .sync-stop-btn:focus-visible {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+  transform: scale(1.02);
+}
+
+.sync-stop-btn:active {
+  transform: scale(0.98);
 }
 
 .sync-stop-btn[hidden] {
@@ -3198,6 +3220,9 @@ svg {
 }
 
 .sync-choice-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1 1 0%;
   min-width: 0;
   height: 44px;
@@ -3211,16 +3236,23 @@ svg {
   white-space: nowrap;
   cursor: pointer;
   outline: none;
-  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease,
+    color 250ms ease, transform 250ms ease;
 }
 
 .sync-choice-btn:hover {
   background-color: rgba(255, 255, 255, 0.16);
   border-color: rgba(255, 255, 255, 0.35);
+  transform: scale(1.02);
 }
 
 .sync-choice-btn:focus-visible {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+  transform: scale(1.02);
+}
+
+.sync-choice-btn:active {
+  transform: scale(0.98);
 }
 
 .sync-choice-btn--danger {
@@ -3233,6 +3265,20 @@ svg {
   background-color: rgba(127, 29, 29, 0.78);
   border-color: rgba(248, 113, 113, 0.55);
   color: #fecaca;
+}
+
+.sync-action-btn-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.sync-stop-btn:hover .sync-action-btn-inner,
+.sync-stop-btn:focus-visible .sync-action-btn-inner,
+.sync-choice-btn:hover .sync-action-btn-inner,
+.sync-choice-btn:focus-visible .sync-action-btn-inner {
+  transform: scale(1.05);
 }
 
 /* =========================================================
@@ -3352,6 +3398,24 @@ html.no-focus-visible .sync-choice-btn:focus {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
+html.no-focus-visible .sync-modal-close:focus {
+  transform: scale(1.06);
+}
+
+html.no-focus-visible .sync-modal-close:focus .sync-modal-close-icon {
+  transform: scale(1.18);
+}
+
+html.no-focus-visible .sync-stop-btn:focus,
+html.no-focus-visible .sync-choice-btn:focus {
+  transform: scale(1.02);
+}
+
+html.no-focus-visible .sync-stop-btn:focus .sync-action-btn-inner,
+html.no-focus-visible .sync-choice-btn:focus .sync-action-btn-inner {
+  transform: scale(1.05);
+}
+
 html.no-focus-visible .media-card-remove:focus {
   opacity: 1;
 }
@@ -3412,8 +3476,8 @@ html.no-focus-visible .episodes-trigger-btn:focus {
     margin-left: 12px;
   }
 
-  .sync-modal-title-wrap > * + * {
-    margin-left: 12px;
+  .sync-modal-heading > * + * {
+    margin-left: 8px;
   }
 
   .sync-modal-body > :not([hidden]) ~ :not([hidden]) {

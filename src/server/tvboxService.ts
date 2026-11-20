@@ -140,19 +140,22 @@ export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
   },
 ];
 
-// Preloaded high-speed CMS VOD providers extracted from awesome-zhuiju-free TVBox configs (小马, 老刘备, 创享影视)
+// Curated CMS VOD providers verified for live direct HLS playback (CORS *),
+// broad catalog coverage, and balanced 1080p quality + low latency.
+// NOTE: Keep 8–10 verified sites so MAX_VOD_SUBREQUESTS (26) leaves budget for fallback keywords.
+// Before changing or adding sources, follow the 5-step benchmark & repo list in AGENTS.md.
 export const BUILTIN_VOD_SITES: VodSite[] = [
+  {
+    id: "modu",
+    name: "魔都资源",
+    api: "https://caiji.moduapi.cc/api.php/provide/vod",
+    fromConfig: "LunaTV Direct",
+    enabled: true,
+  },
   {
     id: "bfzy",
     name: "暴风资源",
     api: "https://bfzyapi.com/api.php/provide/vod",
-    fromConfig: "小马 / 老刘备 TVBox",
-    enabled: true,
-  },
-  {
-    id: "lzzy",
-    name: "量子资源",
-    api: "https://cj.lziapi.com/api.php/provide/vod",
     fromConfig: "小马 / 老刘备 TVBox",
     enabled: true,
   },
@@ -164,52 +167,10 @@ export const BUILTIN_VOD_SITES: VodSite[] = [
     enabled: true,
   },
   {
-    id: "ruyi",
-    name: "如意资源",
-    api: "https://cj.rycjapi.com/api.php/provide/vod",
-    fromConfig: "awesome-zhuiju Direct",
-    enabled: true,
-  },
-  {
     id: "dytt",
     name: "电影天堂",
-    api: "http://caiji.dyttzyapi.com/api.php/provide/vod",
+    api: "https://caiji.dyttzyapi.com/api.php/provide/vod",
     fromConfig: "小马 TVBox",
-    enabled: true,
-  },
-  {
-    id: "subo",
-    name: "速播资源",
-    api: "https://subocaiji.com/api.php/provide/vod",
-    fromConfig: "创享影视 TVBox",
-    enabled: true,
-  },
-  {
-    id: "hhzy",
-    name: "火狐豪华",
-    api: "https://hhzyapi.com/api.php/provide/vod",
-    fromConfig: "老刘备 TVBox",
-    enabled: true,
-  },
-  {
-    id: "jisu",
-    name: "极速资源",
-    api: "https://jszyapi.com/api.php/provide/vod",
-    fromConfig: "小马 TVBox",
-    enabled: true,
-  },
-  {
-    id: "hongniu",
-    name: "红牛资源",
-    api: "https://www.hongniuzy2.com/api.php/provide/vod",
-    fromConfig: "小马 / 创享 TVBox",
-    enabled: true,
-  },
-  {
-    id: "guangsu",
-    name: "光速资源",
-    api: "https://api.guangsuapi.com/api.php/provide/vod",
-    fromConfig: "小马 / 创享 TVBox",
     enabled: true,
   },
   {
@@ -220,27 +181,61 @@ export const BUILTIN_VOD_SITES: VodSite[] = [
     enabled: true,
   },
   {
+    id: "lzzy",
+    name: "量子资源",
+    api: "https://cj.lziapi.com/api.php/provide/vod",
+    fromConfig: "小马 / 老刘备 TVBox",
+    enabled: true,
+  },
+  {
+    id: "wujin",
+    name: "无尽资源",
+    api: "https://api.wujinapi.com/api.php/provide/vod",
+    fromConfig: "LunaTV Direct",
+    enabled: true,
+  },
+  {
+    id: "ruyi",
+    name: "如意资源",
+    api: "https://cj.rycjapi.com/api.php/provide/vod",
+    fromConfig: "awesome-zhuiju Direct",
+    enabled: true,
+  },
+  {
+    id: "hongniu",
+    name: "红牛资源",
+    api: "https://www.hongniuzy2.com/api.php/provide/vod",
+    fromConfig: "小马 / 创享 TVBox",
+    enabled: true,
+  },
+  {
     id: "360zy",
     name: "360资源",
     api: "https://360zy.com/api.php/provide/vod",
     fromConfig: "awesome-zhuiju Direct",
     enabled: true,
   },
-  {
-    id: "huya",
-    name: "虎牙资源",
-    api: "https://www.huyaapi.com/api.php/provide/vod",
-    fromConfig: "老刘备 TVBox",
-    enabled: true,
-  },
-  {
-    id: "xinlang",
-    name: "新浪资源",
-    api: "http://api.xinlangapi.com/xinlangapi.php/provide/vod",
-    fromConfig: "小马 TVBox",
-    enabled: true,
-  },
 ];
+
+// Quality & stream-speed tier (higher is preferred when title match and full-episode status tie).
+// NOTE: Tier intentionally runs before API latencyMs because a fast JSON search endpoint does not imply a fast or 1080p video CDN.
+const SOURCE_QUALITY_TIER: Record<string, number> = {
+  modu: 3,
+  bfzy: 3,
+  ffzy: 3,
+  dytt: 3,
+  ikun: 3,
+  lzzy: 2,
+  ruyi: 2,
+  hongniu: 2,
+  wujin: 1,
+  "360zy": 1,
+};
+
+function getSourceQualityTier(sourceId: string): number {
+  const baseId = sourceId.replace(/_(yue|guo)$/, "");
+  return SOURCE_QUALITY_TIER[baseId] ?? 1;
+}
 
 const dynamicVodSitesMap = new Map<string, VodSite>();
 
@@ -1417,6 +1412,7 @@ export async function resolveStreamsForMedia(params: {
   let matchedSources: ResolvedStreamSource[] = [];
   const matchedBaseSiteIds = new Set<string>();
   const maxKeywordsToTry = Math.min(searchKeywords.length, 3);
+  // NOTE: Stay under Cloudflare Pages Functions' 50-subrequest ceiling across TMDB + up to 3 keyword rounds.
   const MAX_VOD_SUBREQUESTS = 26;
   let vodSubrequestsUsed = 0;
 
@@ -1473,6 +1469,10 @@ export async function resolveStreamsForMedia(params: {
     const bHasFull = b.episodes.some((e) => !e.name.includes("预告")) ? 1 : 0;
     if (aHasFull !== bHasFull) return bHasFull - aHasFull;
 
+    const aTier = getSourceQualityTier(a.sourceId);
+    const bTier = getSourceQualityTier(b.sourceId);
+    if (aTier !== bTier) return bTier - aTier;
+
     return a.latencyMs - b.latencyMs;
   });
 
@@ -1509,18 +1509,18 @@ export async function resolveStreamsForMedia(params: {
   return response;
 }
 
-// Fast probe sites ordered by lowest latency and broadest catalog coverage
+// Fast probe sites ordered by coverage and reliability
 const FAST_PROBE_SITE_IDS = new Set([
-  "jisu",
-  "huya",
-  "hhzy",
-  "hongniu",
-  "guangsu",
   "bfzy",
   "lzzy",
+  "modu",
+  "wujin",
   "ffzy",
-  "ruyi",
+  "dytt",
   "ikun",
+  "hongniu",
+  "ruyi",
+  "360zy",
 ]);
 
 export async function checkMediaHasPlayableStreams(

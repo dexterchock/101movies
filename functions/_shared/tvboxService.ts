@@ -15,10 +15,11 @@ const availabilityCache = new Map<
   { available: boolean; primaryZhTitle?: string; expiresAt: number }
 >();
 
-// Top curated VOD providers for fast availability checks ordered by coverage and low latency
+// Top curated VOD providers for fast availability checks ordered by coverage and playability.
+// NOTE: Keep limited to 2 large-catalog sites with verified working video CDNs (see AGENTS.md).
 const FAST_PROBE_SITES: { id: string; url: string }[] = [
   { id: "bfzy", url: "https://bfzyapi.com/api.php/provide/vod" },
-  { id: "hhzy", url: "https://hhzyapi.com/api.php/provide/vod" },
+  { id: "lzzy", url: "https://cj.lziapi.com/api.php/provide/vod" },
 ];
 
 function consumeBudget(tracker: { used: number; max: number }): boolean {

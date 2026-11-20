@@ -219,9 +219,31 @@ export interface ResponsiveGridState {
   isMobileView: boolean;
 }
 
+let safeAreaProbeEl: HTMLDivElement | null = null;
+
+function getSafeAreaVerticalInset(): number {
+  if (typeof document === "undefined" || !document.body) return 0;
+  try {
+    if (!safeAreaProbeEl || !document.body.contains(safeAreaProbeEl)) {
+      safeAreaProbeEl = document.createElement("div");
+      safeAreaProbeEl.className = "safe-area-probe";
+      safeAreaProbeEl.setAttribute("aria-hidden", "true");
+      document.body.appendChild(safeAreaProbeEl);
+    }
+    const cs = window.getComputedStyle(safeAreaProbeEl);
+    const top = parseFloat(cs.paddingTop) || 0;
+    const bottom = parseFloat(cs.paddingBottom) || 0;
+    const total = top + bottom;
+    return Number.isFinite(total) && total > 0 ? total : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export function getResponsiveGridState(twoRowMobileHeader = false): ResponsiveGridState {
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
-  const h = typeof window !== "undefined" ? window.innerHeight : 720;
+  const rawH = typeof window !== "undefined" ? window.innerHeight : 720;
+  const h = Math.max(320, rawH - getSafeAreaVerticalInset());
   const layout = getGridLayout(w, h, twoRowMobileHeader);
   return {
     colsPerRow: layout.cols,

@@ -78,6 +78,20 @@ svg {
   border: 0;
 }
 
+.safe-area-probe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+  padding-top: 0;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* =========================================================
    App Shell & Floating Bottom Navigation
    ========================================================= */
@@ -294,6 +308,9 @@ svg {
   row-gap: 8px;
   width: 100%;
   padding: 12px 16px 0 16px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
   z-index: 40;
 }
 
@@ -335,12 +352,18 @@ svg {
     flex-wrap: nowrap;
     column-gap: 12px;
     padding: 16px 24px 0 24px;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
   }
 }
 
 @media (min-width: 768px) {
   .top-bar {
     padding: 20px 32px 0 32px;
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    padding-left: max(32px, env(safe-area-inset-left, 0px));
+    padding-right: max(32px, env(safe-area-inset-right, 0px));
   }
 }
 
@@ -1885,6 +1908,7 @@ svg {
   position: fixed;
   top: 12px;
   left: 16px;
+  left: max(16px, env(safe-area-inset-left, 0px));
   z-index: 100;
   padding-top: env(safe-area-inset-top);
   pointer-events: none;
@@ -1951,6 +1975,7 @@ svg {
   .back-btn-wrap {
     top: 20px;
     left: 24px;
+    left: max(24px, env(safe-area-inset-left, 0px));
     gap: 10px;
   }
 
@@ -1975,6 +2000,7 @@ svg {
   .back-btn-wrap {
     top: 24px;
     left: 32px;
+    left: max(32px, env(safe-area-inset-left, 0px));
   }
 }
 
@@ -2123,6 +2149,7 @@ svg {
   object-fit: contain;
   object-position: center 14%;
   padding: 20px 16px 32px 16px;
+  padding-top: calc(20px + env(safe-area-inset-top, 0px));
 }
 
 .player-backdrop.is-loaded {
@@ -2291,6 +2318,7 @@ svg {
 @media (min-width: 640px) {
   .player-backdrop--poster {
     padding: 24px 32px 48px 32px;
+    padding-top: calc(24px + env(safe-area-inset-top, 0px));
   }
 
   .player-info {
@@ -2903,6 +2931,8 @@ svg {
   align-items: center;
   justify-content: center;
   padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   background-color: rgba(0, 0, 0, 0.85);
 }
 

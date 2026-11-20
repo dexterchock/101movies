@@ -766,6 +766,8 @@ export function mount(
       ? chineseTitle
       : undefined;
 
+    // NOTE: Keep /t/p/original on main .player-backdrop (TMDB has no tier between w1280 and original;
+    // w1280 softens on 2K/4K/portrait displays). Only the 42px blurred fallback uses w342.
     const hasWideBackdrop = Boolean(details.backdrop_path);
     const backdropPath = details.backdrop_path || details.poster_path;
     const backdropUrl = backdropPath

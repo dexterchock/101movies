@@ -65,6 +65,8 @@ export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
     img.decoding = "async";
     img.referrerPolicy = "no-referrer";
     img.className = "media-card-img";
+    // NOTE: Grids are fixed-viewport paginated (above the fold). Keep loading eager with
+    // fetchpriority="high" on row 1 for LCP, and keep w500 in srcset for 4K TVs & 3x Retina phones.
     if (isPriority) {
       img.setAttribute("fetchpriority", "high");
     }

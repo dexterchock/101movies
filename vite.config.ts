@@ -1,6 +1,8 @@
 import path from "path";
 import { defineConfig, Plugin } from "vite";
 
+// NOTE: DO NOT remove or switch to native <script type="module">. Samsung Tizen 4.0
+// (Chromium 56) rejects modern module scripts/crossorigin attributes and requires a classic deferred IIFE.
 function tizenClassicBundlePlugin(): Plugin {
   return {
     name: "tizen-classic-bundle",
@@ -29,6 +31,7 @@ export default defineConfig(() => {
       },
     },
     build: {
+      // NOTE: Samsung Tizen 4.0 / Chromium 56 requires es2015/chrome56 IIFE output (no dynamic ES chunks).
       target: ["chrome56", "es2015"],
       cssTarget: "chrome56",
       modulePreload: false,

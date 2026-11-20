@@ -378,6 +378,7 @@ export function createVideoUpscaler(
               gpu.destroy();
               return;
             }
+            // NOTE: Keep WebGPU on cnn-2x-m + tier 3 (single-tile); cnn-2x-l hitches on mid-range GPUs.
             nextEngine = new WebSR({
               canvas: nextCanvas,
               network_name: "anime4k/cnn-2x-m",

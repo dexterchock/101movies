@@ -672,6 +672,7 @@ svg {
   }
 }
 
+/* NOTE: Keep year track widths balanced so mobile 2026 stays centered and PC Rankings/Trending category bars match lengths. */
 .pill-track--year {
   width: 54px;
 }
@@ -1508,6 +1509,7 @@ svg {
   transform: scale(1.05);
 }
 
+/* NOTE: Keep will-change + translate3d scoped to pointer-hover desktops so mouse-leave doesn't stutter while mobile/TVs skip idle GPU layers. */
 @media (hover: hover) and (pointer: fine) {
   .media-card-poster {
     transform: translateZ(0);
@@ -1988,6 +1990,7 @@ svg {
   position: relative;
 }
 
+/* NOTE: Top offset keeps the native video player below the Back/Save header bar across iPhone/tablet/desktop (zeroed in :fullscreen). */
 .player-video-wrap {
   flex: 1 1 0%;
   min-height: 0;
@@ -3369,6 +3372,7 @@ html.no-focus-visible .episodes-trigger-btn:focus {
 
 /* =========================================================
    Chromium 56 / Tizen 4.0 Flexbox Fallbacks
+   NOTE: Required because Chromium 56 lacks CSS flexbox `gap` support.
    ========================================================= */
 
 @supports not (display: grid) {

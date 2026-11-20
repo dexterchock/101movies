@@ -221,7 +221,45 @@ export interface ResponsiveGridState {
 
 let safeAreaProbeEl: HTMLDivElement | null = null;
 
-function getSafeAreaVerticalInset(): number {
+export function isIosStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  return (window.navigator as { standalone?: boolean }).standalone === true;
+}
+
+/** Sync `--app-height` and `html.ios-standalone` to bypass WebKit's standalone `viewport-fit=cover` bottom truncation bug. */
+export function syncIosStandaloneViewport(): number | null {
+  if (typeof document === "undefined") return null;
+  const docEl = document.documentElement;
+  if (!isIosStandalone()) {
+    docEl.classList.remove("ios-standalone");
+    docEl.style.removeProperty("--app-height");
+    return null;
+  }
+
+  docEl.classList.add("ios-standalone");
+  const sw = window.screen?.width ?? 0;
+  const sh = window.screen?.height ?? 0;
+  const iw = window.innerWidth;
+  const minDim = Math.min(sw, sh);
+  const maxDim = Math.max(sw, sh);
+
+  let expectedH: number | null = null;
+  if (minDim > 0 && Math.abs(iw - minDim) <= 4) {
+    expectedH = maxDim;
+  } else if (maxDim > 0 && Math.abs(iw - maxDim) <= 4) {
+    expectedH = minDim;
+  }
+
+  if (!expectedH || !Number.isFinite(expectedH)) {
+    docEl.style.removeProperty("--app-height");
+    return null;
+  }
+
+  docEl.style.setProperty("--app-height", `${expectedH}px`);
+  return expectedH;
+}
+
+function getSafeAreaVerticalInset(viewportWidth: number): number {
   if (typeof document === "undefined" || !document.body) return 0;
   try {
     if (!safeAreaProbeEl || !document.body.contains(safeAreaProbeEl)) {
@@ -233,7 +271,11 @@ function getSafeAreaVerticalInset(): number {
     const cs = window.getComputedStyle(safeAreaProbeEl);
     const top = parseFloat(cs.paddingTop) || 0;
     const bottom = parseFloat(cs.paddingBottom) || 0;
-    const total = top + bottom;
+    const extraTop = top + (isIosStandalone() && viewportWidth < 640 ? 18 : 0);
+    const bottomThreshold =
+      viewportWidth >= 768 ? 30 : viewportWidth >= 640 ? 26 : 22;
+    const extraBottom = Math.max(0, bottom - bottomThreshold);
+    const total = extraTop + extraBottom;
     return Number.isFinite(total) && total > 0 ? total : 0;
   } catch {
     return 0;
@@ -242,8 +284,10 @@ function getSafeAreaVerticalInset(): number {
 
 export function getResponsiveGridState(twoRowMobileHeader = false): ResponsiveGridState {
   const w = typeof window !== "undefined" ? window.innerWidth : 1280;
-  const rawH = typeof window !== "undefined" ? window.innerHeight : 720;
-  const h = Math.max(320, rawH - getSafeAreaVerticalInset());
+  const standaloneH = syncIosStandaloneViewport();
+  const rawH =
+    standaloneH ?? (typeof window !== "undefined" ? window.innerHeight : 720);
+  const h = Math.max(320, rawH - getSafeAreaVerticalInset(w));
   const layout = getGridLayout(w, h, twoRowMobileHeader);
   return {
     colsPerRow: layout.cols,
@@ -259,6 +303,7 @@ export function observeResponsiveGrid(
   signal: AbortSignal
 ): ResponsiveGridState {
   let current = getResponsiveGridState(twoRowMobileHeader);
+  let orientTimer: ReturnType<typeof setTimeout> | null = null;
   const onResize = () => {
     const next = getResponsiveGridState(twoRowMobileHeader);
     if (
@@ -271,7 +316,23 @@ export function observeResponsiveGrid(
       onChange(next);
     }
   };
+  const onOrient = () => {
+    onResize();
+    if (orientTimer !== null) clearTimeout(orientTimer);
+    orientTimer = setTimeout(onResize, 150);
+  };
   window.addEventListener("resize", onResize, { signal });
+  window.addEventListener("orientationchange", onOrient, { signal });
+  signal.addEventListener(
+    "abort",
+    () => {
+      if (orientTimer !== null) {
+        clearTimeout(orientTimer);
+        orientTimer = null;
+      }
+    },
+    { once: true }
+  );
   return current;
 }
 

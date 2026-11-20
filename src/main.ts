@@ -3,6 +3,7 @@ import "./index.css";
 import { icons } from "./icons";
 import { initRouter } from "./router";
 import { pullSyncState } from "./sync";
+import { syncIosStandaloneViewport } from "./utils";
 
 // Polyfill smooth-scroll options API on older Smart TV Chromium engines (WebOS / Tizen)
 if (typeof window !== "undefined") {
@@ -321,6 +322,8 @@ function bootstrap() {
   const rootEl = document.getElementById("root");
   if (!rootEl) return;
 
+  syncIosStandaloneViewport();
+
   const shell = document.createElement("div");
   shell.className = "app-shell";
 
@@ -386,7 +389,16 @@ function bootstrap() {
     });
   }
 
-  window.addEventListener("resize", updateBottomNav);
+  const handleViewportSync = () => {
+    syncIosStandaloneViewport();
+    updateBottomNav();
+  };
+  window.addEventListener("resize", handleViewportSync);
+  window.addEventListener("orientationchange", () => {
+    handleViewportSync();
+    setTimeout(handleViewportSync, 150);
+  });
+  window.addEventListener("pageshow", handleViewportSync);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       void checkForNewBundle(currentPath);

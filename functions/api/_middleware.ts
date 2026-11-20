@@ -56,17 +56,25 @@ export const onRequest: PagesFunction = async (context) => {
   // Apply Edge Caching headers if successful GET response
   if (isCacheableApiGet && response.status === 200) {
     headers.set("X-Cache-Status", "MISS");
-    if (url.pathname.includes("/tmdb/")) {
-      headers.set(
-        "Cache-Control",
-        "public, s-maxage=3600, stale-while-revalidate=86400"
-      );
-    } else if (url.pathname.includes("/vod/resolve")) {
-      headers.set(
-        "Cache-Control",
-        "public, max-age=1800, s-maxage=3600, stale-while-revalidate=43200"
-      );
+    const existingCacheControl = headers.get("Cache-Control");
+    if (!existingCacheControl) {
+      if (url.pathname.includes("/tmdb/")) {
+        headers.set(
+          "Cache-Control",
+          "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+        );
+      } else if (url.pathname.includes("/vod/resolve")) {
+        headers.set(
+          "Cache-Control",
+          "public, max-age=1800, s-maxage=3600, stale-while-revalidate=43200"
+        );
+      }
     }
+
+    const finalCacheControl = (headers.get("Cache-Control") || "").toLowerCase();
+    const isCacheStoreAllowed =
+      !finalCacheControl.includes("no-store") &&
+      !finalCacheControl.includes("private");
 
     const responseToCache = new Response(response.body, {
       status: response.status,
@@ -74,7 +82,7 @@ export const onRequest: PagesFunction = async (context) => {
       headers,
     });
 
-    if (cache && cacheKey && context.waitUntil) {
+    if (isCacheStoreAllowed && cache && cacheKey && context.waitUntil) {
       try {
         context.waitUntil(cache.put(cacheKey, responseToCache.clone()));
       } catch {}

@@ -12,7 +12,10 @@ export const onRequestGet: PagesFunction = async (context) => {
 
   if (genre.toLowerCase() === "hk") {
     if (!apiKey) {
-      return Response.json({ results: [] });
+      return Response.json(
+        { results: [] },
+        { headers: { "Cache-Control": "public, max-age=0, s-maxage=60" } }
+      );
     }
     try {
       const results = await fetchTrendingHk("movie", apiKey);
@@ -27,8 +30,8 @@ export const onRequestGet: PagesFunction = async (context) => {
           headers: {
             "Cache-Control":
               results.length > 0
-                ? "public, s-maxage=3600, stale-while-revalidate=86400"
-                : "public, s-maxage=60",
+                ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+                : "public, max-age=0, s-maxage=60",
           },
         }
       );
@@ -59,8 +62,8 @@ export const onRequestGet: PagesFunction = async (context) => {
     return Response.json(data, {
       headers: {
         "Cache-Control": hasResults
-          ? "public, s-maxage=3600, stale-while-revalidate=86400"
-          : "public, s-maxage=60",
+          ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+          : "public, max-age=0, s-maxage=60",
       },
     });
   } catch (err: any) {

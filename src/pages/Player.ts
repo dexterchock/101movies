@@ -455,6 +455,29 @@ export function mount(
     };
   }
 
+  function toSlimHistoryItem(
+    item: MediaItem,
+    itemType: "movie" | "tv",
+    watchProgress?: WatchProgress
+  ): MediaItem {
+    return {
+      id: item.id,
+      title: item.title,
+      name: item.name,
+      en_title: item.en_title,
+      zh_title: item.zh_title,
+      is_chinese_origin: item.is_chinese_origin,
+      poster_path: item.poster_path ?? null,
+      backdrop_path: item.backdrop_path ?? null,
+      overview: item.overview || "",
+      vote_average: item.vote_average || 0,
+      media_type: itemType,
+      release_date: item.release_date,
+      first_air_date: item.first_air_date,
+      ...(watchProgress ? { watchProgress } : {}),
+    };
+  }
+
   function persistWatchHistory(
     mediaDetails: MediaDetails | null,
     progressUpdate: WatchProgress,
@@ -463,7 +486,17 @@ export function mount(
     if (!mediaDetails) return;
     try {
       const stored = localStorage.getItem("watch_history");
-      let history: MediaItem[] = stored ? JSON.parse(stored) : [];
+      const rawHistory: MediaItem[] = stored ? JSON.parse(stored) : [];
+      const history: MediaItem[] = Array.isArray(rawHistory)
+        ? rawHistory.map((item) => {
+            const itemType: "movie" | "tv" =
+              item.media_type === "tv" ||
+              (!item.media_type && !item.title && Boolean(item.name))
+                ? "tv"
+                : "movie";
+            return toSlimHistoryItem(item, itemType, item.watchProgress);
+          })
+        : [];
       const existingItem = history.find(
         (item) =>
           item.id.toString() === id && (item.media_type || "movie") === type
@@ -473,18 +506,14 @@ export function mount(
         ...progressUpdate,
         updatedAt: Date.now(),
       };
-      history = history.filter(
+      const filtered = history.filter(
         (item) =>
           !(item.id.toString() === id && (item.media_type || "movie") === type)
       );
-      history.unshift({
-        ...(mediaDetails as MediaItem),
-        media_type: type,
-        watchProgress: mergedProgress,
-      });
+      filtered.unshift(toSlimHistoryItem(mediaDetails, type, mergedProgress));
       localStorage.setItem(
         "watch_history",
-        JSON.stringify(history.slice(0, 20))
+        JSON.stringify(filtered.slice(0, 20))
       );
       savedProgress = mergedProgress;
       queueHistoryProgressSync(syncImmediately);
@@ -827,6 +856,7 @@ export function mount(
       img.alt = primaryTitle;
       img.referrerPolicy = "no-referrer";
       img.decoding = "async";
+      img.setAttribute("fetchpriority", "high");
       img.className = [
         "player-backdrop",
         hasWideBackdrop ? "" : "player-backdrop--poster",

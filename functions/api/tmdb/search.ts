@@ -73,7 +73,10 @@ export const onRequestGet: PagesFunction = async (context) => {
   const apiKey = getTmdbKey(context.env);
 
   if (!query || !apiKey) {
-    return Response.json({ results: [] });
+    return Response.json(
+      { results: [] },
+      { headers: { "Cache-Control": "public, max-age=0, s-maxage=60" } }
+    );
   }
 
   try {
@@ -128,7 +131,9 @@ export const onRequestGet: PagesFunction = async (context) => {
     }
 
     const responses = await Promise.allSettled<any>(
-      fetchConfigs.map((cfg) => fetch(cfg.url).then((r) => r.json()))
+      fetchConfigs.map((cfg) =>
+        fetch(cfg.url, { signal: AbortSignal.timeout(4500) }).then((r) => r.json())
+      )
     );
 
     const zhMap = new Map<number, string>();
@@ -198,11 +203,14 @@ export const onRequestGet: PagesFunction = async (context) => {
       "movie",
       apiKey
     );
+    const hasResults = Array.isArray(verified) && verified.length > 0;
     return Response.json(
       { page: 1, results: verified },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+          "Cache-Control": hasResults
+            ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+            : "public, max-age=0, s-maxage=60",
         },
       }
     );

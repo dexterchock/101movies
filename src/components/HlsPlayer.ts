@@ -13,7 +13,7 @@ declare global {
 
 // NOTE: DO NOT statically import hls.js into the main IIFE (~160 KiB gzip savings on browse pages).
 // Keep on-demand script loading, and keep iOS Safari on native HLS via hasStandardMSE().
-const HLS_SCRIPT_URL = "/vendor/hls-1.6.16.min.js";
+const HLS_SCRIPT_URL = "/vendor/hls.light-1.6.16.min.js";
 let hlsLoadPromise: Promise<typeof HlsType | null> | null = null;
 
 function hasStandardMSE(): boolean {

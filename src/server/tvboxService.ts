@@ -822,11 +822,20 @@ async function searchSingleVodSite(
   targetTitles: string[],
   targetYear?: string,
   mediaType?: "movie" | "tv",
-  timeoutMs = 3800
+  timeoutMs = 2600,
+  externalSignal?: AbortSignal
 ): Promise<ResolvedStreamSource[]> {
+  if (externalSignal?.aborted) return [];
   const start = Date.now();
   const sep = site.api.includes("?") ? "&" : "?";
   const searchUrl = `${site.api}${sep}ac=videolist&wd=${encodeURIComponent(keyword)}`;
+
+  const reqAc = new AbortController();
+  const onExternalAbort = () => reqAc.abort();
+  const timer = setTimeout(() => reqAc.abort(), timeoutMs);
+  if (externalSignal) {
+    externalSignal.addEventListener("abort", onExternalAbort, { once: true });
+  }
 
   try {
     const res = await fetch(searchUrl, {
@@ -834,7 +843,7 @@ async function searchSingleVodSite(
         "User-Agent": "okhttp/4.12.0",
         Accept: "application/json, text/plain, */*",
       },
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: reqAc.signal,
     });
 
     if (!res.ok) return [];
@@ -1107,6 +1116,11 @@ async function searchSingleVodSite(
     return singleSource ? [singleSource] : [];
   } catch {
     return [];
+  } finally {
+    clearTimeout(timer);
+    if (externalSignal) {
+      externalSignal.removeEventListener("abort", onExternalAbort);
+    }
   }
 }
 
@@ -1418,7 +1432,7 @@ export async function resolveStreamsForMedia(params: {
 
   for (let kIdx = 0; kIdx < maxKeywordsToTry; kIdx++) {
     if (vodSubrequestsUsed >= MAX_VOD_SUBREQUESTS) break;
-    if (kIdx > 0 && matchedBaseSiteIds.size >= 5) break;
+    if (kIdx > 0 && matchedBaseSiteIds.size >= 4) break;
     if (kIdx > 1 && matchedBaseSiteIds.size > 0) break;
 
     const kw = searchKeywords[kIdx];
@@ -1430,23 +1444,46 @@ export async function resolveStreamsForMedia(params: {
 
     vodSubrequestsUsed += remainingSites.length;
 
-    const settled = await Promise.allSettled(
-      remainingSites.map(async (site) => {
-        const siteSources = await searchSingleVodSite(
-          site,
-          kw,
-          candidateTitles,
-          releaseYear,
-          type
-        );
-        return { siteId: site.id, siteSources };
-      })
-    );
+    const roundAc = new AbortController();
+    const roundStart = Date.now();
+    let softDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
 
-    for (const r of settled) {
-      if (r.status === "fulfilled" && r.value.siteSources.length > 0) {
-        matchedBaseSiteIds.add(r.value.siteId);
-        matchedSources.push(...r.value.siteSources);
+    try {
+      await Promise.allSettled(
+        remainingSites.map(async (site) => {
+          const siteSources = await searchSingleVodSite(
+            site,
+            kw,
+            candidateTitles,
+            releaseYear,
+            type,
+            2600,
+            roundAc.signal
+          );
+          if (siteSources.length > 0 && !matchedBaseSiteIds.has(site.id)) {
+            matchedBaseSiteIds.add(site.id);
+            matchedSources.push(...siteSources);
+
+            const tier3MatchedCount = Array.from(matchedBaseSiteIds).filter(
+              (baseId) => getSourceQualityTier(baseId) >= 3
+            ).length;
+
+            if (
+              !softDeadlineTimer &&
+              matchedBaseSiteIds.size >= 4 &&
+              tier3MatchedCount >= 2
+            ) {
+              const elapsed = Date.now() - roundStart;
+              const graceMs = Math.max(500, 1100 - elapsed);
+              softDeadlineTimer = setTimeout(() => roundAc.abort(), graceMs);
+            }
+          }
+        })
+      );
+    } finally {
+      if (softDeadlineTimer) {
+        clearTimeout(softDeadlineTimer);
+        softDeadlineTimer = null;
       }
     }
   }

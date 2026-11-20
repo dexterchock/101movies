@@ -133,10 +133,10 @@ export async function fetchTmdb(
   const urlPage2Zh = `${TMDB_BASE_URL}${endpoint}${separator}page=2&language=zh-CN&api_key=${apiKey}`;
 
   const [res1, res2, zhRes1, zhRes2] = await Promise.allSettled<any>([
-    fetch(urlPage1).then((r) => r.json()),
-    fetch(urlPage2).then((r) => r.json()),
-    fetch(urlPage1Zh).then((r) => r.json()),
-    fetch(urlPage2Zh).then((r) => r.json()),
+    fetch(urlPage1, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
+    fetch(urlPage2, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
+    fetch(urlPage1Zh, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
+    fetch(urlPage2Zh, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
   ]);
 
   const zhMap = new Map<number, string>();
@@ -215,10 +215,10 @@ export async function fetchTrendingHk(
   const popUrl = `${TMDB_BASE_URL}/discover/${type}?sort_by=popularity.desc&with_origin_country=HK&vote_count.gte=${popMinVotes}`;
 
   const [recentRes, popRes, recentZhRes, popZhRes] = await Promise.allSettled<any>([
-    fetch(`${recentUrl}&api_key=${apiKey}`).then((r) => r.json()),
-    fetch(`${popUrl}&api_key=${apiKey}`).then((r) => r.json()),
-    fetch(`${recentUrl}&language=zh-CN&api_key=${apiKey}`).then((r) => r.json()),
-    fetch(`${popUrl}&language=zh-CN&api_key=${apiKey}`).then((r) => r.json()),
+    fetch(`${recentUrl}&api_key=${apiKey}`, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
+    fetch(`${popUrl}&api_key=${apiKey}`, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
+    fetch(`${recentUrl}&language=zh-CN&api_key=${apiKey}`, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
+    fetch(`${popUrl}&language=zh-CN&api_key=${apiKey}`, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
   ]);
 
   const zhMap = new Map<number, string>();
@@ -332,7 +332,9 @@ async function resolveChinesePersonName(
     return personZhNameCache.get(personId) || fallbackName;
   }
   try {
-    const res = await fetch(`${TMDB_BASE_URL}/person/${personId}?api_key=${apiKey}`);
+    const res = await fetch(`${TMDB_BASE_URL}/person/${personId}?api_key=${apiKey}`, {
+      signal: AbortSignal.timeout(2500),
+    });
     if (!res.ok) return fallbackName;
     const data: any = await res.json();
     const candidates: unknown[] = [
@@ -400,15 +402,23 @@ export async function fetchMediaDetails(
 
   const [enRes, zhRes] = await Promise.allSettled<any>([
     fetch(
-      `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits,external_ids&api_key=${apiKey}`
+      `${TMDB_BASE_URL}/${type}/${id}?language=en-US&append_to_response=credits,external_ids&api_key=${apiKey}`,
+      { signal: AbortSignal.timeout(4500) }
     ).then((r) => r.json()),
     fetch(
-      `${TMDB_BASE_URL}/${type}/${id}?language=zh-CN&append_to_response=credits,translations,alternative_titles&api_key=${apiKey}`
+      `${TMDB_BASE_URL}/${type}/${id}?language=zh-CN&append_to_response=credits,translations,alternative_titles&api_key=${apiKey}`,
+      { signal: AbortSignal.timeout(4500) }
     ).then((r) => r.json()),
   ]);
 
   const enData: any = enRes.status === "fulfilled" && enRes.value ? enRes.value : {};
   const zhData: any = zhRes.status === "fulfilled" && zhRes.value ? zhRes.value : {};
+
+  if (!enData || enData.success === false || (!enData.id && !zhData.id)) {
+    return enData?.success === false ? { success: false } : {};
+  }
+
+  const baseData = enData?.id ? enData : zhData;
 
   let rawZhTitle = "";
 
@@ -472,16 +482,75 @@ export async function fetchMediaDetails(
   const primaryDisplayTitle =
     is_chinese_origin && zh_title ? zh_title : en_title || zh_title || "";
 
+  const rawGenres = Array.isArray(baseData.genres)
+    ? baseData.genres
+    : Array.isArray(zhData.genres)
+    ? zhData.genres
+    : [];
+  const genres = rawGenres
+    .filter((g: any) => g && g.id !== undefined && g.name !== undefined)
+    .map((g: any) => ({ id: Number(g.id), name: String(g.name) }));
+
+  const rawOriginCountry = Array.isArray(baseData.origin_country)
+    ? baseData.origin_country
+    : Array.isArray(zhData.origin_country)
+    ? zhData.origin_country
+    : null;
+  const origin_country = rawOriginCountry
+    ? rawOriginCountry.filter((c: any) => typeof c === "string")
+    : undefined;
+
+  const rawProdCountries = Array.isArray(baseData.production_countries)
+    ? baseData.production_countries
+    : Array.isArray(zhData.production_countries)
+    ? zhData.production_countries
+    : null;
+  const production_countries = rawProdCountries
+    ? rawProdCountries.map((c: any) => ({
+        iso_3166_1: String(c?.iso_3166_1 || ""),
+        name: String(c?.name || ""),
+      }))
+    : undefined;
+
   return {
-    ...enData,
-    overview,
-    imdb_id: enData.imdb_id || enData?.external_ids?.imdb_id || undefined,
-    title: type === "movie" ? primaryDisplayTitle : enData.title,
-    name: type === "tv" ? primaryDisplayTitle : enData.name,
+    id: baseData.id,
+    media_type: type,
+    title: type === "movie" ? primaryDisplayTitle || undefined : undefined,
+    name: type === "tv" ? primaryDisplayTitle || undefined : undefined,
+    original_title:
+      type === "movie" ? baseData.original_title || zhData.original_title : undefined,
+    original_name:
+      type === "tv" ? baseData.original_name || zhData.original_name : undefined,
     en_title,
     zh_title,
     is_chinese_origin,
+    poster_path: baseData.poster_path ?? zhData.poster_path ?? null,
+    backdrop_path: baseData.backdrop_path ?? zhData.backdrop_path ?? null,
+    overview: overview || String(zhData.overview || "").trim() || "",
+    vote_average:
+      typeof baseData.vote_average === "number" ? baseData.vote_average : 0,
+    release_date: baseData.release_date || zhData.release_date,
+    first_air_date: baseData.first_air_date || zhData.first_air_date,
+    runtime: typeof baseData.runtime === "number" ? baseData.runtime : undefined,
+    number_of_seasons:
+      typeof baseData.number_of_seasons === "number"
+        ? baseData.number_of_seasons
+        : undefined,
+    number_of_episodes:
+      typeof baseData.number_of_episodes === "number"
+        ? baseData.number_of_episodes
+        : undefined,
+    tagline: typeof baseData.tagline === "string" ? baseData.tagline : "",
+    genres,
     cast,
+    origin_country,
+    production_countries,
+    original_language: baseData.original_language || zhData.original_language,
+    imdb_id:
+      enData.imdb_id ||
+      enData?.external_ids?.imdb_id ||
+      zhData.imdb_id ||
+      undefined,
   };
 }
 

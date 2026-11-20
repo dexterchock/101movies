@@ -286,7 +286,7 @@ function attachSpatialNavigation() {
 }
 
 const BUNDLE_CHECK_INTERVAL_MS = 60_000;
-let lastBundleCheckAt = 0;
+let lastBundleCheckAt = Date.now();
 
 function getCurrentBundlePath(): string | null {
   const scripts = document.querySelectorAll<HTMLScriptElement>("script[src]");

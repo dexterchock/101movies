@@ -8,6 +8,12 @@ import {
 
 const REMOTE_API_ORIGIN = "https://101movies.pages.dev";
 
+declare global {
+  interface Window {
+    __EARLY_FETCH__?: Record<string, Promise<Response>>;
+  }
+}
+
 function isLocalhost(): boolean {
   if (typeof window === "undefined") return false;
   const host = window.location.hostname;
@@ -15,6 +21,47 @@ function isLocalhost(): boolean {
 }
 
 let localTmdbConfigured: boolean | null = null;
+
+async function consumeEarlyFetch(
+  path: string,
+  signal?: AbortSignal
+): Promise<Response | null> {
+  if (typeof window === "undefined") return null;
+  const store = window.__EARLY_FETCH__;
+  const earlyPromise = store?.[path];
+  if (!earlyPromise) return null;
+  delete store[path];
+
+  if (signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+
+  try {
+    const res = signal
+      ? await new Promise<Response>((resolve, reject) => {
+          const onAbort = () =>
+            reject(new DOMException("Aborted", "AbortError"));
+          signal.addEventListener("abort", onAbort, { once: true });
+          earlyPromise.then(
+            (r) => {
+              signal.removeEventListener("abort", onAbort);
+              resolve(r);
+            },
+            (err) => {
+              signal.removeEventListener("abort", onAbort);
+              reject(err);
+            }
+          );
+        })
+      : await earlyPromise;
+    return res.ok ? res : null;
+  } catch (err: any) {
+    if (err?.name === "AbortError" || signal?.aborted) {
+      throw err;
+    }
+    return null;
+  }
+}
 
 async function fetchJsonWithLocalFallback<T>(
   path: string,
@@ -30,7 +77,8 @@ async function fetchJsonWithLocalFallback<T>(
     return (await remoteRes.json()) as T;
   }
 
-  const res = await fetch(path, { signal });
+  const earlyRes = !isLocalhost() ? await consumeEarlyFetch(path, signal) : null;
+  const res = earlyRes || (await fetch(path, { signal }));
   if (!res.ok) {
     if (isLocalhost() && canUseRemoteFallback && res.status === 500) {
       // Allow local fallback only when local dev server lacks TMDB key, without poisoning valid transient errors
@@ -211,7 +259,7 @@ export function prewarmStreamManifests(
   if (!firstM3u8Source) return;
 
   const rawUrl = firstM3u8Source.episodes[0].url;
-  const cachedQuality = manifestResolutionCache.get(firstM3u8Source.sourceId);
+  const cachedQuality = manifestResolutionCache.get(rawUrl);
   if (cachedQuality) {
     onQuality?.(firstM3u8Source.sourceId, cachedQuality);
   }
@@ -245,7 +293,7 @@ export function prewarmStreamManifests(
       const text = await res.text();
       const detected = parseM3u8Resolution(text);
       if (detected) {
-        setBoundedCache(manifestResolutionCache, firstM3u8Source.sourceId, detected, 100);
+        setBoundedCache(manifestResolutionCache, rawUrl, detected, 150);
         onQuality?.(firstM3u8Source.sourceId, detected);
       }
     })
@@ -277,6 +325,27 @@ export const api = {
   getCachedDetails(type: "movie" | "tv", id: string): MediaDetails | undefined {
     return detailsCache.get(`${type}_${id}`);
   },
+  getPreviewItem(type: "movie" | "tv", id: string): MediaItem | undefined {
+    const pools: [Map<string, MediaItem[]>, "movie" | "tv" | null][] = [
+      [trendingMoviesCache, "movie"],
+      [trendingTVCache, "tv"],
+      [rankingsCache, null],
+      [searchCache, null],
+    ];
+    for (const [pool, fixedType] of pools) {
+      for (const [poolKey, list] of pool.entries()) {
+        for (const item of list) {
+          if (String(item.id) !== id) continue;
+          const inferredType =
+            item.media_type ||
+            fixedType ||
+            (poolKey.startsWith("tv_") ? "tv" : item.title ? "movie" : "tv");
+          if (inferredType === type) return item;
+        }
+      }
+    }
+    return undefined;
+  },
   getCachedVodStreams(
     type: "movie" | "tv",
     id: string,
@@ -285,11 +354,11 @@ export const api = {
   ): VodResolveResponse | undefined {
     return vodResolveCache.get(buildVodResolveKey(type, id, customKeyword, disabledIds));
   },
-  getCachedManifestQuality(sourceId: string): string | undefined {
-    return manifestResolutionCache.get(sourceId);
+  getCachedManifestQuality(url?: string): string | undefined {
+    return url ? manifestResolutionCache.get(url) : undefined;
   },
-  setCachedManifestQuality(sourceId: string, quality: string): void {
-    setBoundedCache(manifestResolutionCache, sourceId, quality, 100);
+  setCachedManifestQuality(url: string, quality: string): void {
+    if (url) setBoundedCache(manifestResolutionCache, url, quality, 150);
   },
 
   async getTrendingMovies(

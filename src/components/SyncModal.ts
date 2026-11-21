@@ -389,7 +389,15 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   }, 1000);
 
   const pollTimer = window.setInterval(() => {
-    if (signal.aborted || synced || !pendingGroupId || pairing) return;
+    if (
+      signal.aborted ||
+      synced ||
+      !pendingGroupId ||
+      pairing ||
+      document.visibilityState === "hidden"
+    ) {
+      return;
+    }
     void checkPendingGroupPaired(pendingGroupId, signal).then((becamePaired) => {
       if (becamePaired && !signal.aborted && !synced) {
         synced = true;

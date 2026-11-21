@@ -5,6 +5,114 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
     <link rel="preconnect" href="https://image.tmdb.org" />
     <link rel="dns-prefetch" href="https://image.tmdb.org" />
+    <script>
+      (function () {
+        if (typeof window.fetch !== "function") return;
+        var host = window.location.hostname;
+        if (host === "localhost" || host === "127.0.0.1") return;
+        var ef = (window.__EARLY_FETCH__ = {});
+        function kick(u) {
+          try {
+            ef[u] = window.fetch(u);
+          } catch (e) {}
+        }
+        function ss(k) {
+          try {
+            return window.sessionStorage ? window.sessionStorage.getItem(k) : null;
+          } catch (e) {
+            return null;
+          }
+        }
+        function normCat(c) {
+          if (!c || c === "all") return "all";
+          var g = String(c).toLowerCase().trim();
+          var m = {
+            hk: "hk",
+            "28": "action",
+            "10759": "action",
+            action: "action",
+            "878": "scifi",
+            "10765": "scifi",
+            scifi: "scifi",
+            "sci-fi": "scifi",
+            "35": "comedy",
+            comedy: "comedy",
+            "18": "drama",
+            drama: "drama",
+            "16": "animation",
+            animation: "animation",
+            "53": "thriller",
+            thriller: "thriller",
+            "80": "crime",
+            crime: "crime",
+            "9648": "mystery",
+            mystery: "mystery",
+            "27": "horror",
+            horror: "horror",
+            "10749": "romance",
+            romance: "romance",
+            "12": "action",
+            adventure: "action"
+          };
+          return m[g] || c;
+        }
+        function resolveGenre(t, c) {
+          if (!c || c === "all") return "";
+          var g = String(c).toLowerCase().trim();
+          var isTv = t === "tv";
+          var m = {
+            action: isTv ? "10759" : "28",
+            "28": isTv ? "10759" : "28",
+            "10759": isTv ? "10759" : "28",
+            scifi: isTv ? "10765" : "878",
+            "sci-fi": isTv ? "10765" : "878",
+            "878": isTv ? "10765" : "878",
+            "10765": isTv ? "10765" : "878",
+            comedy: "35",
+            "35": "35",
+            drama: "18",
+            "18": "18",
+            animation: "16",
+            "16": "16",
+            thriller: isTv ? "80,9648" : "53",
+            "53": isTv ? "80,9648" : "53",
+            crime: "80",
+            "80": "80",
+            mystery: "9648",
+            "9648": "9648",
+            horror: isTv ? "9648" : "27",
+            "27": isTv ? "9648" : "27",
+            romance: isTv ? "18" : "10749",
+            "10749": isTv ? "18" : "10749",
+            adventure: isTv ? "10759" : "12",
+            "12": isTv ? "10759" : "12"
+          };
+          return m[g] || c;
+        }
+        var p = window.location.pathname || "/";
+        if (p === "/" || p === "") {
+          var t = ss("trending_media_type") === "tv" ? "tv" : "movie";
+          var cat = normCat(ss(t === "tv" ? "home_tv_category" : "home_movie_category")) || "all";
+          var r = resolveGenre(t, cat);
+          var q = r && r !== "all" ? "?genre=" + encodeURIComponent(r) + "&v=5" : "?v=5";
+          kick("/api/tmdb/trending/" + t + q);
+        } else if (p === "/rankings") {
+          var rt = ss("rankings_media_type") === "tv" ? "tv" : "movie";
+          var ryRaw = parseInt(ss("rankings_year") || "", 10);
+          var ry = isNaN(ryRaw) ? new Date().getFullYear() : ryRaw;
+          var rCat = normCat(ss("rankings_genre")) || "all";
+          var rr = resolveGenre(rt, rCat);
+          var rq = rr && rr !== "all" ? "&genre=" + encodeURIComponent(rr) : "";
+          kick("/api/tmdb/discover/" + rt + "?year=" + ry + rq + "&v=5");
+        } else {
+          var pm = p.match(/^\/player\/(movie|tv)\/(\d+)$/);
+          if (pm) {
+            kick("/api/tmdb/" + pm[1] + "/" + pm[2] + "?v=5");
+            kick("/api/vod/resolve?type=" + encodeURIComponent(pm[1]) + "&id=" + encodeURIComponent(pm[2]));
+          }
+        }
+      })();
+    </script>
     
     <!-- Primary SEO Meta Tags -->
     <title>101Movies</title>

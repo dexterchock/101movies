@@ -9,6 +9,7 @@ import { buildMovieOgSvg, extractOgCardInput } from "./functions/_shared/ogCard"
 import {
   TMDB_BASE_URL,
   fetchMediaDetails as fetchTmdbMediaDetails,
+  fetchOgMediaMetadata,
   fetchTmdb as fetchSharedTmdb,
   fetchTrendingHk,
   filterReleasedMedia,
@@ -31,6 +32,7 @@ import {
   parseTvboxConfig,
   pingVodSite,
   resolveStreamsForMedia,
+  toSimplifiedChinese,
 } from "./src/server/tvboxService";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
@@ -237,7 +239,11 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
       }
 
       const responses = await Promise.allSettled<any>(
-        fetchConfigs.map((cfg) => fetch(cfg.url).then((r) => r.json()))
+        fetchConfigs.map((cfg) =>
+          fetch(cfg.url, { signal: AbortSignal.timeout(4500) }).then((r) =>
+            r.json()
+          )
+        )
       );
 
       const zhMap = new Map<number, string>();
@@ -255,7 +261,7 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
           const t = item.title || item.name;
           if (t) {
             if (/[\u4e00-\u9fff]/.test(t)) {
-              zhMap.set(item.id, t.trim());
+              zhMap.set(item.id, toSimplifiedChinese(t.trim()));
             } else {
               enMap.set(item.id, t.trim());
             }
@@ -277,7 +283,7 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
         const zhTitle =
           zhMap.get(item.id) ||
           (isZhQuery && /[\u4e00-\u9fff]/.test(item.title || item.name)
-            ? item.title || item.name
+            ? toSimplifiedChinese(item.title || item.name)
             : undefined);
         const enTitle =
           enMap.get(item.id) ||
@@ -335,34 +341,36 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
   });
   app.get("/api/tmdb/discover/:type", async (req, res) => {
     const type = req.params.type === "tv" ? "tv" : "movie";
-    const year = req.query.year || new Date().getFullYear();
+    const year = String(req.query.year || new Date().getFullYear());
     const genre = req.query.genre ? String(req.query.genre).trim() : "";
     const yearParam =
       type === "tv"
-        ? `first_air_date_year=${year}`
-        : `primary_release_year=${year}`;
+        ? `first_air_date_year=${encodeURIComponent(year)}`
+        : `primary_release_year=${encodeURIComponent(year)}`;
+    const isHk = genre.toLowerCase() === "hk";
     let genreParam = "";
-    if (genre.toLowerCase() === "hk") {
+    if (isHk) {
       genreParam = "&with_origin_country=HK";
     } else if (genre && genre !== "all") {
       const resolvedGenre = resolveTmdbGenre(type, genre);
       genreParam = `&with_genres=${encodeURIComponent(resolvedGenre)}`;
     }
+    const minVotes = isHk ? 1 : 3;
+    const discoverMinVotes = isHk ? 1 : 10;
     fetchTmdb(
-      `/discover/${type}?sort_by=popularity.desc&vote_count.gte=10&${yearParam}${genreParam}`,
+      `/discover/${type}?sort_by=popularity.desc&vote_count.gte=${discoverMinVotes}&${yearParam}${genreParam}`,
       res,
-      type
+      type,
+      minVotes
     );
   });
 
   let localOgFontsPromise: Promise<Uint8Array[]> | null = null;
   const loadLocalOgFonts = (): Promise<Uint8Array[]> => {
     if (localOgFontsPromise) return localOgFontsPromise;
-    localOgFontsPromise = Promise.all([
-      fs.readFile(path.resolve(process.cwd(), "public/fonts/Poppins-Bold.ttf")),
-      fs.readFile(path.resolve(process.cwd(), "public/fonts/Poppins-Regular.ttf")),
-    ])
-      .then(([bold, regular]) => [new Uint8Array(bold), new Uint8Array(regular)])
+    localOgFontsPromise = fs
+      .readFile(path.resolve(process.cwd(), "public/fonts/Poppins-Bold.ttf"))
+      .then((bold) => [new Uint8Array(bold)])
       .catch((err) => {
         localOgFontsPromise = null;
         throw err;
@@ -381,7 +389,7 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
 
     try {
       const mediaType = rawType as "movie" | "tv";
-      const details = await fetchTmdbMediaDetails(mediaType, id, TMDB_API_KEY);
+      const details = await fetchOgMediaMetadata(mediaType, id, TMDB_API_KEY, true);
       const input = extractOgCardInput(details, mediaType);
       if (!input) {
         return res.redirect(302, fallbackUrl);

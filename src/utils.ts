@@ -304,7 +304,10 @@ export function observeResponsiveGrid(
 ): ResponsiveGridState {
   let current = getResponsiveGridState(twoRowMobileHeader);
   let orientTimer: ReturnType<typeof setTimeout> | null = null;
-  const onResize = () => {
+  let rafId: number | null = null;
+  const applyResize = () => {
+    rafId = null;
+    if (signal.aborted) return;
     const next = getResponsiveGridState(twoRowMobileHeader);
     if (
       next.colsPerRow !== current.colsPerRow ||
@@ -315,6 +318,10 @@ export function observeResponsiveGrid(
       current = next;
       onChange(next);
     }
+  };
+  const onResize = () => {
+    if (rafId !== null) return;
+    rafId = requestAnimationFrame(applyResize);
   };
   const onOrient = () => {
     onResize();
@@ -329,6 +336,10 @@ export function observeResponsiveGrid(
       if (orientTimer !== null) {
         clearTimeout(orientTimer);
         orientTimer = null;
+      }
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
       }
     },
     { once: true }
@@ -741,10 +752,6 @@ export function createPillTrack(opts: {
     signal: opts.signal,
   });
 
-  window.addEventListener("resize", () => centerTrack(false), {
-    signal: opts.signal,
-  });
-
   let lastTrackWidth = track.clientWidth;
   if (typeof ResizeObserver !== "undefined") {
     const ro = new ResizeObserver(() => {
@@ -755,6 +762,10 @@ export function createPillTrack(opts: {
     });
     ro.observe(track);
     opts.signal.addEventListener("abort", () => ro.disconnect(), { once: true });
+  } else {
+    window.addEventListener("resize", () => centerTrack(false), {
+      signal: opts.signal,
+    });
   }
 
   updateVisualState();

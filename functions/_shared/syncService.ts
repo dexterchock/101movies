@@ -15,10 +15,23 @@ export interface D1PreparedStatementLike {
 
 export interface D1DatabaseLike {
   prepare(query: string): D1PreparedStatementLike;
+  withSession?: (constraint?: string) => Pick<D1DatabaseLike, "prepare">;
 }
 
 export interface SyncEnv {
   DB?: D1DatabaseLike;
+}
+
+function getReadDb(
+  env: SyncEnv
+): Pick<D1DatabaseLike, "prepare"> | null {
+  if (!env?.DB) return null;
+  if (typeof env.DB.withSession === "function") {
+    try {
+      return env.DB.withSession("first-unconstrained");
+    } catch {}
+  }
+  return env.DB;
 }
 
 interface SyncGroupRow {
@@ -247,13 +260,19 @@ function generateFourDigitCode(): string {
   return String(buf[0] % 10000).padStart(4, "0");
 }
 
-async function dbGetGroup(env: SyncEnv, groupId: string): Promise<SyncGroupRow | null> {
-  if (!env?.DB) {
+async function dbGetGroup(
+  env: SyncEnv,
+  groupId: string,
+  useReplica = false
+): Promise<SyncGroupRow | null> {
+  const db = useReplica ? getReadDb(env) : env?.DB;
+  if (!db) {
     return getMemoryStore().groups.get(groupId) || null;
   }
-  return env.DB.prepare(
-    "SELECT group_id, history_json, saved_json, paired, updated_at FROM sync_groups WHERE group_id = ?"
-  )
+  return db
+    .prepare(
+      "SELECT group_id, history_json, saved_json, paired, updated_at FROM sync_groups WHERE group_id = ?"
+    )
     .bind(groupId)
     .first<SyncGroupRow>();
 }
@@ -324,31 +343,38 @@ async function dbDeleteCode(env: SyncEnv, code: string): Promise<void> {
 async function dbInsertUniqueCode(
   env: SyncEnv,
   groupId: string,
-  expiresAt: number
+  expiresAt: number,
+  now: number
 ): Promise<string> {
   for (let attempt = 0; attempt < 15; attempt++) {
     const code = generateFourDigitCode();
     if (!env?.DB) {
       const store = getMemoryStore();
-      if (!store.codes.has(code)) {
+      const existing = store.codes.get(code);
+      if (!existing || existing.expires_at <= now) {
         store.codes.set(code, { code, group_id: groupId, expires_at: expiresAt });
         return code;
       }
       continue;
     }
 
-    const existing = await dbGetCode(env, code);
-    if (!existing) {
-      try {
-        await env.DB.prepare(
-          "INSERT INTO sync_codes (code, group_id, expires_at) VALUES (?, ?, ?)"
-        )
-          .bind(code, groupId, expiresAt)
-          .run();
+    try {
+      const inserted = await env.DB.prepare(
+        `INSERT INTO sync_codes (code, group_id, expires_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(code) DO UPDATE SET
+           group_id = excluded.group_id,
+           expires_at = excluded.expires_at
+         WHERE sync_codes.expires_at <= ?
+         RETURNING code`
+      )
+        .bind(code, groupId, expiresAt, now)
+        .first<{ code: string }>();
+      if (inserted?.code === code) {
         return code;
-      } catch {
-        // Retry if another concurrent request claimed the same 4-digit code
       }
+    } catch {
+      // Retry if another concurrent request holds an active 4-digit code
     }
   }
   throw new Error("Unable to allocate unique 4-digit pairing code");
@@ -361,7 +387,8 @@ export interface SyncHandlerResult {
 
 export async function handleCreateSyncCode(
   env: SyncEnv,
-  rawBody: unknown
+  rawBody: unknown,
+  waitUntil?: (promise: Promise<unknown>) => void
 ): Promise<SyncHandlerResult> {
   const body = (rawBody && typeof rawBody === "object" ? rawBody : {}) as {
     groupId?: unknown;
@@ -377,8 +404,17 @@ export async function handleCreateSyncCode(
     typeof body.groupId === "string" ? body.groupId.trim() : "";
   const requestedGroupId = GROUP_ID_RE.test(rawGroupId) ? rawGroupId : "";
 
-  await dbDeleteExpiredCodes(env, now);
-  await dbDeleteStaleUnpairedGroups(env, now - UNPAIRED_GROUP_TTL_MS);
+  const cleanupPromise = Promise.allSettled([
+    dbDeleteExpiredCodes(env, now),
+    dbDeleteStaleUnpairedGroups(env, now - UNPAIRED_GROUP_TTL_MS),
+  ]);
+  if (waitUntil) {
+    try {
+      waitUntil(cleanupPromise);
+    } catch {}
+  } else {
+    await cleanupPromise;
+  }
 
   let row: SyncGroupRow | null = requestedGroupId
     ? await dbGetGroup(env, requestedGroupId)
@@ -411,7 +447,7 @@ export async function handleCreateSyncCode(
   }
 
   await dbUpsertGroup(env, row);
-  const code = await dbInsertUniqueCode(env, row.group_id, expiresAt);
+  const code = await dbInsertUniqueCode(env, row.group_id, expiresAt, now);
 
   return {
     status: 200,
@@ -506,7 +542,7 @@ export async function handleGetSyncState(
     return { status: 400, body: { ok: false, error: "Missing groupId" } };
   }
 
-  const row = await dbGetGroup(env, groupId);
+  const row = await dbGetGroup(env, groupId, true);
   if (!row) {
     return { status: 404, body: { ok: false, error: "Sync group not found" } };
   }

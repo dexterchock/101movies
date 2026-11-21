@@ -87,44 +87,10 @@ export const icons = {
       size,
       fill: "currentColor",
     }),
-  server: (size = 18) =>
-    svg(
-      `<rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/>`,
-      "",
-      { size }
-    ),
-  copy: (size = 13) =>
-    svg(
-      `<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>`,
-      "",
-      { size }
-    ),
-  check: (className = "", size = 13) =>
-    svg(`<path d="M20 6 9 17l-5-5"/>`, className, { size }),
   refreshCw: (className = "", size = 13) =>
     svg(
       `<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>`,
       className,
-      { size }
-    ),
-  link2: (className = "", size = 13) =>
-    svg(
-      `<path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>`,
-      className,
-      { size }
-    ),
-  plus: (size = 14) =>
-    svg(`<path d="M5 12h14"/><path d="M12 5v14"/>`, "", { size }),
-  activity: (size = 14) =>
-    svg(
-      `<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>`,
-      "",
-      { size }
-    ),
-  folderGit2: (size = 13) =>
-    svg(
-      `<path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"/><circle cx="13" cy="12" r="2"/><path d="M18 19c-2.8 0-5-2.2-5-5v8"/><circle cx="20" cy="19" r="2"/>`,
-      "",
       { size }
     ),
   maximize: (className = "", size = 18) =>

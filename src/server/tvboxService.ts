@@ -728,12 +728,55 @@ function buildSearchKeywords(titles: string[]): string[] {
   return candidates;
 }
 
+export interface PreparedTargetTitle {
+  target: string;
+  normFullTarget: string;
+  numbersKey: string;
+  hasNumbers: boolean;
+}
+
+export function prepareTargetTitles(
+  targetTitles: string[],
+  mediaType?: "movie" | "tv"
+): PreparedTargetTitle[] {
+  const prepared: PreparedTargetTitle[] = [];
+  const seen = new Set<string>();
+  for (const rawTarget of targetTitles) {
+    const cleanTarget = stripLanguageAndStatusTags(
+      toSimplifiedChinese(stripYearSuffix(rawTarget))
+    );
+    const { baseTitle: targetBaseTitle } =
+      mediaType === "tv"
+        ? parseSeasonInfo(rawTarget)
+        : { baseTitle: cleanTarget };
+
+    const target = normalizeTitleForComparison(targetBaseTitle);
+    const normFullTarget = normalizeTitleForComparison(cleanTarget);
+    if (!target) continue;
+
+    const dedupKey = `${target}|${normFullTarget}`;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+
+    const nums = extractNumbers(target);
+    prepared.push({
+      target,
+      normFullTarget,
+      numbersKey: nums.join(","),
+      hasNumbers: nums.length > 0,
+    });
+  }
+  return prepared;
+}
+
 export function computeTitleMatchScore(
   vodName: string,
   vodSub: string,
-  targetTitles: string[],
+  targetTitles: string[] | PreparedTargetTitle[],
   mediaType?: "movie" | "tv"
 ): number {
+  if (!targetTitles || targetTitles.length === 0) return 0;
+
   const cleanVod = stripLanguageAndStatusTags(
     toSimplifiedChinese(stripYearSuffix(vodName))
   );
@@ -759,20 +802,16 @@ export function computeTitleMatchScore(
     .filter(Boolean);
 
   const vodNumbers = extractNumbers(normVodName);
+  const vodNumbersKey = vodNumbers.join(",");
+  const preparedTargets: PreparedTargetTitle[] =
+    typeof targetTitles[0] === "string"
+      ? prepareTargetTitles(targetTitles as string[], mediaType)
+      : (targetTitles as PreparedTargetTitle[]);
+
   let bestScore = 0;
 
-  for (const rawTarget of targetTitles) {
-    const cleanTarget = stripLanguageAndStatusTags(
-      toSimplifiedChinese(stripYearSuffix(rawTarget))
-    );
-    const { baseTitle: targetBaseTitle } =
-      mediaType === "tv"
-        ? parseSeasonInfo(rawTarget)
-        : { baseTitle: cleanTarget };
-
-    const target = normalizeTitleForComparison(targetBaseTitle);
-    const normFullTarget = normalizeTitleForComparison(cleanTarget);
-    if (!target) continue;
+  for (const pt of preparedTargets) {
+    const { target, normFullTarget, numbersKey, hasNumbers } = pt;
 
     if (normVodName === target || normCleanVod === normFullTarget) {
       bestScore = Math.max(bestScore, 260);
@@ -793,10 +832,8 @@ export function computeTitleMatchScore(
       }
     }
 
-    const targetNumbers = extractNumbers(target);
     const numbersConflict =
-      (targetNumbers.length > 0 || vodNumbers.length > 0) &&
-      targetNumbers.join(",") !== vodNumbers.join(",");
+      (hasNumbers || vodNumbers.length > 0) && numbersKey !== vodNumbersKey;
 
     if (numbersConflict) {
       continue;
@@ -816,13 +853,41 @@ export function computeTitleMatchScore(
   return bestScore;
 }
 
+const SITE_CIRCUIT_THRESHOLD = 3;
+const SITE_CIRCUIT_COOLDOWN_MS = 120_000;
+const siteCircuitMap = new Map<string, { failures: number; openUntil: number }>();
+
+function isSiteInCooldown(siteId: string): boolean {
+  const entry = siteCircuitMap.get(siteId);
+  if (!entry) return false;
+  if (entry.openUntil > Date.now()) return true;
+  if (entry.openUntil > 0) {
+    siteCircuitMap.delete(siteId);
+  }
+  return false;
+}
+
+function recordSiteSuccess(siteId: string): void {
+  siteCircuitMap.delete(siteId);
+}
+
+function recordSiteFailure(siteId: string): void {
+  const prev = siteCircuitMap.get(siteId);
+  const failures = (prev?.failures ?? 0) + 1;
+  const openUntil =
+    failures >= SITE_CIRCUIT_THRESHOLD
+      ? Date.now() + SITE_CIRCUIT_COOLDOWN_MS
+      : 0;
+  setBoundedCache(siteCircuitMap, siteId, { failures, openUntil }, 64);
+}
+
 async function searchSingleVodSite(
   site: VodSite,
   keyword: string,
-  targetTitles: string[],
+  targetTitles: string[] | PreparedTargetTitle[],
   targetYear?: string,
   mediaType?: "movie" | "tv",
-  timeoutMs = 2600,
+  timeoutMs = 2400,
   externalSignal?: AbortSignal
 ): Promise<ResolvedStreamSource[]> {
   if (externalSignal?.aborted) return [];
@@ -846,8 +911,12 @@ async function searchSingleVodSite(
       signal: reqAc.signal,
     });
 
-    if (!res.ok) return [];
+    if (!res.ok) {
+      recordSiteFailure(site.id);
+      return [];
+    }
     const data: any = await res.json();
+    recordSiteSuccess(site.id);
     const list = Array.isArray(data?.list) ? data.list : [];
     if (list.length === 0) return [];
 
@@ -1115,6 +1184,9 @@ async function searchSingleVodSite(
     const singleSource = buildSourceFromCandidates(validCandidates, undefined);
     return singleSource ? [singleSource] : [];
   } catch {
+    if (!externalSignal?.aborted) {
+      recordSiteFailure(site.id);
+    }
     return [];
   } finally {
     clearTimeout(timer);
@@ -1198,6 +1270,32 @@ async function getTmdbCandidateMetadata(
     return cached;
   }
 
+  const edgeCache =
+    typeof caches !== "undefined" ? (caches as any).default : null;
+  const edgeCacheReq =
+    tmdbId && edgeCache
+      ? new Request(`https://tmdb-meta.101movies.internal/v1/${type}/${tmdbId}`, {
+          method: "GET",
+        })
+      : null;
+
+  if (edgeCache && edgeCacheReq) {
+    try {
+      const edgeHit: Response | undefined = await edgeCache.match(edgeCacheReq);
+      if (edgeHit) {
+        const parsed = (await edgeHit.json()) as TmdbCandidateMetadata;
+        if (parsed && Array.isArray(parsed.candidateTitles)) {
+          const freshMeta: TmdbCandidateMetadata = {
+            ...parsed,
+            expiresAt: Date.now() + 60 * 60 * 1000,
+          };
+          setBoundedCache(tmdbMetadataCache, cacheKey, freshMeta, 500);
+          return freshMeta;
+        }
+      }
+    } catch {}
+  }
+
   const candidateTitles: string[] = [];
   let releaseYear: string | undefined;
   let isUnreleased = false;
@@ -1232,25 +1330,12 @@ async function getTmdbCandidateMetadata(
 
   if (tmdbId && tmdbApiKey) {
     try {
-      const promises: Promise<any>[] = [
-        fetch(
-          `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${tmdbApiKey}`,
-          { signal: AbortSignal.timeout(4000) }
-        ).then((r) => r.json()),
-      ];
-      if (!hintItem) {
-        promises.push(
-          fetch(
-            `https://api.themoviedb.org/3/${type}/${tmdbId}?language=en-US&api_key=${tmdbApiKey}`,
-            { signal: AbortSignal.timeout(4000) }
-          ).then((r) => r.json())
-        );
-      }
-
-      const [zhRes, enRes] = await Promise.allSettled(promises);
-
-      if (zhRes && zhRes.status === "fulfilled" && zhRes.value) {
-        const d = zhRes.value;
+      const res = await fetch(
+        `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${tmdbApiKey}`,
+        { signal: AbortSignal.timeout(4000) }
+      );
+      if (res.ok) {
+        const d: any = await res.json();
         const zhTitle = d.title || d.name;
         const origTitle = d.original_title || d.original_name;
         const dateStr = d.release_date || d.first_air_date;
@@ -1273,7 +1358,6 @@ async function getTmdbCandidateMetadata(
           allFoundZh.add(zhTitle.trim());
         }
 
-        // Extract Chinese titles from translations (CN, SG, TW, HK)
         const transList = Array.isArray(d?.translations?.translations)
           ? d.translations.translations
           : [];
@@ -1289,7 +1373,6 @@ async function getTmdbCandidateMetadata(
           }
         }
 
-        // Extract Chinese titles from alternative_titles
         const altList = Array.isArray(d?.alternative_titles?.results)
           ? d.alternative_titles.results
           : Array.isArray(d?.alternative_titles?.titles)
@@ -1313,24 +1396,22 @@ async function getTmdbCandidateMetadata(
           }
         }
 
+        // Extract English title from translations instead of issuing a second en-US request
+        for (const region of ["US", "GB", ""]) {
+          const enTr = transList.find(
+            (tr: any) =>
+              tr?.iso_639_1 === "en" &&
+              (!region || tr?.iso_3166_1 === region) &&
+              (tr?.data?.title || tr?.data?.name)
+          );
+          if (enTr) {
+            addCandidateTitle(String(enTr.data.title || enTr.data.name));
+            break;
+          }
+        }
+
         if (zhTitle) addCandidateTitle(zhTitle);
         if (origTitle) addCandidateTitle(origTitle);
-      }
-
-      if (enRes && enRes.status === "fulfilled" && enRes.value) {
-        const d = enRes.value;
-        const enTitle = d.title || d.name;
-        const dateStr = d.release_date || d.first_air_date;
-        if (dateStr && typeof dateStr === "string" && !releaseYear) {
-          releaseYear = dateStr.slice(0, 4);
-        }
-        if (
-          (d.status && UNRELEASED_STATUSES.has(String(d.status))) ||
-          Number(d.vote_count || 0) === 0
-        ) {
-          isUnreleased = true;
-        }
-        if (enTitle) addCandidateTitle(enTitle);
       }
     } catch {}
   }
@@ -1350,6 +1431,22 @@ async function getTmdbCandidateMetadata(
     expiresAt: Date.now() + 60 * 60 * 1000,
   };
   setBoundedCache(tmdbMetadataCache, cacheKey, meta, 500);
+
+  if (edgeCache && edgeCacheReq && candidateTitles.length > 0) {
+    edgeCache
+      .put(
+        edgeCacheReq,
+        new Response(JSON.stringify(meta), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "public, max-age=21600",
+          },
+        })
+      )
+      .catch(() => {});
+  }
+
   return meta;
 }
 
@@ -1408,9 +1505,11 @@ export async function resolveStreamsForMedia(params: {
   }
 
   const disabledSet = new Set(disabledSiteIds);
-  const activeSites = getAllVodSites().filter(
+  const enabledSites = getAllVodSites().filter(
     (s) => s.enabled !== false && !disabledSet.has(s.id)
   );
+  const healthySites = enabledSites.filter((s) => !isSiteInCooldown(s.id));
+  const activeSites = healthySites.length >= 3 ? healthySites : enabledSites;
 
   if (!primaryQuery || activeSites.length === 0) {
     return {
@@ -1423,17 +1522,24 @@ export async function resolveStreamsForMedia(params: {
     };
   }
 
+  const preparedTargets = prepareTargetTitles(candidateTitles, type);
   let matchedSources: ResolvedStreamSource[] = [];
   const matchedBaseSiteIds = new Set<string>();
   const maxKeywordsToTry = Math.min(searchKeywords.length, 3);
   // NOTE: Stay under Cloudflare Pages Functions' 50-subrequest ceiling across TMDB + up to 3 keyword rounds.
   const MAX_VOD_SUBREQUESTS = 26;
+  const OVERALL_DEADLINE_MS = 3400;
+  const resolveStart = Date.now();
   let vodSubrequestsUsed = 0;
 
   for (let kIdx = 0; kIdx < maxKeywordsToTry; kIdx++) {
     if (vodSubrequestsUsed >= MAX_VOD_SUBREQUESTS) break;
     if (kIdx > 0 && matchedBaseSiteIds.size >= 4) break;
     if (kIdx > 1 && matchedBaseSiteIds.size > 0) break;
+
+    const remainingWallMs = OVERALL_DEADLINE_MS - (Date.now() - resolveStart);
+    if (kIdx > 0 && remainingWallMs < 600) break;
+    const roundTimeoutMs = Math.max(600, Math.min(2400, remainingWallMs));
 
     const kw = searchKeywords[kIdx];
     const remainingBudget = MAX_VOD_SUBREQUESTS - vodSubrequestsUsed;
@@ -1454,10 +1560,10 @@ export async function resolveStreamsForMedia(params: {
           const siteSources = await searchSingleVodSite(
             site,
             kw,
-            candidateTitles,
+            preparedTargets,
             releaseYear,
             type,
-            2600,
+            roundTimeoutMs,
             roundAc.signal
           );
           if (siteSources.length > 0 && !matchedBaseSiteIds.has(site.id)) {
@@ -1468,13 +1574,19 @@ export async function resolveStreamsForMedia(params: {
               (baseId) => getSourceQualityTier(baseId) >= 3
             ).length;
 
-            if (
+            if (matchedBaseSiteIds.size >= 6 && tier3MatchedCount >= 3) {
+              if (softDeadlineTimer) {
+                clearTimeout(softDeadlineTimer);
+                softDeadlineTimer = null;
+              }
+              roundAc.abort();
+            } else if (
               !softDeadlineTimer &&
               matchedBaseSiteIds.size >= 4 &&
               tier3MatchedCount >= 2
             ) {
               const elapsed = Date.now() - roundStart;
-              const graceMs = Math.max(500, 1100 - elapsed);
+              const graceMs = Math.max(250, 750 - elapsed);
               softDeadlineTimer = setTimeout(() => roundAc.abort(), graceMs);
             }
           }

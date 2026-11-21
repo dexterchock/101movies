@@ -1,4 +1,4 @@
-import { fetchMediaDetails, getTmdbKey } from "../../_shared/tmdb";
+import { fetchOgMediaMetadata, getTmdbKey } from "../../_shared/tmdb";
 
 interface OgMetadata {
   title: string;
@@ -11,6 +11,9 @@ interface OgMetadata {
 
 const DEFAULT_OG_TIMEOUT_MS = 2500;
 const OG_CACHE_TTL_SECONDS = 3600;
+const OG_CACHE_URL_PREFIX = "https://og-meta.101movies.internal/v4";
+const CRAWLER_UA_RE =
+  /(bot|crawl|spider|slurp|facebookexternalhit|facebot|twitterbot|whatsapp|telegrambot|discordbot|slackbot|linkedinbot|applebot|imessage|embedly|quora|pinterest|vkshare|w3c_validator|bingpreview|line|kakaotalk|wechat|micromessenger|qq\/)/i;
 
 function truncateOverview(text: string, maxLen = 220): string {
   const clean = text.replace(/\s+/g, " ").trim();
@@ -79,42 +82,50 @@ async function fetchBaseSpaHtml(context: EventContext<any, any, any>, origin: st
   return context.next();
 }
 
-async function getCachedOrFreshOgMetadata(
+async function readCachedOgMetadata(
+  type: "movie" | "tv",
+  id: string
+): Promise<OgMetadata | null> {
+  const cache = typeof caches !== "undefined" ? (caches as any).default : null;
+  if (!cache) return null;
+  const cacheReq = new Request(`${OG_CACHE_URL_PREFIX}/${type}/${id}`, {
+    method: "GET",
+  });
+  try {
+    const cachedRes = await cache.match(cacheReq);
+    if (cachedRes) {
+      const cachedData = (await cachedRes.json()) as OgMetadata;
+      if (cachedData?.title) return cachedData;
+    }
+  } catch {
+    // Ignore cache read failures
+  }
+  return null;
+}
+
+async function fetchAndCacheOgMetadata(
   type: "movie" | "tv",
   id: string,
   origin: string,
-  context: EventContext<any, any, any>
+  apiKey: string
 ): Promise<OgMetadata | null> {
-  const apiKey = getTmdbKey(context.env);
   if (!apiKey) return null;
-
-  const cache = typeof caches !== "undefined" ? (caches as any).default : null;
-  const cacheUrl = `https://og-meta.101movies.internal/v4/${type}/${id}`;
-  const cacheReq = new Request(cacheUrl, { method: "GET" });
-
-  if (cache) {
-    try {
-      const cachedRes = await cache.match(cacheReq);
-      if (cachedRes) {
-        const cachedData = (await cachedRes.json()) as OgMetadata;
-        if (cachedData?.title) return cachedData;
-      }
-    } catch {
-      // Ignore cache read failures
-    }
-  }
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     const details = await Promise.race([
-      fetchMediaDetails(type, id, apiKey),
+      fetchOgMediaMetadata(type, id, apiKey, false),
       new Promise<null>((resolve) => {
         timeoutId = setTimeout(() => resolve(null), DEFAULT_OG_TIMEOUT_MS);
       }),
     ]);
 
     const og = buildOgMetadata(details, type, id, origin);
-    if (og && cache && context.waitUntil) {
+    const cache = typeof caches !== "undefined" ? (caches as any).default : null;
+    if (og && cache) {
+      const cacheReq = new Request(`${OG_CACHE_URL_PREFIX}/${type}/${id}`, {
+        method: "GET",
+      });
       const toCache = new Response(JSON.stringify(og), {
         status: 200,
         headers: {
@@ -123,7 +134,7 @@ async function getCachedOrFreshOgMetadata(
         },
       });
       try {
-        context.waitUntil(cache.put(cacheReq, toCache));
+        await cache.put(cacheReq, toCache);
       } catch {
         // Ignore cache write failures
       }
@@ -146,10 +157,28 @@ export const onRequestGet: PagesFunction = async (context) => {
   }
 
   const mediaType = rawType as "movie" | "tv";
-  const [baseRes, og] = await Promise.all([
+  const apiKey = getTmdbKey(context.env);
+  const ua = context.request.headers.get("user-agent") || "";
+  const isCrawler = CRAWLER_UA_RE.test(ua);
+
+  const [baseRes, cachedOg] = await Promise.all([
     fetchBaseSpaHtml(context, reqUrl.origin),
-    getCachedOrFreshOgMetadata(mediaType, id, reqUrl.origin, context),
+    readCachedOgMetadata(mediaType, id),
   ]);
+
+  let og = cachedOg;
+  if (!og && apiKey) {
+    if (isCrawler) {
+      og = await fetchAndCacheOgMetadata(mediaType, id, reqUrl.origin, apiKey);
+    } else if (context.waitUntil) {
+      // Never block human browser navigation TTFB waiting on TMDB metadata; warm edge cache in background
+      try {
+        context.waitUntil(
+          fetchAndCacheOgMetadata(mediaType, id, reqUrl.origin, apiKey)
+        );
+      } catch {}
+    }
+  }
 
   const contentType = baseRes.headers.get("content-type") || "";
   if (!og || !baseRes.ok || !contentType.includes("text/html")) {

@@ -1,9 +1,11 @@
 import {
   computeTitleMatchScore,
   generateZhTitleVariants,
+  prepareTargetTitles,
   setBoundedCache,
   stripYearSuffix,
   toSimplifiedChinese,
+  type PreparedTargetTitle,
 } from "../../src/server/tvboxService";
 
 // Re-export everything from the original tvboxService
@@ -58,11 +60,11 @@ function hasPlayableStreamWithoutParsing(
 async function probeVodSiteForMedia(
   siteUrl: string,
   keyword: string,
-  targetTitles: string[],
+  targetTitles: string[] | PreparedTargetTitle[],
   targetYear?: string,
   mediaType: "movie" | "tv" = "movie",
   useVideoList = true,
-  timeoutMs = 2200
+  timeoutMs = 2000
 ): Promise<boolean> {
   const sep = siteUrl.includes("?") ? "&" : "?";
   const ac = useVideoList ? "videolist" : "list";
@@ -139,25 +141,58 @@ async function probeVodSiteForMedia(
   return false;
 }
 
-export async function checkMediaHasPlayableStreams(
+interface ProbeContext {
+  idx: number;
+  item: any;
+  type: "movie" | "tv";
+  availKey: string;
+  primaryZhTitle?: string;
+  primaryQuery: string;
+  preparedTargets: PreparedTargetTitle[];
+  releaseYear: string;
+}
+
+function applyAvailabilityTitle(item: any, primaryZhTitle?: string): any {
+  return {
+    ...item,
+    title:
+      item.is_chinese_origin && primaryZhTitle ? primaryZhTitle : item.title,
+    name:
+      item.is_chinese_origin && primaryZhTitle ? primaryZhTitle : item.name,
+    zh_title: primaryZhTitle || item.zh_title,
+  };
+}
+
+function storeAvailabilityCache(
+  availKey: string,
+  available: boolean,
+  primaryZhTitle?: string
+): void {
+  const ttl = available ? 30 * 60 * 1000 : 15 * 60 * 1000;
+  setBoundedCache(
+    availabilityCache,
+    availKey,
+    {
+      available,
+      primaryZhTitle,
+      expiresAt: Date.now() + ttl,
+    },
+    500
+  );
+}
+
+async function prepareProbeContext(
+  idx: number,
   item: any,
   defaultType: "movie" | "tv",
-  _tmdbApiKey?: string,
+  tmdbApiKey?: string,
   budgetTracker?: { used: number; max: number }
-): Promise<{ available: boolean; primaryZhTitle?: string }> {
-  if (!item || !item.id) return { available: false };
+): Promise<ProbeContext | null> {
+  if (!item || !item.id) return null;
   const type: "movie" | "tv" =
     item.media_type === "tv" || defaultType === "tv" ? "tv" : "movie";
   const tmdbId = String(item.id);
   const availKey = `${type}:${tmdbId}`;
-
-  const cached = availabilityCache.get(availKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return {
-      available: cached.available,
-      primaryZhTitle: cached.primaryZhTitle,
-    };
-  }
 
   let primaryZhTitle =
     item.zh_title && /[\u4e00-\u9fff]/.test(item.zh_title)
@@ -165,7 +200,6 @@ export async function checkMediaHasPlayableStreams(
       : undefined;
 
   const tracker = budgetTracker || { used: 0, max: 30 };
-
   const candidateTitles: string[] = [];
   const addTitle = (t?: string) => {
     if (!t) return;
@@ -176,10 +210,10 @@ export async function checkMediaHasPlayableStreams(
   let probeQuery = "";
 
   // Only look up TMDB detail translations for the rare item lacking any CJK list title
-  if (!primaryZhTitle && _tmdbApiKey && tracker.used < tracker.max - 2 && consumeBudget(tracker)) {
+  if (!primaryZhTitle && tmdbApiKey && tracker.used < tracker.max - 2 && consumeBudget(tracker)) {
     try {
       const metaRes = await fetch(
-        `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${_tmdbApiKey}`,
+        `https://api.themoviedb.org/3/${type}/${tmdbId}?language=zh-CN&append_to_response=translations,alternative_titles&api_key=${tmdbApiKey}`,
         { signal: AbortSignal.timeout(2200) }
       );
       if (metaRes.ok) {
@@ -235,13 +269,49 @@ export async function checkMediaHasPlayableStreams(
   addTitle(item.original_title);
   addTitle(item.original_name);
 
-  if (candidateTitles.length === 0) {
-    return { available: false, primaryZhTitle };
-  }
+  if (candidateTitles.length === 0) return null;
 
   const releaseYear = (item.release_date || item.first_air_date || "").slice(0, 4);
   const cleanZh = primaryZhTitle ? primaryZhTitle.split(/[:：\s]/)[0].trim() : "";
-  const primaryQuery = probeQuery || cleanZh || item.title || item.name || candidateTitles[0];
+  const primaryQuery =
+    probeQuery || cleanZh || item.title || item.name || candidateTitles[0];
+
+  return {
+    idx,
+    item,
+    type,
+    availKey,
+    primaryZhTitle,
+    primaryQuery,
+    preparedTargets: prepareTargetTitles(candidateTitles, type),
+    releaseYear,
+  };
+}
+
+export async function checkMediaHasPlayableStreams(
+  item: any,
+  defaultType: "movie" | "tv",
+  tmdbApiKey?: string,
+  budgetTracker?: { used: number; max: number }
+): Promise<{ available: boolean; primaryZhTitle?: string }> {
+  if (!item || !item.id) return { available: false };
+  const type: "movie" | "tv" =
+    item.media_type === "tv" || defaultType === "tv" ? "tv" : "movie";
+  const availKey = `${type}:${String(item.id)}`;
+
+  const cached = availabilityCache.get(availKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return {
+      available: cached.available,
+      primaryZhTitle: cached.primaryZhTitle,
+    };
+  }
+
+  const tracker = budgetTracker || { used: 0, max: 30 };
+  const ctx = await prepareProbeContext(0, item, defaultType, tmdbApiKey, tracker);
+  if (!ctx) {
+    return { available: false };
+  }
 
   let available = false;
   let checkedAtLeastOneSite = false;
@@ -251,10 +321,10 @@ export async function checkMediaHasPlayableStreams(
     checkedAtLeastOneSite = true;
     const found = await probeVodSiteForMedia(
       site.url,
-      primaryQuery,
-      candidateTitles,
-      releaseYear,
-      type,
+      ctx.primaryQuery,
+      ctx.preparedTargets,
+      ctx.releaseYear,
+      ctx.type,
       true
     );
     if (found) {
@@ -264,27 +334,17 @@ export async function checkMediaHasPlayableStreams(
   }
 
   if (available || checkedAtLeastOneSite) {
-    const ttl = available ? 30 * 60 * 1000 : 15 * 60 * 1000;
-    setBoundedCache(
-      availabilityCache,
-      availKey,
-      {
-        available,
-        primaryZhTitle,
-        expiresAt: Date.now() + ttl,
-      },
-      500
-    );
+    storeAvailabilityCache(ctx.availKey, available, ctx.primaryZhTitle);
   }
 
-  return { available, primaryZhTitle };
+  return { available, primaryZhTitle: ctx.primaryZhTitle };
 }
 
 export async function filterItemsByServerAvailability(
   items: any[],
   defaultType: "movie" | "tv",
   tmdbApiKey?: string,
-  concurrency = 6
+  concurrency = 12
 ): Promise<any[]> {
   if (!Array.isArray(items) || items.length === 0) return [];
 
@@ -293,69 +353,129 @@ export async function filterItemsByServerAvailability(
   const budgetTracker = { used: 0, max: 32 };
   const maxAvailableItems = 20;
   let availableCount = 0;
-  let cursor = 0;
 
-  const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
-    async () => {
+  const now = Date.now();
+  const uncachedItems: { idx: number; item: any }[] = [];
+
+  for (let idx = 0; idx < items.length; idx++) {
+    const item = items[idx];
+    if (!item || !item.id) continue;
+    const type: "movie" | "tv" =
+      item.media_type === "tv" || defaultType === "tv" ? "tv" : "movie";
+    const cached = availabilityCache.get(`${type}:${item.id}`);
+    if (cached && cached.expiresAt > now) {
+      if (cached.available && availableCount < maxAvailableItems) {
+        availableCount++;
+        results[idx] = applyAvailabilityTitle(item, cached.primaryZhTitle);
+      }
+      continue;
+    }
+    uncachedItems.push({ idx, item });
+  }
+
+  if (availableCount >= maxAvailableItems || uncachedItems.length === 0) {
+    return results.filter(Boolean).slice(0, maxAvailableItems);
+  }
+
+  const contextPoolSize = Math.min(8, uncachedItems.length);
+  const preparedContexts: ProbeContext[] = [];
+  let ctxCursor = 0;
+  await Promise.all(
+    Array.from({ length: contextPoolSize }, async () => {
       while (true) {
-        if (availableCount >= maxAvailableItems) break;
-        const idx = cursor++;
-        if (idx >= items.length) break;
-        const item = items[idx];
-
-        const cached = availabilityCache.get(
-          `${item.media_type || defaultType}:${item.id}`
-        );
-        if (cached && cached.expiresAt > Date.now()) {
-          if (cached.available) {
-            availableCount++;
-            results[idx] = {
-              ...item,
-              title:
-                item.is_chinese_origin && cached.primaryZhTitle
-                  ? cached.primaryZhTitle
-                  : item.title,
-              name:
-                item.is_chinese_origin && cached.primaryZhTitle
-                  ? cached.primaryZhTitle
-                  : item.name,
-              zh_title: cached.primaryZhTitle || item.zh_title,
-            };
-          }
-          continue;
-        }
-
-        if (budgetTracker.used >= budgetTracker.max) {
-          continue;
-        }
-
-        const { available, primaryZhTitle } = await checkMediaHasPlayableStreams(
+        const pos = ctxCursor++;
+        if (pos >= uncachedItems.length) break;
+        const { idx, item } = uncachedItems[pos];
+        const ctx = await prepareProbeContext(
+          idx,
           item,
           defaultType,
           tmdbApiKey,
           budgetTracker
         );
-
-        if (available) {
-          availableCount++;
-          results[idx] = {
-            ...item,
-            title:
-              item.is_chinese_origin && primaryZhTitle
-                ? primaryZhTitle
-                : item.title,
-            name:
-              item.is_chinese_origin && primaryZhTitle
-                ? primaryZhTitle
-                : item.name,
-            zh_title: primaryZhTitle || item.zh_title,
-          };
-        }
+        if (ctx) preparedContexts.push(ctx);
       }
-    }
+    })
   );
 
-  await Promise.all(workers);
+  preparedContexts.sort((a, b) => a.idx - b.idx);
+  const pass1Site = FAST_PROBE_SITES[0];
+  const pass2Site = FAST_PROBE_SITES[1];
+  const pass1Misses: ProbeContext[] = [];
+
+  // Pass 1: Probe primary high-coverage site (bfzy) in parallel across uncached items
+  if (pass1Site && preparedContexts.length > 0 && availableCount < maxAvailableItems) {
+    let pass1Cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(concurrency, preparedContexts.length) },
+      async () => {
+        while (true) {
+          if (availableCount >= maxAvailableItems) break;
+          const pos = pass1Cursor++;
+          if (pos >= preparedContexts.length) break;
+          const ctx = preparedContexts[pos];
+          if (!consumeBudget(budgetTracker)) break;
+
+          const found = await probeVodSiteForMedia(
+            pass1Site.url,
+            ctx.primaryQuery,
+            ctx.preparedTargets,
+            ctx.releaseYear,
+            ctx.type,
+            true
+          );
+          if (found) {
+            availableCount++;
+            results[ctx.idx] = applyAvailabilityTitle(ctx.item, ctx.primaryZhTitle);
+            storeAvailabilityCache(ctx.availKey, true, ctx.primaryZhTitle);
+          } else {
+            pass1Misses.push(ctx);
+          }
+        }
+      }
+    );
+    await Promise.all(workers);
+  }
+
+  // Pass 2: Probe backup high-coverage site (lzzy) in parallel ONLY for Pass 1 misses
+  if (
+    pass2Site &&
+    pass1Misses.length > 0 &&
+    availableCount < maxAvailableItems &&
+    budgetTracker.used < budgetTracker.max
+  ) {
+    pass1Misses.sort((a, b) => a.idx - b.idx);
+    let pass2Cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(concurrency, pass1Misses.length) },
+      async () => {
+        while (true) {
+          if (availableCount >= maxAvailableItems) break;
+          const pos = pass2Cursor++;
+          if (pos >= pass1Misses.length) break;
+          const ctx = pass1Misses[pos];
+          if (!consumeBudget(budgetTracker)) break;
+
+          const found = await probeVodSiteForMedia(
+            pass2Site.url,
+            ctx.primaryQuery,
+            ctx.preparedTargets,
+            ctx.releaseYear,
+            ctx.type,
+            true
+          );
+          if (found) {
+            availableCount++;
+            results[ctx.idx] = applyAvailabilityTitle(ctx.item, ctx.primaryZhTitle);
+            storeAvailabilityCache(ctx.availKey, true, ctx.primaryZhTitle);
+          } else {
+            storeAvailabilityCache(ctx.availKey, false, ctx.primaryZhTitle);
+          }
+        }
+      }
+    );
+    await Promise.all(workers);
+  }
+
   return results.filter(Boolean).slice(0, maxAvailableItems);
 }

@@ -212,6 +212,49 @@ function resolveCountryCode(details: MediaDetails): string {
   return langMap[origLang] || "";
 }
 
+function buildMetaRowHtml(details: MediaDetails): string {
+  const releaseYear = (
+    details.release_date || details.first_air_date
+  )?.substring(0, 4);
+  const countryCode = resolveCountryCode(details);
+  const genreNames = details.genres?.slice(0, 3).map((g) => g.name).join(", ");
+  const castList = (details.cast || []).slice(0, 4);
+
+  const metaParts: string[] = [];
+  if (releaseYear) metaParts.push(`<span>${escapeHtml(releaseYear)}</span>`);
+  if (countryCode) {
+    if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
+    metaParts.push(`<span>${escapeHtml(countryCode)}</span>`);
+  }
+  if (details.runtime) {
+    if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
+    metaParts.push(`<span>${details.runtime} min</span>`);
+  }
+  if (details.vote_average > 0) {
+    if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
+    metaParts.push(
+      `<span class="player-meta-rating">&#9733; ${details.vote_average.toFixed(1)}</span>`
+    );
+  }
+  if (genreNames) {
+    if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
+    metaParts.push(`<span class="player-meta-genres">${escapeHtml(genreNames)}</span>`);
+  }
+  if (castList.length > 0) {
+    if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
+    metaParts.push(
+      `<span class="player-meta-cast">${escapeHtml(castList.join(", "))}</span>`
+    );
+  }
+  return metaParts.join("");
+}
+
+function buildImdbHref(imdbId: string, fallbackTitle: string): string {
+  return imdbId
+    ? `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/`
+    : `https://www.imdb.com/find/?s=tt&q=${encodeURIComponent(fallbackTitle)}`;
+}
+
 export function mount(
   container: HTMLElement,
   params: { type: "movie" | "tv"; id: string },
@@ -221,15 +264,37 @@ export function mount(
   const ac = new AbortController();
   const { signal } = ac;
 
-  // Read cached data synchronously so prefetched cards open with zero skeleton flash
-  let details: MediaDetails | null = api.getCachedDetails(type, id) ?? null;
+  let existingHistoryItem: MediaItem | null = null;
+  let savedProgress: WatchProgress | null = (() => {
+    try {
+      const stored = localStorage.getItem("watch_history");
+      const history: MediaItem[] = stored ? JSON.parse(stored) : [];
+      const existing = history.find(
+        (item) =>
+          item.id.toString() === id && (item.media_type || "movie") === type
+      );
+      if (existing) existingHistoryItem = existing;
+      return existing?.watchProgress || null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // Hydrate immediately from details cache or list/history preview so opening a card never flashes a skeleton
+  let fullDetails: MediaDetails | null = api.getCachedDetails(type, id) ?? null;
+  const previewItem: MediaItem | null = fullDetails
+    ? null
+    : api.getPreviewItem(type, id) ?? existingHistoryItem ?? null;
+  let details: MediaDetails | null =
+    fullDetails || (previewItem ? { ...previewItem, genres: [], tagline: "" } : null);
+
   const cachedVod = api.getCachedVodStreams(type, id);
   let sources: ResolvedStreamSource[] = cachedVod?.sources || [];
   let resolving = !cachedVod;
 
   const detectedQualities: Record<string, string> = {};
   sources.forEach((src) => {
-    const q = api.getCachedManifestQuality(src.sourceId);
+    const q = api.getCachedManifestQuality(src.episodes?.[0]?.url);
     if (q) detectedQualities[src.sourceId] = q;
   });
 
@@ -244,20 +309,6 @@ export function mount(
   let serverPage = 0;
   let serverBarWidth =
     typeof window !== "undefined" ? Math.max(320, window.innerWidth - 420) : 800;
-
-  let savedProgress: WatchProgress | null = (() => {
-    try {
-      const stored = localStorage.getItem("watch_history");
-      const history: MediaItem[] = stored ? JSON.parse(stored) : [];
-      const existing = history.find(
-        (item) =>
-          item.id.toString() === id && (item.media_type || "movie") === type
-      );
-      return existing?.watchProgress || null;
-    } catch {
-      return null;
-    }
-  })();
 
   let hlsController: HlsPlayerController | null = null;
   let currentPlayedUrl = "";
@@ -521,7 +572,7 @@ export function mount(
   }
 
   function handleBack() {
-    flushHistoryProgressSync(true);
+    flushCurrentPlayback();
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
@@ -657,27 +708,57 @@ export function mount(
     }
   }
 
-  function handleTimeUpdate(currentTime: number, duration: number) {
-    currentVideoTime = currentTime;
-    const now = Date.now();
-    if (now - lastSaveTime < 2000) return;
-    lastSaveTime = now;
-
+  function savePlaybackProgress(
+    currentTime: number,
+    duration: number,
+    syncImmediately = false
+  ) {
+    if (!details || !isPlaying || currentTime <= 0) return;
     const derived = getDerivedState();
     if (!derived.activeServer) return;
+    lastSaveTime = Date.now();
     const epLabel = formatEpisodeLabel(
       derived.activeEpisodeObj?.name || "",
       derived.activeEpisodeIndexClamped
     );
-    persistWatchHistory(details, {
-      sourceId: derived.activeServer.sourceId,
-      seasonNumber: derived.activeServerSeasonGroup?.seasonNumber,
-      seasonIndex: derived.activeServerSafeSeasonIdx,
-      episodeIndex: derived.activeEpisodeIndexClamped,
-      episodeLabel: epLabel,
-      currentTime,
-      duration,
-    });
+    persistWatchHistory(
+      details,
+      {
+        sourceId: derived.activeServer.sourceId,
+        seasonNumber: derived.activeServerSeasonGroup?.seasonNumber,
+        seasonIndex: derived.activeServerSafeSeasonIdx,
+        episodeIndex: derived.activeEpisodeIndexClamped,
+        episodeLabel: epLabel,
+        currentTime,
+        duration,
+      },
+      syncImmediately
+    );
+  }
+
+  function flushCurrentPlayback() {
+    const videoEl = hlsController?.getVideoElement();
+    const t =
+      videoEl && videoEl.currentTime > 0 ? videoEl.currentTime : currentVideoTime;
+    const dur = videoEl?.duration || 0;
+    if (isPlaying && t > 0) {
+      savePlaybackProgress(t, dur, true);
+    } else {
+      flushHistoryProgressSync(true);
+    }
+  }
+
+  function handleTimeUpdate(currentTime: number, duration: number) {
+    currentVideoTime = currentTime;
+    const now = Date.now();
+    if (now - lastSaveTime < 8000) return;
+    savePlaybackProgress(currentTime, duration, false);
+  }
+
+  function applyDetectedQuality(sourceId: string, q: string) {
+    if (detectedQualities[sourceId] === q) return;
+    detectedQualities[sourceId] = q;
+    renderServerBar();
   }
 
   function getResumeButtonLabel(): string | null {
@@ -727,12 +808,20 @@ export function mount(
         initialTime: initialSeekTime,
         isAnimation: isAnimationTitle(details),
         onTimeUpdate: handleTimeUpdate,
+        onPersistProgress: (ct, dur) => savePlaybackProgress(ct, dur, false),
         onError: handleStreamError,
         onQualityDetected: (q) => {
           if (signal.aborted || !derived.activeServer) return;
-          detectedQualities[derived.activeServer.sourceId] = q;
-          api.setCachedManifestQuality(derived.activeServer.sourceId, q);
-          renderServerBar();
+          api.setCachedManifestQuality(derived.activeStreamUrl, q);
+          const firstEpUrl = derived.activeServer.episodes?.[0]?.url;
+          if (
+            firstEpUrl &&
+            firstEpUrl !== derived.activeStreamUrl &&
+            derived.activeEpisodeIndexClamped === 0
+          ) {
+            api.setCachedManifestQuality(firstEpUrl, q);
+          }
+          applyDetectedQuality(derived.activeServer.sourceId, q);
         },
       });
       return;
@@ -803,21 +892,44 @@ export function mount(
       ? `https://image.tmdb.org/t/p/original${backdropPath}`
       : "";
     const imdbId = details.imdb_id || details.external_ids?.imdb_id || "";
+    const metaHtml = buildMetaRowHtml(details);
+    const overviewText = details.overview || "";
+    const imdbHref = buildImdbHref(imdbId, englishTitle || primaryTitle);
 
-    const nextHeroKey = `${details.id}_${primaryTitle}_${secondaryTitle || ""}_${backdropUrl}_${hasWideBackdrop ? 1 : 0}_${imdbId}`;
+    const heroAssetKey = `${details.id}|${backdropUrl}|${hasWideBackdrop ? 1 : 0}`;
+    const nextHeroKey = `${heroAssetKey}|${primaryTitle}|${secondaryTitle || ""}|${imdbHref}|${metaHtml}|${overviewText}`;
     if (renderedHeroKey === nextHeroKey) return;
 
-    // If only bilingual title changed (after VOD resolve), update title in-place without reloading backdrop image
+    // Hydrate metadata/title in-place when hero backdrop element is unchanged to avoid reloading the 4K backdrop
     const existingInfo = stageEl.querySelector(".player-info");
-    if (
-      renderedHeroKey.startsWith(`${details.id}_`) &&
-      renderedHeroKey.endsWith(`_${backdropUrl}_${hasWideBackdrop ? 1 : 0}_${imdbId}`) &&
-      existingInfo
-    ) {
+    if (renderedHeroKey.startsWith(`${heroAssetKey}|`) && existingInfo) {
       renderedHeroKey = nextHeroKey;
       const existingTitle = existingInfo.querySelector(".player-title");
       if (existingTitle) {
         updateTitleElement(existingTitle, primaryTitle, secondaryTitle);
+      }
+      const existingMeta = existingInfo.querySelector(".player-meta-row");
+      if (existingMeta) {
+        existingMeta.innerHTML = metaHtml;
+      }
+      const existingOverview = existingInfo.querySelector(".player-overview");
+      if (overviewText) {
+        if (existingOverview) {
+          existingOverview.textContent = overviewText;
+        } else {
+          const overviewEl = document.createElement("p");
+          overviewEl.className = "player-overview";
+          overviewEl.textContent = overviewText;
+          const actionsEl = existingInfo.querySelector(".player-info-actions");
+          if (actionsEl) existingInfo.insertBefore(overviewEl, actionsEl);
+          else existingInfo.appendChild(overviewEl);
+        }
+      } else if (existingOverview) {
+        existingOverview.remove();
+      }
+      const existingImdb = existingInfo.querySelector<HTMLAnchorElement>(".imdb-btn");
+      if (existingImdb) {
+        existingImdb.href = imdbHref;
       }
       return;
     }
@@ -889,48 +1001,15 @@ export function mount(
     updateTitleElement(titleEl, primaryTitle, secondaryTitle);
     info.appendChild(titleEl);
 
-    const releaseYear = (
-      details.release_date || details.first_air_date
-    )?.substring(0, 4);
-    const countryCode = resolveCountryCode(details);
-    const genreNames = details.genres?.slice(0, 3).map((g) => g.name).join(", ");
-    const castList = (details.cast || []).slice(0, 4);
-
     const metaRow = document.createElement("div");
     metaRow.className = "player-meta-row tabular-nums";
-    const metaParts: string[] = [];
-    if (releaseYear) metaParts.push(`<span>${escapeHtml(releaseYear)}</span>`);
-    if (countryCode) {
-      if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
-      metaParts.push(`<span>${escapeHtml(countryCode)}</span>`);
-    }
-    if (details.runtime) {
-      if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
-      metaParts.push(`<span>${details.runtime} min</span>`);
-    }
-    if (details.vote_average > 0) {
-      if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
-      metaParts.push(
-        `<span class="player-meta-rating">&#9733; ${details.vote_average.toFixed(1)}</span>`
-      );
-    }
-    if (genreNames) {
-      if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
-      metaParts.push(`<span class="player-meta-genres">${escapeHtml(genreNames)}</span>`);
-    }
-    if (castList.length > 0) {
-      if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
-      metaParts.push(
-        `<span class="player-meta-cast">${escapeHtml(castList.join(", "))}</span>`
-      );
-    }
-    metaRow.innerHTML = metaParts.join("");
+    metaRow.innerHTML = metaHtml;
     info.appendChild(metaRow);
 
-    if (details.overview) {
+    if (overviewText) {
       const overviewEl = document.createElement("p");
       overviewEl.className = "player-overview";
-      overviewEl.textContent = details.overview;
+      overviewEl.textContent = overviewText;
       info.appendChild(overviewEl);
     }
 
@@ -975,11 +1054,7 @@ export function mount(
     imdbLink.rel = "noopener noreferrer";
     imdbLink.setAttribute("aria-label", "Open IMDb page");
     imdbLink.tabIndex = 0;
-    imdbLink.href = imdbId
-      ? `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/`
-      : `https://www.imdb.com/find/?s=tt&q=${encodeURIComponent(
-          englishTitle || primaryTitle
-        )}`;
+    imdbLink.href = imdbHref;
     imdbLink.innerHTML = `<span>IMDb</span>${icons.externalLink("", 14)}`;
     actionsRow.appendChild(imdbLink);
 
@@ -1477,21 +1552,33 @@ export function mount(
   updateServerBarWidth();
   void preloadHlsLibrary();
 
+  // Flush playback progress cleanly when tab hides or page is left
+  document.addEventListener(
+    "visibilitychange",
+    () => {
+      if (document.visibilityState === "hidden") {
+        flushCurrentPlayback();
+      }
+    },
+    { signal }
+  );
+  window.addEventListener("pagehide", flushCurrentPlayback, { signal });
+
   // Pre-warm primary m3u8 manifest if sources came from prefetch cache
   if (sources.length > 0) {
     prewarmStreamManifests(sources, signal, (sourceId, q) => {
       if (signal.aborted) return;
-      detectedQualities[sourceId] = q;
-      renderServerBar();
+      applyDetectedQuality(sourceId, q);
     });
   }
 
-  // Fetch details if not already cached
-  if (!details) {
+  // Fetch full details if not already cached (even when preview rendered immediately)
+  if (!fullDetails) {
     api
       .getDetails(type, id, signal)
       .then((data) => {
         if (signal.aborted) return;
+        fullDetails = data;
         details = data;
         hlsController?.setUpscaleAnimation(isAnimationTitle(details));
         syncHeadMeta();
@@ -1510,7 +1597,7 @@ export function mount(
         if (signal.aborted) return;
         sources = res.sources || [];
         sources.forEach((src) => {
-          const q = api.getCachedManifestQuality(src.sourceId);
+          const q = api.getCachedManifestQuality(src.episodes?.[0]?.url);
           if (q) detectedQualities[src.sourceId] = q;
         });
         resolving = false;
@@ -1518,8 +1605,7 @@ export function mount(
         renderBottomBar();
         prewarmStreamManifests(sources, signal, (sourceId, q) => {
           if (signal.aborted) return;
-          detectedQualities[sourceId] = q;
-          renderServerBar();
+          applyDetectedQuality(sourceId, q);
         });
       })
       .catch(() => {
@@ -1532,7 +1618,7 @@ export function mount(
 
   return {
     destroy() {
-      flushHistoryProgressSync(true);
+      flushCurrentPlayback();
       ac.abort();
       resizeObserver?.disconnect();
       resizeObserver = null;

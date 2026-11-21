@@ -1,6 +1,6 @@
 import { Resvg } from "@cf-wasm/resvg/workerd";
 import { buildMovieOgSvg, extractOgCardInput } from "../../../_shared/ogCard";
-import { fetchMediaDetails, getTmdbKey } from "../../../_shared/tmdb";
+import { fetchOgMediaMetadata, getTmdbKey } from "../../../_shared/tmdb";
 
 const OG_IMAGE_CACHE_TTL = 86400 * 7;
 
@@ -14,24 +14,17 @@ async function loadWorkerFonts(
 
   fontBuffersPromise = (async () => {
     const assets = context.env?.ASSETS as { fetch?: typeof fetch } | undefined;
-    const fetchAsset = (path: string) => {
-      const url = new URL(path, origin).toString();
-      return assets && typeof assets.fetch === "function" ? assets.fetch(url) : fetch(url);
-    };
-
-    const [boldRes, regularRes] = await Promise.all([
-      fetchAsset("/fonts/Poppins-Bold.ttf"),
-      fetchAsset("/fonts/Poppins-Regular.ttf"),
-    ]);
-    if (!boldRes.ok || !regularRes.ok) {
-      throw new Error("Failed to load bundled OG fonts from ASSETS");
+    const url = new URL("/fonts/Poppins-Bold.ttf", origin).toString();
+    const boldRes =
+      assets && typeof assets.fetch === "function"
+        ? await assets.fetch(url)
+        : await fetch(url);
+    if (!boldRes.ok) {
+      throw new Error("Failed to load bundled OG font from ASSETS");
     }
 
-    const [boldBuf, regularBuf] = await Promise.all([
-      boldRes.arrayBuffer(),
-      regularRes.arrayBuffer(),
-    ]);
-    return [new Uint8Array(boldBuf), new Uint8Array(regularBuf)];
+    const boldBuf = await boldRes.arrayBuffer();
+    return [new Uint8Array(boldBuf)];
   })().catch((err) => {
     fontBuffersPromise = null;
     throw err;
@@ -72,7 +65,7 @@ export const onRequestGet: PagesFunction = async (context) => {
 
   let details: any = null;
   try {
-    details = await fetchMediaDetails(mediaType, id, apiKey);
+    details = await fetchOgMediaMetadata(mediaType, id, apiKey, true);
     const input = extractOgCardInput(details, mediaType);
     if (!input) {
       return Response.redirect(fallbackUrl, 302);

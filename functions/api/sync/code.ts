@@ -3,7 +3,11 @@ import { handleCreateSyncCode, type SyncEnv } from "../../_shared/syncService";
 export const onRequestPost: PagesFunction<SyncEnv> = async (context) => {
   try {
     const body = await context.request.json().catch(() => ({}));
-    const result = await handleCreateSyncCode(context.env, body);
+    const result = await handleCreateSyncCode(
+      context.env,
+      body,
+      context.waitUntil?.bind(context)
+    );
     return Response.json(result.body, {
       status: result.status,
       headers: { "Cache-Control": "no-store" },

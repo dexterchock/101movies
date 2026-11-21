@@ -2,6 +2,7 @@ import { api } from "../api";
 import { icons } from "../icons";
 import type { MediaItem } from "../types";
 import { cn, escapeHtml, resolveMediaItemType } from "../utils";
+import { preloadHlsLibrary } from "./HlsPlayer";
 
 export interface MediaCardOptions {
   item: MediaItem;
@@ -155,6 +156,18 @@ export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
 
   card.addEventListener("mouseenter", schedulePrefetch, { signal });
   card.addEventListener("focus", schedulePrefetch, { signal });
+  card.addEventListener(
+    "pointerdown",
+    (e: PointerEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.(".media-card-remove")) {
+        return;
+      }
+      cancelPrefetch();
+      api.prefetchMediaIntent(type, String(item.id));
+      void preloadHlsLibrary();
+    },
+    { signal }
+  );
   card.addEventListener("mouseleave", cancelPrefetch, { signal });
   card.addEventListener("blur", cancelPrefetch, { signal });
   signal.addEventListener("abort", cancelPrefetch, { once: true });

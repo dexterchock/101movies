@@ -18,7 +18,7 @@
     "@cf-wasm/resvg": "^0.4.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "hls.js": "^1.6.16",
+    "hls.js": "^1.7.4",
     "vite": "^6.2.3"
   },
   "devDependencies": {
@@ -28,7 +28,6 @@
     "@websr/webgl": "^0.1.0",
     "@websr/websr": "^0.1.1",
     "esbuild": "^0.25.0",
-    "terser": "^5.51.2",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "wrangler": "^4.158.0"

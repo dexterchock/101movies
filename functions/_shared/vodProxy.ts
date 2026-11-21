@@ -264,6 +264,17 @@ export function rewriteM3u8Playlist(text: string, baseUrl: URL): string {
     .join("\n");
 }
 
+function isImmutableMediaSegmentPath(pathLower: string): boolean {
+  if (pathLower.includes(".m3u8")) return false;
+  return (
+    pathLower.endsWith(".ts") ||
+    pathLower.endsWith(".m4s") ||
+    pathLower.endsWith(".key") ||
+    pathLower.endsWith(".aac") ||
+    pathLower.endsWith(".mp4")
+  );
+}
+
 function startsWithExtM3u(text: string): boolean {
   return text.replace(/^\uFEFF/, "").trimStart().startsWith("#EXTM3U");
 }
@@ -447,6 +458,13 @@ export async function handleVodProxyRequest(
       const responseHeaders = new Headers(corsHeaders);
       if (contentType) responseHeaders.set("Content-Type", contentType);
       responseHeaders.set("Content-Length", String(buf.byteLength));
+      if (
+        upstream.status === 200 &&
+        (isImmutableMediaSegmentPath(initialPathLower) ||
+          isImmutableMediaSegmentPath(finalPathLower))
+      ) {
+        responseHeaders.set("Cache-Control", "public, max-age=3600");
+      }
       return new Response(buf, {
         status: upstream.status,
         headers: responseHeaders,
@@ -465,6 +483,13 @@ export async function handleVodProxyRequest(
 
     const responseHeaders = new Headers(corsHeaders);
     if (contentType) responseHeaders.set("Content-Type", contentType);
+    if (
+      upstream.status === 200 &&
+      (isImmutableMediaSegmentPath(initialPathLower) ||
+        isImmutableMediaSegmentPath(finalPathLower))
+    ) {
+      responseHeaders.set("Cache-Control", "public, max-age=3600");
+    }
 
     const hasContentEncoding = Boolean(upstream.headers.get("content-encoding"));
     const passthroughHeaders = hasContentEncoding

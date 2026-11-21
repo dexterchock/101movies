@@ -14,7 +14,7 @@ Notes for future coding sessions and automated agents working on this repository
 - **Vite Build (`vite.config.ts`)**: Keep `target: ["chrome56", "es2015"]`, `cssTarget: "chrome56"`, `modulePreload: false`, `format: "iife"`, `inlineDynamicImports: true`, and `tizenClassicBundlePlugin` (strips `type="module"` and `crossorigin`, outputs `<script defer>`). Do NOT switch to native ESM or raise the browser target.
 - **Runtime Polyfills (`src/polyfills.ts`)**: Keep `URLSearchParams` plain-object constructor support, `Element.prototype.append` / `replaceChildren`, `String.prototype.padStart` / `padEnd`, `Promise.prototype.finally` / `Promise.allSettled`, `AbortController` / `AbortSignal` + `{ signal }` listener wrapper, and `html.no-focus-visible` detection.
 - **Flexbox `gap` Fallbacks (`src/index.css`)**: Keep `@supports not (display: grid)` margin fallbacks (Chromium 56 lacks flex `gap`). Also keep Tizen Return/Back (`keyCode 10009` / `XF86Back`) navigation intact.
-- **On-Demand `hls.js` (`src/components/HlsPlayer.ts`)**: Keep `public/vendor/hls.light-1.6.16.min.js` (~106 KiB gzip ES5 light build with AES-128 decryption support) lazy-loaded via `<script>` on the player route instead of statically importing `hls.js` into the main IIFE (saves ~160 KiB gzip on browse pages). All active MacCMS VOD playlists are verified free of `#EXT-X-MEDIA` / `#EXT-X-DEFINE` demuxed audio/subtitle tracks; revert to full `hls.min.js` only if a future source adds those tags. Keep standard-MSE check (`hasStandardMSE()`) so iOS Safari uses native HLS and skips downloading `hls.js`. Keep TV-safe buffer caps (`maxBufferLength: 60`, `maxBufferSize: 60000000`, `backBufferLength: 30`) and strict `hls.destroy()` teardown on exit to prevent OOM crashes on Tizen TVs.
+- **On-Demand `hls.js` (`src/components/HlsPlayer.ts`)**: Keep `public/vendor/hls.light-1.7.4.min.js` (~118 KiB gzip ES5 light build with AES-128 decryption support) lazy-loaded via `<script>` on the player route instead of statically importing `hls.js` into the main IIFE (saves ~160 KiB gzip on browse pages). All active MacCMS VOD playlists are verified free of `#EXT-X-MEDIA` / `#EXT-X-DEFINE` demuxed audio/subtitle tracks; revert to full `hls.min.js` only if a future source adds those tags. Keep standard-MSE check (`hasStandardMSE()`) so iOS Safari uses native HLS and skips downloading `hls.js`. Keep TV-safe buffer caps (`maxBufferLength: 60`, `maxBufferSize: 60000000`, `backBufferLength: 30`) and strict `hls.destroy()` teardown on exit to prevent OOM crashes on Tizen TVs.
 
 ### 1.3 Desktop AI Video Upscaler (`src/components/VideoUpscaler.ts`)
 - Hidden on phones, tablets, touch laptops (`maxTouchPoints > 0`), and Smart TVs (`isDesktopUpscaleSupported()`).
@@ -48,10 +48,10 @@ Notes for future coding sessions and automated agents working on this repository
 
 ### 2.2 GitHub Repos to Trace Fresh MacCMS Sources
 When existing sources go offline or slow down, extract `type: 0/1` `provide/vod` URLs from these maintained repos:
-1. **Primary (actively updated CMS list)**: `https://github.com/hafrey1/LunaTV-config` (`LunaTV-config.json`)
+1. **Primary (actively updated CMS list + daily uptime reports)**: `https://github.com/hafrey1/LunaTV-config` (`LunaTV-config.json`)
 2. **Curated CMS list + reliability notes**: `https://github.com/yujian0815/fnmedia-ext` (`proxy/providers.py`, `proxy/assets/cat_lite.json`)
 3. **Directory & TVBox feeds**: `https://github.com/laoma528/awesome-zhuiju-free` (`resources/resources.json`)
-4. **Mirror fallback list**: `https://github.com/katelya77/KatelyaTV` (`config.json`)
+4. **Mirror fallback list (successor to `katelya77/KatelyaTV`)**: `https://github.com/Decohererk/DecoTV` (`config.json`)
 
 *(Avoid unmaintained pastebins — >90% of old CMS domain lists are dead or WAF-blocked.)*
 

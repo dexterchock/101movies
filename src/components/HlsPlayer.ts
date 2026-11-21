@@ -13,7 +13,7 @@ declare global {
 
 // NOTE: DO NOT statically import hls.js into the main IIFE (~160 KiB gzip savings on browse pages).
 // Keep on-demand script loading, and keep iOS Safari on native HLS via hasStandardMSE().
-const HLS_SCRIPT_URL = "/vendor/hls.light-1.6.16.min.js";
+const HLS_SCRIPT_URL = "/vendor/hls.light-1.7.4.min.js";
 let hlsLoadPromise: Promise<typeof HlsType | null> | null = null;
 
 function hasStandardMSE(): boolean {
@@ -62,6 +62,7 @@ export interface HlsPlayerOptions {
   initialTime?: number;
   isAnimation?: boolean;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
+  onPersistProgress?: (currentTime: number, duration: number) => void;
   onError?: () => void;
   onQualityDetected?: (quality: string) => void;
 }
@@ -227,9 +228,11 @@ export function createHlsPlayer(
   const applyInitialSeekAndPlay = () => {
     if (destroyed) return;
     if (pendingSeek > 0) {
-      try {
-        video.currentTime = pendingSeek;
-      } catch {}
+      if (Math.abs(video.currentTime - pendingSeek) > 2) {
+        try {
+          video.currentTime = pendingSeek;
+        } catch {}
+      }
       pendingSeek = 0;
     }
     video.play().catch(() => {});
@@ -255,6 +258,20 @@ export function createHlsPlayer(
     () => {
       if (video.currentTime > 0) {
         options.onTimeUpdate?.(video.currentTime, video.duration || 0);
+      }
+    },
+    { signal }
+  );
+  video.addEventListener(
+    "error",
+    () => {
+      if (destroyed || hls !== null) return;
+      if (!useProxy) {
+        pendingSeek = video.currentTime || pendingSeek;
+        useProxy = true;
+        void startPlayback();
+      } else {
+        options.onError?.();
       }
     },
     { signal }
@@ -304,6 +321,7 @@ export function createHlsPlayer(
     if (destroyed || gen !== playbackGen) return;
 
     if (Hls && Hls.isSupported()) {
+      let mediaErrorRetries = 0;
       // NOTE: DO NOT raise buffer limits; capped for low-RAM Smart TVs (Samsung Tizen 4.0) to avoid OOM crashes.
       hls = new Hls({
         enableWorker: true,
@@ -311,6 +329,41 @@ export function createHlsPlayer(
         maxBufferLength: 60,
         maxBufferSize: 60000000,
         backBufferLength: 30,
+        startPosition: pendingSeek > 0 ? pendingSeek : -1,
+        startFragPrefetch: true,
+        testBandwidth: false,
+        manifestLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 8000,
+            maxLoadTimeMs: 12000,
+            timeoutRetry: {
+              maxNumRetry: 1,
+              retryDelayMs: 500,
+              maxRetryDelayMs: 2000,
+            },
+            errorRetry: {
+              maxNumRetry: 1,
+              retryDelayMs: 500,
+              maxRetryDelayMs: 2000,
+            },
+          },
+        },
+        fragLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 8000,
+            maxLoadTimeMs: 15000,
+            timeoutRetry: {
+              maxNumRetry: 2,
+              retryDelayMs: 500,
+              maxRetryDelayMs: 2000,
+            },
+            errorRetry: {
+              maxNumRetry: 2,
+              retryDelayMs: 500,
+              maxRetryDelayMs: 2000,
+            },
+          },
+        },
       });
 
       hls.loadSource(effectiveSrc);
@@ -329,12 +382,25 @@ export function createHlsPlayer(
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (destroyed || gen !== playbackGen || !data.fatal) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !useProxy) {
+          pendingSeek = video.currentTime || pendingSeek;
           destroyHlsInstance();
           useProxy = true;
           void startPlayback();
         } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-          hls?.recoverMediaError();
+          mediaErrorRetries++;
+          if (mediaErrorRetries === 1) {
+            hls?.recoverMediaError();
+          } else if (mediaErrorRetries === 2) {
+            if (typeof hls?.swapAudioCodec === "function") {
+              hls.swapAudioCodec();
+            }
+            hls?.recoverMediaError();
+          } else {
+            destroyHlsInstance();
+            options.onError?.();
+          }
         } else {
+          destroyHlsInstance();
           options.onError?.();
         }
       });
@@ -416,7 +482,25 @@ export function createHlsPlayer(
   );
 
   video.addEventListener("play", () => syncControlsVisibility(false), { signal });
-  video.addEventListener("pause", () => syncControlsVisibility(true), { signal });
+  video.addEventListener(
+    "pause",
+    () => {
+      syncControlsVisibility(true);
+      if (!destroyed && video.currentTime > 0) {
+        options.onPersistProgress?.(video.currentTime, video.duration || 0);
+      }
+    },
+    { signal }
+  );
+  video.addEventListener(
+    "seeked",
+    () => {
+      if (!destroyed && video.currentTime > 0) {
+        options.onPersistProgress?.(video.currentTime, video.duration || 0);
+      }
+    },
+    { signal }
+  );
   video.addEventListener("ended", () => syncControlsVisibility(true), { signal });
 
   video.addEventListener(

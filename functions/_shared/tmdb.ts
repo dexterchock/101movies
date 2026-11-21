@@ -554,6 +554,85 @@ export async function fetchMediaDetails(
   };
 }
 
+/**
+ * Lightweight TMDB fetch for OG metadata & OG image generation (skips credits,
+ * external_ids, translations, and per-actor /person/{id} lookups).
+ */
+export async function fetchOgMediaMetadata(
+  type: "movie" | "tv",
+  id: string,
+  apiKey: string,
+  imagesOnly = false
+): Promise<any> {
+  if (!apiKey) return {};
+  try {
+    const enRes = await fetch(
+      `${TMDB_BASE_URL}/${type}/${id}?language=en-US&api_key=${apiKey}`,
+      { signal: AbortSignal.timeout(4500) }
+    );
+    if (!enRes.ok) return {};
+    const enData: any = await enRes.json();
+    if (!enData || enData.success === false || !enData.id) {
+      return enData?.success === false ? { success: false } : {};
+    }
+
+    if (imagesOnly) {
+      return {
+        id: enData.id,
+        backdrop_path: enData.backdrop_path ?? null,
+        poster_path: enData.poster_path ?? null,
+      };
+    }
+
+    const isZhOrigin = isChineseOriginItem(enData);
+    let title = String(enData.title || enData.name || "").trim();
+    let overview = String(enData.overview || "").trim();
+
+    if (isZhOrigin) {
+      try {
+        const zhRes = await fetch(
+          `${TMDB_BASE_URL}/${type}/${id}?language=zh-CN&api_key=${apiKey}`,
+          { signal: AbortSignal.timeout(3000) }
+        );
+        if (zhRes.ok) {
+          const zhData: any = await zhRes.json();
+          const zhTitle = String(
+            zhData?.title ||
+              zhData?.name ||
+              enData.original_title ||
+              enData.original_name ||
+              ""
+          ).trim();
+          if (zhTitle && hasChineseChars(zhTitle)) {
+            title = toSimplifiedChinese(zhTitle);
+          }
+          const zhOverview = String(zhData?.overview || "").trim();
+          if (zhOverview && hasChineseChars(zhOverview)) {
+            overview = toSimplifiedChinese(zhOverview);
+          }
+        }
+      } catch {
+        // Keep en-US fallback if zh-CN times out
+      }
+    }
+
+    return {
+      id: enData.id,
+      title: type === "movie" ? title || undefined : undefined,
+      name: type === "tv" ? title || undefined : undefined,
+      release_date: enData.release_date,
+      first_air_date: enData.first_air_date,
+      vote_average:
+        typeof enData.vote_average === "number" ? enData.vote_average : 0,
+      overview,
+      backdrop_path: enData.backdrop_path ?? null,
+      poster_path: enData.poster_path ?? null,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export function resolveTmdbGenre(type: "movie" | "tv", genre?: string): string {
   if (!genre || genre === "all") return "";
   const g = genre.toLowerCase().trim();

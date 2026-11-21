@@ -460,16 +460,18 @@ export async function fetchMediaDetails(
       ? zhData.credits.cast
       : [];
 
+  const rawZhOverview = hasChineseChars(String(zhData.overview || ""))
+    ? String(zhData.overview).trim()
+    : findZhTranslationText(zhData, (data) => data?.overview || "");
+  const zh_overview = rawZhOverview ? toSimplifiedChinese(rawZhOverview) : undefined;
+
   let cast: string[];
   let overview = enData.overview;
 
   if (is_chinese_origin) {
     const zhCast = Array.isArray(zhData?.credits?.cast) ? zhData.credits.cast : [];
-    const rawZhOverview = hasChineseChars(String(zhData.overview || ""))
-      ? String(zhData.overview).trim()
-      : findZhTranslationText(zhData, (data) => data?.overview || "");
-    if (rawZhOverview) {
-      overview = toSimplifiedChinese(rawZhOverview);
+    if (zh_overview) {
+      overview = zh_overview;
     }
     cast = await resolveChineseCastNames(rawCast, zhCast, apiKey);
   } else {
@@ -527,6 +529,7 @@ export async function fetchMediaDetails(
     poster_path: baseData.poster_path ?? zhData.poster_path ?? null,
     backdrop_path: baseData.backdrop_path ?? zhData.backdrop_path ?? null,
     overview: overview || String(zhData.overview || "").trim() || "",
+    zh_overview,
     vote_average:
       typeof baseData.vote_average === "number" ? baseData.vote_average : 0,
     release_date: baseData.release_date || zhData.release_date,

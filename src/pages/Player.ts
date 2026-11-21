@@ -8,6 +8,7 @@ import {
   isAnimationTitle,
   isDesktopUpscaleSupported,
 } from "../components/VideoUpscaler";
+import { formatEpisodeLabel, getLocalizedGenreName, isZh, t } from "../i18n";
 import { icons } from "../icons";
 import {
   MediaDetails,
@@ -26,34 +27,6 @@ const DEFAULT_SITE_TITLE = "101Movies";
 const DEFAULT_SITE_DESC =
   "Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation and real-time TMDB integration.";
 const DEFAULT_SITE_IMAGE = "https://101movies.pages.dev/og-image.png?v=5";
-
-function formatEpisodeLabel(rawName: string, index: number): string {
-  const trimmed = rawName.trim();
-  if (!trimmed) return `Ep ${index + 1}`;
-
-  const epMatch = trimmed.match(/^第\s*0*(\d+)\s*[集期话回]$/);
-  if (epMatch) {
-    return `Ep ${epMatch[1]}`;
-  }
-
-  if (/^\d+$/.test(trimmed)) {
-    return `Ep ${parseInt(trimmed, 10)}`;
-  }
-
-  if (/^(正片|高清|超清|蓝光|HD|Full|BD|TC|1080[pP]|720[pP]|4[kK])$/i.test(trimmed)) {
-    return trimmed
-      .replace("正片", "Full")
-      .replace("高清", "HD")
-      .replace("超清", "FHD")
-      .replace("蓝光", "Blu-ray");
-  }
-
-  if (trimmed.includes("预告")) {
-    return "Trailer";
-  }
-
-  return trimmed;
-}
 
 function formatPlaybackTime(seconds?: number): string {
   if (!seconds || !Number.isFinite(seconds) || seconds < 1) return "0:00";
@@ -217,7 +190,10 @@ function buildMetaRowHtml(details: MediaDetails): string {
     details.release_date || details.first_air_date
   )?.substring(0, 4);
   const countryCode = resolveCountryCode(details);
-  const genreNames = details.genres?.slice(0, 3).map((g) => g.name).join(", ");
+  const genreNames = details.genres
+    ?.slice(0, 3)
+    .map((g) => getLocalizedGenreName(g))
+    .join(", ");
   const castList = (details.cast || []).slice(0, 4);
 
   const metaParts: string[] = [];
@@ -228,7 +204,9 @@ function buildMetaRowHtml(details: MediaDetails): string {
   }
   if (details.runtime) {
     if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
-    metaParts.push(`<span>${details.runtime} min</span>`);
+    metaParts.push(
+      `<span>${escapeHtml(t("player.minutes", { mins: details.runtime }))}</span>`
+    );
   }
   if (details.vote_average > 0) {
     if (metaParts.length > 0) metaParts.push(`<span class="player-meta-dot">&middot;</span>`);
@@ -325,12 +303,12 @@ export function mount(
   const backBtn = document.createElement("button");
   backBtn.type = "button";
   backBtn.className = "back-btn";
-  backBtn.setAttribute("aria-label", "Go back");
+  backBtn.setAttribute("aria-label", t("player.backAria"));
   backBtn.tabIndex = 0;
   backBtn.innerHTML = `<span class="back-btn-inner">${icons.arrowLeft(
     "back-btn-icon",
     18
-  )}<span>Back</span></span>`;
+  )}<span>${escapeHtml(t("player.back"))}</span></span>`;
   backBtn.addEventListener("mousedown", (e) => e.stopPropagation(), { signal });
   backBtn.addEventListener("click", handleBack, { signal });
   backBtnWrap.appendChild(backBtn);
@@ -345,12 +323,12 @@ export function mount(
     upscaleBtn = document.createElement("button");
     upscaleBtn.type = "button";
     upscaleBtn.className = "back-btn upscale-btn";
-    upscaleBtn.setAttribute("aria-label", "Upscale in fullscreen");
+    upscaleBtn.setAttribute("aria-label", t("player.upscaleAria"));
     upscaleBtn.tabIndex = 0;
     upscaleBtn.innerHTML = `<span class="back-btn-inner">${icons.maximize(
       "back-btn-icon",
       18
-    )}<span>Upscale</span></span>`;
+    )}<span>${escapeHtml(t("player.upscale"))}</span></span>`;
     upscaleBtn.hidden = true;
     upscaleBtn.addEventListener("mousedown", (e) => e.stopPropagation(), {
       signal,
@@ -406,11 +384,15 @@ export function mount(
 
   function syncHeadMeta() {
     if (!details || (!details.title && !details.name)) return;
+    const zhMode = isZh();
     const raw = details.title || details.name || "";
     const en = details.en_title || raw;
     const zh = details.zh_title;
-    const shareTitle =
-      details.is_chinese_origin && zh ? zh : en || zh || raw;
+    const shareTitle = zhMode
+      ? zh || en || raw
+      : details.is_chinese_origin && zh
+      ? zh
+      : en || zh || raw;
     if (!shareTitle) return;
 
     const releaseYear = (details.release_date || details.first_air_date || "").slice(
@@ -418,11 +400,14 @@ export function mount(
       4
     );
     const metaParts = [
-      type === "tv" ? "TV Series" : "Movie",
+      type === "tv" ? t("type.tvSeriesLabel") : t("type.movieSingular"),
       releaseYear,
       details.vote_average ? `★ ${details.vote_average.toFixed(1)}` : "",
     ].filter(Boolean);
-    const cleanOverview = (details.overview || "").replace(/\s+/g, " ").trim();
+    const rawOverview = zhMode
+      ? details.zh_overview || details.overview || ""
+      : details.overview || "";
+    const cleanOverview = rawOverview.replace(/\s+/g, " ").trim();
     const shareDesc = cleanOverview
       ? `${metaParts.join(" · ")} — ${cleanOverview.slice(0, 220)}`
       : `Watch ${shareTitle} (${metaParts.join(" · ")}) on 101Movies.`;
@@ -770,15 +755,28 @@ export function mount(
         : null;
 
     if (type === "tv") {
-      const epNum = (savedProgress.episodeIndex ?? 0) + 1;
+      const epIdx = savedProgress.episodeIndex ?? 0;
+      const epNum = epIdx + 1;
+      const epLabel = formatEpisodeLabel(
+        savedProgress.episodeLabel || String(epNum),
+        epIdx
+      );
       const epPart =
         derived.hasMultipleSeasons && savedProgress.seasonNumber
-          ? `S${savedProgress.seasonNumber}:E${epNum}`
-          : savedProgress.episodeLabel || `Ep ${epNum}`;
-      return timeStr ? `Resume ${epPart} · ${timeStr}` : `Resume ${epPart}`;
+          ? isZh()
+            ? `${t("player.seasonName", {
+                season: savedProgress.seasonNumber,
+              })}·${epLabel}`
+            : `S${savedProgress.seasonNumber}:E${epNum}`
+          : epLabel;
+      return timeStr
+        ? t("player.resumeEpAt", { ep: epPart, time: timeStr })
+        : t("player.resumeEp", { ep: epPart });
     }
 
-    return timeStr ? `Resume · ${timeStr}` : "Resume";
+    return timeStr
+      ? t("player.resumeAt", { time: timeStr })
+      : t("player.resume");
   }
 
   function syncStage() {
@@ -867,12 +865,15 @@ export function mount(
       return;
     }
 
+    const zhMode = isZh();
     const rawTitle = details.title || details.name || "";
     const englishTitle = details.en_title || rawTitle;
     const fallbackVodZhTitle = cleanDisplayZhTitle(sources[0]?.vodName);
     const chineseTitle = details.zh_title || fallbackVodZhTitle;
 
-    const isChineseDefault = Boolean(details.is_chinese_origin && chineseTitle);
+    const isChineseDefault = Boolean(
+      (zhMode || details.is_chinese_origin) && chineseTitle
+    );
     const primaryTitle = isChineseDefault
       ? chineseTitle!
       : englishTitle || rawTitle;
@@ -893,7 +894,9 @@ export function mount(
       : "";
     const imdbId = details.imdb_id || details.external_ids?.imdb_id || "";
     const metaHtml = buildMetaRowHtml(details);
-    const overviewText = details.overview || "";
+    const overviewText = zhMode
+      ? details.zh_overview || details.overview || ""
+      : details.overview || "";
     const imdbHref = buildImdbHref(imdbId, englishTitle || primaryTitle);
 
     const heroAssetKey = `${details.id}|${backdropUrl}|${hasWideBackdrop ? 1 : 0}`;
@@ -1023,9 +1026,9 @@ export function mount(
     const renderWatchLaterBtn = (saved: boolean) => {
       watchLaterBtn.classList.toggle("is-saved", saved);
       watchLaterBtn.setAttribute("aria-pressed", String(saved));
-      watchLaterBtn.innerHTML = `${icons.bookmark("", 14)}<span>${
-        saved ? "Saved" : "Save"
-      }</span>`;
+      watchLaterBtn.innerHTML = `${icons.bookmark("", 14)}<span>${escapeHtml(
+        saved ? t("player.saved") : t("player.save")
+      )}</span>`;
     };
     renderWatchLaterBtn(isInWatchLater(type, details.id));
     watchLaterBtn.addEventListener("click", () => {
@@ -1052,7 +1055,7 @@ export function mount(
     imdbLink.className = "imdb-btn";
     imdbLink.target = "_blank";
     imdbLink.rel = "noopener noreferrer";
-    imdbLink.setAttribute("aria-label", "Open IMDb page");
+    imdbLink.setAttribute("aria-label", t("player.imdbAria"));
     imdbLink.tabIndex = 0;
     imdbLink.href = imdbHref;
     imdbLink.innerHTML = `<span>IMDb</span>${icons.externalLink("", 14)}`;
@@ -1117,7 +1120,7 @@ export function mount(
       const msg = document.createElement("p");
       msg.style.cssText =
         "margin:0;font-size:13px;color:rgba(255,255,255,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-      msg.textContent = "No playable streams found from enabled sources.";
+      msg.textContent = t("player.noStreams");
       serverBarEl.replaceChildren(msg);
       return;
     }
@@ -1161,7 +1164,7 @@ export function mount(
         .filter(Boolean)
         .join(" ");
       btn.title = isHighPing
-        ? `${label} (${effectiveQuality} · ${src.latencyMs}ms - High Ping)`
+        ? `${label} (${effectiveQuality} · ${src.latencyMs}ms - ${t("player.highPing")})`
         : `${label} (${effectiveQuality} · ${src.latencyMs}ms)`;
 
       const qualityClass =
@@ -1201,7 +1204,7 @@ export function mount(
       prevSrvBtn.className = "server-nav-btn";
       prevSrvBtn.dataset.serverNav = "prev";
       prevSrvBtn.disabled = !showServerPrev;
-      prevSrvBtn.setAttribute("aria-label", "Previous servers");
+      prevSrvBtn.setAttribute("aria-label", t("player.prevServersAria"));
       prevSrvBtn.innerHTML = icons.chevronLeft("server-nav-icon");
       prevSrvBtn.addEventListener("click", () => {
         if (serverPage > 0) {
@@ -1215,7 +1218,7 @@ export function mount(
       nextSrvBtn.className = "server-nav-btn";
       nextSrvBtn.dataset.serverNav = "next";
       nextSrvBtn.disabled = !showServerNext;
-      nextSrvBtn.setAttribute("aria-label", "Next servers");
+      nextSrvBtn.setAttribute("aria-label", t("player.nextServersAria"));
       nextSrvBtn.innerHTML = icons.chevronRight("server-nav-icon");
       nextSrvBtn.addEventListener("click", () => {
         if (serverPage < totalServerPages - 1) {
@@ -1317,8 +1320,10 @@ export function mount(
       triggerBtn.tabIndex = 0;
       const triggerTitle =
         derived.hasMultipleSeasons && derived.currentSeasonGroup
-          ? `S${derived.currentSeasonGroup.seasonNumber} · Episodes`
-          : "Episodes";
+          ? t("player.seasonEpisodes", {
+              season: derived.currentSeasonGroup.seasonNumber,
+            })
+          : t("player.episodes");
 
       triggerBtn.innerHTML = `
         <span class="episodes-trigger-inner">
@@ -1352,21 +1357,21 @@ export function mount(
         header.className = "episodes-popover-header";
         header.innerHTML = `
           <div style="display:flex;align-items:center;gap:8px;min-width:0">
-            <span style="font-size:14px;font-weight:700;color:#ffffff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${
+            <span style="font-size:14px;font-weight:700;color:#ffffff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(
               derived.hasMultipleSeasons
-                ? "Select Season &amp; Episode"
-                : "Select Episode"
-            }</span>
-            <span class="tabular-nums" style="font-size:12px;font-family:ui-monospace,monospace;color:rgba(255,255,255,0.5);flex-shrink:0">&middot; ${
-              derived.episodes.length
-            } eps</span>
+                ? t("player.selectSeasonEpisode")
+                : t("player.selectEpisode")
+            )}</span>
+            <span class="tabular-nums" style="font-size:12px;font-family:ui-monospace,monospace;color:rgba(255,255,255,0.5);flex-shrink:0">&middot; ${escapeHtml(
+              t("player.epsCount", { count: derived.episodes.length })
+            )}</span>
           </div>
         `;
 
         const closeBtn = document.createElement("button");
         closeBtn.type = "button";
         closeBtn.className = "episodes-popover-close";
-        closeBtn.setAttribute("aria-label", "Close episodes");
+        closeBtn.setAttribute("aria-label", t("player.closeEpisodesAria"));
         closeBtn.innerHTML = `<span class="episodes-trigger-inner">${icons.x(
           "",
           16,
@@ -1390,7 +1395,9 @@ export function mount(
                 ? "season-btn is-active"
                 : "season-btn";
             sBtn.tabIndex = 0;
-            sBtn.textContent = season.name;
+            sBtn.textContent = isZh()
+              ? t("player.seasonName", { season: season.seasonNumber })
+              : season.name;
             sBtn.addEventListener("click", () => {
               activeSeasonIndex = sIdx;
               activeEpisodeIndex = 0;

@@ -1,5 +1,6 @@
 import { api } from "../api";
 import { createMediaCard } from "../components/MediaCard";
+import { getLocalizedCategories, t } from "../i18n";
 import { MEDIA_CATEGORIES, MediaItem, normalizeCategoryId } from "../types";
 import {
   GRID_COLS_CLASS,
@@ -20,11 +21,6 @@ const ALL_YEARS = Array.from(
   (_, i) => CURRENT_YEAR - i
 );
 
-const MEDIA_TYPES: { id: "movie" | "tv"; label: string }[] = [
-  { id: "movie", label: "Movies" },
-  { id: "tv", label: "Shows" },
-];
-
 const YEAR_PILL_WIDTH_DESKTOP = 64;
 const YEAR_PILL_WIDTH_MOBILE = 54;
 const GENRE_PILL_WIDTH_DESKTOP = 84;
@@ -33,6 +29,11 @@ const GENRE_PILL_WIDTH_MOBILE = 72;
 export function mount(container: HTMLElement): ViewCleanup {
   const ac = new AbortController();
   const { signal } = ac;
+
+  const mediaTypes: { id: "movie" | "tv"; label: string }[] = [
+    { id: "movie", label: t("type.movies") },
+    { id: "tv", label: t("type.shows") },
+  ];
 
   let mediaType: "movie" | "tv" =
     sessionStorage.getItem("rankings_media_type") === "tv" ? "tv" : "movie";
@@ -85,7 +86,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   const mediaToggle = document.createElement("div");
   mediaToggle.className = "capsule-group top-bar-left";
   mediaToggle.setAttribute("role", "tablist");
-  mediaToggle.setAttribute("aria-label", "Content Type");
+  mediaToggle.setAttribute("aria-label", t("type.aria"));
 
   const mediaIndicator = document.createElement("div");
   mediaIndicator.className = "capsule-indicator";
@@ -93,25 +94,25 @@ export function mount(container: HTMLElement): ViewCleanup {
   mediaToggle.appendChild(mediaIndicator);
 
   const mediaBtns = new Map<"movie" | "tv", HTMLButtonElement>();
-  MEDIA_TYPES.forEach((t) => {
+  mediaTypes.forEach((ty) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "capsule-btn";
     btn.setAttribute("role", "tab");
     btn.tabIndex = 0;
-    btn.innerHTML = `<span class="capsule-btn-label">${t.label}</span>`;
+    btn.innerHTML = `<span class="capsule-btn-label">${ty.label}</span>`;
     btn.addEventListener(
       "click",
       () => {
-        if (mediaType === t.id) return;
-        mediaType = t.id;
+        if (mediaType === ty.id) return;
+        mediaType = ty.id;
         savePage(0);
         updateMediaToggle();
         loadRankings();
       },
       { signal }
     );
-    mediaBtns.set(t.id, btn);
+    mediaBtns.set(ty.id, btn);
     mediaToggle.appendChild(btn);
   });
 
@@ -120,14 +121,14 @@ export function mount(container: HTMLElement): ViewCleanup {
   centerWrap.className = "top-bar-center";
 
   const genreTrack = createPillTrack({
-    items: MEDIA_CATEGORIES,
+    items: getLocalizedCategories(),
     activeId: genre,
     pillWidth: gridState.isMobileView
       ? GENRE_PILL_WIDTH_MOBILE
       : GENRE_PILL_WIDTH_DESKTOP,
     trackClass: "pill-track--category",
-    leftAriaLabel: "Scroll categories left",
-    rightAriaLabel: "Scroll categories right",
+    leftAriaLabel: t("common.scrollCatsLeft"),
+    rightAriaLabel: t("common.scrollCatsRight"),
     onSelect: (id) => {
       if (genre === id && !hasError) return;
       genre = id;
@@ -150,8 +151,8 @@ export function mount(container: HTMLElement): ViewCleanup {
       ? YEAR_PILL_WIDTH_MOBILE
       : YEAR_PILL_WIDTH_DESKTOP,
     trackClass: "pill-track--year",
-    leftAriaLabel: "Scroll to newer years",
-    rightAriaLabel: "Scroll to older years",
+    leftAriaLabel: t("common.scrollYearsNew"),
+    rightAriaLabel: t("common.scrollYearsOld"),
     tabularNums: true,
     fixedVisibleCount: 3,
     onSelect: (id) => {
@@ -182,10 +183,10 @@ export function mount(container: HTMLElement): ViewCleanup {
     const idx = mediaType === "tv" ? 1 : 0;
     mediaIndicator.style.width = `${tabW}px`;
     mediaIndicator.style.transform = `translate3d(${idx * (tabW + 4)}px, 0, 0)`;
-    MEDIA_TYPES.forEach((t) => {
-      const btn = mediaBtns.get(t.id);
+    mediaTypes.forEach((ty) => {
+      const btn = mediaBtns.get(ty.id);
       if (!btn) return;
-      const active = t.id === mediaType;
+      const active = ty.id === mediaType;
       btn.style.width = `${tabW}px`;
       btn.classList.toggle("is-active", active);
       btn.setAttribute("aria-selected", String(active));
@@ -244,14 +245,14 @@ export function mount(container: HTMLElement): ViewCleanup {
       stage.innerHTML = hasError
         ? `
         <div class="empty-state">
-          <p class="empty-state-title">Unable to load rankings for ${year}</p>
-          <p class="empty-state-desc">Tap the active year or category again to retry.</p>
+          <p class="empty-state-title">${t("rankings.errorTitle", { year })}</p>
+          <p class="empty-state-desc">${t("rankings.errorDesc")}</p>
         </div>
       `
         : `
         <div class="empty-state">
-          <p class="empty-state-title">No rankings found for ${year}</p>
-          <p class="empty-state-desc">Try selecting a different year or switching categories.</p>
+          <p class="empty-state-title">${t("rankings.emptyTitle", { year })}</p>
+          <p class="empty-state-desc">${t("rankings.emptyDesc")}</p>
         </div>
       `;
       return;

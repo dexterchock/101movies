@@ -1,7 +1,8 @@
 import "./polyfills";
 import "./index.css";
+import { getLang, setLang, t, type I18nKey, type UiLang } from "./i18n";
 import { icons } from "./icons";
-import { initRouter } from "./router";
+import { initRouter, remountCurrentRoute } from "./router";
 import { pullSyncState } from "./sync";
 import { syncIosStandaloneViewport } from "./utils";
 
@@ -48,29 +49,29 @@ if (typeof window !== "undefined") {
 }
 
 interface NavItem {
-  name: string;
+  labelKey: I18nKey;
   path: string;
   icon: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { name: "Trending", path: "/", icon: icons.flame("bottom-nav-icon") },
+  { labelKey: "nav.trending", path: "/", icon: icons.flame("bottom-nav-icon") },
   {
-    name: "Rankings",
+    labelKey: "nav.rankings",
     path: "/rankings",
     icon: icons.trophy("bottom-nav-icon"),
   },
   {
-    name: "History",
+    labelKey: "nav.history",
     path: "/history",
     icon: icons.history("bottom-nav-icon"),
   },
   {
-    name: "Saved",
+    labelKey: "nav.saved",
     path: "/saved",
     icon: icons.bookmark("bottom-nav-icon"),
   },
-  { name: "Search", path: "/search", icon: icons.search("bottom-nav-icon") },
+  { labelKey: "nav.search", path: "/search", icon: icons.search("bottom-nav-icon") },
 ];
 
 type Direction = "up" | "down" | "left" | "right";
@@ -335,29 +336,120 @@ function bootstrap() {
 
   const bottomNav = document.createElement("nav");
   bottomNav.className = "bottom-nav";
-  bottomNav.setAttribute("aria-label", "Primary Navigation");
+  bottomNav.setAttribute("aria-label", t("nav.aria"));
 
   const indicator = document.createElement("div");
   indicator.className = "bottom-nav-indicator";
   indicator.setAttribute("aria-hidden", "true");
   bottomNav.appendChild(indicator);
 
-  const linkEls = NAV_ITEMS.map((item) => {
+  const linkEntries = NAV_ITEMS.map((item) => {
     const a = document.createElement("a");
     a.href = item.path;
     a.tabIndex = 0;
     a.className = "bottom-nav-link";
-    a.setAttribute("aria-label", item.name);
-    a.innerHTML = `<span class="bottom-nav-link-inner">${item.icon}<span>${item.name}</span></span>`;
+    const label = t(item.labelKey);
+    a.setAttribute("aria-label", label);
+    a.innerHTML = `<span class="bottom-nav-link-inner">${item.icon}<span class="bottom-nav-label">${label}</span></span>`;
     bottomNav.appendChild(a);
-    return a;
+    const labelEl = a.querySelector<HTMLSpanElement>(".bottom-nav-label")!;
+    return { a, labelEl, item };
   });
 
-  bottomNavWrap.appendChild(bottomNav);
-  shell.append(bottomNavWrap, mainStage);
-  rootEl.replaceChildren(shell);
+  // Desktop/TV sliding EN | 中 language pill (hidden on mobile < 640px via CSS)
+  const LANG_OPTIONS: { id: UiLang; label: string; ariaKey: I18nKey }[] = [
+    { id: "en", label: "EN", ariaKey: "lang.switchToEn" },
+    { id: "zh", label: "中", ariaKey: "lang.switchToZh" },
+  ];
+
+  const langToggle = document.createElement("div");
+  langToggle.className = "lang-toggle";
+  langToggle.setAttribute("role", "tablist");
+  langToggle.setAttribute("aria-label", t("lang.aria"));
+
+  const langIndicator = document.createElement("div");
+  langIndicator.className = "lang-toggle-indicator";
+  langIndicator.setAttribute("aria-hidden", "true");
+  langToggle.appendChild(langIndicator);
 
   let currentPath = window.location.pathname || "/";
+  let dragSuppressUntil = 0;
+  const langBtns = new Map<UiLang, HTMLButtonElement>();
+
+  const applyLanguage = (nextLang: UiLang) => {
+    const hadFocusInLangToggle = Boolean(
+      document.activeElement && langToggle.contains(document.activeElement)
+    );
+    if (!setLang(nextLang)) return;
+    updateBottomNav();
+    if (!currentPath.startsWith("/player/")) {
+      remountCurrentRoute();
+    }
+    if (hadFocusInLangToggle) {
+      langBtns.get(nextLang)?.focus({ preventScroll: true });
+    }
+  };
+
+  LANG_OPTIONS.forEach((opt) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "lang-toggle-btn";
+    btn.setAttribute("role", "tab");
+    btn.tabIndex = 0;
+    btn.dataset.lang = opt.id;
+    btn.setAttribute("aria-label", t(opt.ariaKey));
+    btn.innerHTML = `<span class="lang-toggle-btn-label">${opt.label}</span>`;
+    btn.addEventListener("click", () => {
+      if (Date.now() < dragSuppressUntil) return;
+      applyLanguage(opt.id);
+    });
+    langBtns.set(opt.id, btn);
+    langToggle.appendChild(btn);
+  });
+
+  let langMouseStartX: number | null = null;
+  langToggle.addEventListener("mousedown", (e: MouseEvent) => {
+    langMouseStartX = e.clientX;
+  });
+  window.addEventListener("mouseup", (e: MouseEvent) => {
+    if (langMouseStartX === null) return;
+    const dx = e.clientX - langMouseStartX;
+    langMouseStartX = null;
+    if (Math.abs(dx) >= 16) {
+      dragSuppressUntil = Date.now() + 250;
+      applyLanguage(dx > 0 ? "zh" : "en");
+    }
+  });
+
+  let langTouchStartX: number | null = null;
+  let langTouchStartY: number | null = null;
+  langToggle.addEventListener(
+    "touchstart",
+    (e: TouchEvent) => {
+      langTouchStartX = e.touches[0].clientX;
+      langTouchStartY = e.touches[0].clientY;
+    },
+    { passive: true }
+  );
+  langToggle.addEventListener(
+    "touchend",
+    (e: TouchEvent) => {
+      if (langTouchStartX === null || langTouchStartY === null) return;
+      const dx = e.changedTouches[0].clientX - langTouchStartX;
+      const dy = e.changedTouches[0].clientY - langTouchStartY;
+      langTouchStartX = null;
+      langTouchStartY = null;
+      if (Math.abs(dx) >= 16 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        dragSuppressUntil = Date.now() + 300;
+        applyLanguage(dx > 0 ? "zh" : "en");
+      }
+    },
+    { passive: true }
+  );
+
+  bottomNavWrap.append(bottomNav, langToggle);
+  shell.append(bottomNavWrap, mainStage);
+  rootEl.replaceChildren(shell);
 
   function updateBottomNav() {
     const isPlayerPage = currentPath.startsWith("/player/");
@@ -374,18 +466,35 @@ function bootstrap() {
     const navTabGap = isMobileNav ? 4 : 8;
     const navTabWidth = isMobileNav
       ? Math.max(54, Math.min(72, Math.floor((window.innerWidth - 42) / navTabCount)))
-      : Math.min(132, Math.floor((window.innerWidth - 78) / navTabCount));
+      : Math.max(76, Math.min(132, Math.floor((window.innerWidth - 190) / navTabCount)));
 
+    bottomNav.setAttribute("aria-label", t("nav.aria"));
     indicator.classList.toggle("is-hidden", !hasActiveTab);
     indicator.style.width = `${navTabWidth}px`;
     indicator.style.transform = `translate3d(${
       activeIndex * (navTabWidth + navTabGap)
     }px, 0, 0)`;
 
-    linkEls.forEach((a, idx) => {
+    linkEntries.forEach(({ a, labelEl, item }, idx) => {
       const isActive = hasActiveTab && idx === activeIndex;
+      const label = t(item.labelKey);
+      labelEl.textContent = label;
+      a.setAttribute("aria-label", label);
       a.style.width = `${navTabWidth}px`;
       a.classList.toggle("is-active", isActive);
+    });
+
+    const activeLang = getLang();
+    const langIdx = activeLang === "zh" ? 1 : 0;
+    langToggle.setAttribute("aria-label", t("lang.aria"));
+    langIndicator.style.transform = `translate3d(${langIdx * 46}px, 0, 0)`;
+    LANG_OPTIONS.forEach((opt) => {
+      const btn = langBtns.get(opt.id);
+      if (!btn) return;
+      const active = opt.id === activeLang;
+      btn.setAttribute("aria-label", t(opt.ariaKey));
+      btn.setAttribute("aria-selected", String(active));
+      btn.classList.toggle("is-active", active);
     });
   }
 

@@ -332,6 +332,29 @@ async function dbGetCode(env: SyncEnv, code: string): Promise<SyncCodeRow | null
     .first<SyncCodeRow>();
 }
 
+async function dbGetActiveCodeForGroup(
+  env: SyncEnv,
+  groupId: string,
+  now: number
+): Promise<SyncCodeRow | null> {
+  if (!env?.DB) {
+    let best: SyncCodeRow | null = null;
+    for (const row of getMemoryStore().codes.values()) {
+      if (row.group_id === groupId && row.expires_at > now) {
+        if (!best || row.expires_at > best.expires_at) {
+          best = row;
+        }
+      }
+    }
+    return best;
+  }
+  return env.DB.prepare(
+    "SELECT code, group_id, expires_at FROM sync_codes WHERE group_id = ? AND expires_at > ? ORDER BY expires_at DESC LIMIT 1"
+  )
+    .bind(groupId, now)
+    .first<SyncCodeRow>();
+}
+
 async function dbDeleteCode(env: SyncEnv, code: string): Promise<void> {
   if (!env?.DB) {
     getMemoryStore().codes.delete(code);
@@ -385,6 +408,8 @@ export interface SyncHandlerResult {
   body: Record<string, unknown>;
 }
 
+const REUSABLE_CODE_MIN_TTL_MS = 15_000;
+
 export async function handleCreateSyncCode(
   env: SyncEnv,
   rawBody: unknown,
@@ -397,7 +422,7 @@ export async function handleCreateSyncCode(
   };
 
   const now = Date.now();
-  const expiresAt = now + PAIRING_CODE_TTL_MS;
+  let expiresAt = now + PAIRING_CODE_TTL_MS;
   const incomingHistory = sanitizeMediaList(body.history, MAX_HISTORY_ITEMS);
   const incomingSaved = sanitizeMediaList(body.saved, MAX_SAVED_ITEMS);
   const rawGroupId =
@@ -416,24 +441,32 @@ export async function handleCreateSyncCode(
     await cleanupPromise;
   }
 
-  let row: SyncGroupRow | null = requestedGroupId
+  const prevRow: SyncGroupRow | null = requestedGroupId
     ? await dbGetGroup(env, requestedGroupId)
     : null;
 
-  if (row) {
+  let row: SyncGroupRow;
+  let payloadUnchanged = false;
+
+  if (prevRow) {
     const mergedHistory = mergeHistoryItems(
-      parseStoredList(row.history_json, MAX_HISTORY_ITEMS),
+      parseStoredList(prevRow.history_json, MAX_HISTORY_ITEMS),
       incomingHistory
     );
     const mergedSaved = mergeSavedItems(
-      parseStoredList(row.saved_json, MAX_SAVED_ITEMS),
+      parseStoredList(prevRow.saved_json, MAX_SAVED_ITEMS),
       incomingSaved
     );
+    const mergedHistoryJson = JSON.stringify(mergedHistory);
+    const mergedSavedJson = JSON.stringify(mergedSaved);
+    payloadUnchanged =
+      prevRow.history_json === mergedHistoryJson &&
+      prevRow.saved_json === mergedSavedJson;
     row = {
-      group_id: row.group_id,
-      history_json: JSON.stringify(mergedHistory),
-      saved_json: JSON.stringify(mergedSaved),
-      paired: row.paired,
+      group_id: prevRow.group_id,
+      history_json: mergedHistoryJson,
+      saved_json: mergedSavedJson,
+      paired: prevRow.paired,
       updated_at: now,
     };
   } else {
@@ -446,8 +479,24 @@ export async function handleCreateSyncCode(
     };
   }
 
-  await dbUpsertGroup(env, row);
-  const code = await dbInsertUniqueCode(env, row.group_id, expiresAt, now);
+  const existingCode = prevRow
+    ? await dbGetActiveCodeForGroup(env, row.group_id, now)
+    : null;
+  const reuseExisting = Boolean(
+    existingCode && existingCode.expires_at - now > REUSABLE_CODE_MIN_TTL_MS
+  );
+
+  if (!payloadUnchanged || !reuseExisting) {
+    await dbUpsertGroup(env, row);
+  }
+
+  let code: string;
+  if (reuseExisting && existingCode) {
+    code = existingCode.code;
+    expiresAt = existingCode.expires_at;
+  } else {
+    code = await dbInsertUniqueCode(env, row.group_id, expiresAt, now);
+  }
 
   return {
     status: 200,

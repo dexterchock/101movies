@@ -103,6 +103,10 @@ export function navigate(path: string, opts?: NavigateOptions): void {
   renderCurrentRoute();
 }
 
+export function remountCurrentRoute(): void {
+  renderCurrentRoute();
+}
+
 export function initRouter(
   stageEl: HTMLElement,
   onRouteChange: RouteListener

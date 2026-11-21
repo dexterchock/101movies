@@ -1,5 +1,6 @@
 import { createMediaCard } from "../components/MediaCard";
 import { openSyncModal, type SyncModalController } from "../components/SyncModal";
+import { t } from "../i18n";
 import { icons } from "../icons";
 import { isDeviceSynced, pullSyncState } from "../sync";
 import { MediaItem } from "../types";
@@ -17,12 +18,6 @@ import {
 import type { ViewCleanup } from "./Home";
 
 type CollectionFilter = "all" | "movie" | "tv";
-
-const FILTER_OPTIONS: { id: CollectionFilter; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "movie", label: "Movies" },
-  { id: "tv", label: "Shows" },
-];
 
 export interface SavedCollectionConfig {
   filterAriaLabel: string;
@@ -47,6 +42,12 @@ export function mountSavedCollection(
 ): ViewCleanup {
   const ac = new AbortController();
   const { signal } = ac;
+
+  const filterOptions: { id: CollectionFilter; label: string }[] = [
+    { id: "all", label: t("type.all") },
+    { id: "movie", label: t("type.movies") },
+    { id: "tv", label: t("type.shows") },
+  ];
 
   let items: MediaItem[] = config.loadItems();
   let filterType: CollectionFilter = (() => {
@@ -98,7 +99,7 @@ export function mountSavedCollection(
   filterGroup.appendChild(filterIndicator);
 
   const filterBtns = new Map<CollectionFilter, HTMLButtonElement>();
-  FILTER_OPTIONS.forEach((opt) => {
+  filterOptions.forEach((opt) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "capsule-btn";
@@ -137,11 +138,15 @@ export function mountSavedCollection(
     syncBtn.classList.toggle("is-synced", synced);
     syncBtn.setAttribute(
       "aria-label",
-      synced ? "Device sync active" : "Sync across devices"
+      synced ? t("collection.syncAriaOn") : t("collection.syncAriaOff")
     );
     syncBtn.innerHTML = synced
-      ? `<span class="sync-btn-inner"><span class="sync-btn-dot" aria-hidden="true"></span><span>Synced</span></span>`
-      : `<span class="sync-btn-inner">${icons.refreshCw("", 14)}<span>Sync</span></span>`;
+      ? `<span class="sync-btn-inner"><span class="sync-btn-dot" aria-hidden="true"></span><span>${escapeHtml(
+          t("collection.synced")
+        )}</span></span>`
+      : `<span class="sync-btn-inner">${icons.refreshCw("", 14)}<span>${escapeHtml(
+          t("collection.sync")
+        )}</span></span>`;
   };
   updateSyncButton();
 
@@ -163,7 +168,9 @@ export function mountSavedCollection(
   clearBtn.className = "clear-history-btn";
   clearBtn.title = config.clearTitle;
   clearBtn.tabIndex = 0;
-  clearBtn.innerHTML = `<span class="clear-history-btn-inner">${icons.x("", 14, 2)}<span>Clear</span></span>`;
+  clearBtn.innerHTML = `<span class="clear-history-btn-inner">${icons.x("", 14, 2)}<span>${escapeHtml(
+    t("collection.clear")
+  )}</span></span>`;
   clearBtn.addEventListener(
     "click",
     () => {
@@ -184,13 +191,13 @@ export function mountSavedCollection(
   const prevBtn = document.createElement("button");
   prevBtn.type = "button";
   prevBtn.className = "page-nav-btn";
-  prevBtn.setAttribute("aria-label", "Previous page");
+  prevBtn.setAttribute("aria-label", t("common.prevPage"));
   prevBtn.innerHTML = icons.chevronLeft("page-nav-icon");
 
   const nextBtn = document.createElement("button");
   nextBtn.type = "button";
   nextBtn.className = "page-nav-btn";
-  nextBtn.setAttribute("aria-label", "Next page");
+  nextBtn.setAttribute("aria-label", t("common.nextPage"));
   nextBtn.innerHTML = icons.chevronRight("page-nav-icon");
 
   rightWrap.append(syncBtn, prevBtn, nextBtn);
@@ -219,12 +226,12 @@ export function mountSavedCollection(
     const tabW = winW < 520 ? 58 : winW < 768 ? 72 : 84;
     const activeIdx = Math.max(
       0,
-      FILTER_OPTIONS.findIndex((opt) => opt.id === filterType)
+      filterOptions.findIndex((opt) => opt.id === filterType)
     );
     filterIndicator.style.width = `${tabW}px`;
     filterIndicator.style.transform = `translate3d(${activeIdx * (tabW + 4)}px, 0, 0)`;
 
-    FILTER_OPTIONS.forEach((opt) => {
+    filterOptions.forEach((opt) => {
       const btn = filterBtns.get(opt.id);
       if (!btn) return;
       const active = opt.id === filterType;

@@ -110,6 +110,7 @@ export interface MediaItem {
 }
 
 export interface MediaDetails extends MediaItem {
+  zh_overview?: string;
   runtime?: number;
   genres: { id: number; name: string }[];
   tagline: string;

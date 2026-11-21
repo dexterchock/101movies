@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import {
   clearWatchLater,
   loadWatchLater,
@@ -8,17 +9,15 @@ import { mountSavedCollection } from "./SavedCollection";
 
 export function mount(container: HTMLElement): ViewCleanup {
   return mountSavedCollection(container, {
-    filterAriaLabel: "Saved Filter",
+    filterAriaLabel: t("saved.filterAria"),
     storagePrefix: "watch_later",
-    clearTitle: "Clear Saved",
-    removeLabel: "Remove from saved",
-    emptyAllTitle: "No saved titles yet",
-    emptyAllDesc:
-      "Open any movie or show and click Save to add it here.",
+    clearTitle: t("saved.clearTitle"),
+    removeLabel: t("saved.removeLabel"),
+    emptyAllTitle: t("saved.emptyAllTitle"),
+    emptyAllDesc: t("saved.emptyAllDesc"),
     emptyFilteredTitle: (f) =>
-      f === "tv" ? "No saved shows" : "No saved movies",
-    emptyFilteredDesc:
-      "Try switching the filter tab or saving more titles from their detail page.",
+      f === "tv" ? t("saved.emptyShowsTitle") : t("saved.emptyMoviesTitle"),
+    emptyFilteredDesc: t("saved.emptyFilteredDesc"),
     loadItems: loadWatchLater,
     clearItems: clearWatchLater,
     removeItem: removeFromWatchLater,

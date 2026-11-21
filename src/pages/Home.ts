@@ -1,7 +1,8 @@
 import { api } from "../api";
 import { createMediaCard } from "../components/MediaCard";
+import { getLocalizedCategories, t } from "../i18n";
 import { icons } from "../icons";
-import { MEDIA_CATEGORIES, MediaItem, normalizeCategoryId } from "../types";
+import { MediaItem, normalizeCategoryId } from "../types";
 import {
   GRID_COLS_CLASS,
   GRID_ROWS_CLASS,
@@ -18,17 +19,17 @@ export interface ViewCleanup {
   destroy: () => void;
 }
 
-const MEDIA_TYPES: { id: "movie" | "tv"; label: string }[] = [
-  { id: "movie", label: "Movies" },
-  { id: "tv", label: "Shows" },
-];
-
 const CATEGORY_PILL_WIDTH_DESKTOP = 84;
 const CATEGORY_PILL_WIDTH_MOBILE = 72;
 
 export function mount(container: HTMLElement): ViewCleanup {
   const ac = new AbortController();
   const { signal } = ac;
+
+  const mediaTypes: { id: "movie" | "tv"; label: string }[] = [
+    { id: "movie", label: t("type.movies") },
+    { id: "tv", label: t("type.shows") },
+  ];
 
   let mediaType: "movie" | "tv" =
     sessionStorage.getItem("trending_media_type") === "tv" ? "tv" : "movie";
@@ -73,7 +74,7 @@ export function mount(container: HTMLElement): ViewCleanup {
   const mediaToggle = document.createElement("div");
   mediaToggle.className = "capsule-group top-bar-left";
   mediaToggle.setAttribute("role", "tablist");
-  mediaToggle.setAttribute("aria-label", "Content Type");
+  mediaToggle.setAttribute("aria-label", t("type.aria"));
 
   const mediaIndicator = document.createElement("div");
   mediaIndicator.className = "capsule-indicator";
@@ -81,18 +82,18 @@ export function mount(container: HTMLElement): ViewCleanup {
   mediaToggle.appendChild(mediaIndicator);
 
   const mediaBtns = new Map<"movie" | "tv", HTMLButtonElement>();
-  MEDIA_TYPES.forEach((t) => {
+  mediaTypes.forEach((ty) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "capsule-btn";
     btn.setAttribute("role", "tab");
     btn.tabIndex = 0;
-    btn.innerHTML = `<span class="capsule-btn-label">${t.label}</span>`;
+    btn.innerHTML = `<span class="capsule-btn-label">${ty.label}</span>`;
     btn.addEventListener(
       "click",
       () => {
-        if (mediaType === t.id) return;
-        mediaType = t.id;
+        if (mediaType === ty.id) return;
+        mediaType = ty.id;
         try {
           sessionStorage.setItem("trending_media_type", mediaType);
         } catch {}
@@ -112,7 +113,7 @@ export function mount(container: HTMLElement): ViewCleanup {
       },
       { signal }
     );
-    mediaBtns.set(t.id, btn);
+    mediaBtns.set(ty.id, btn);
     mediaToggle.appendChild(btn);
   });
 
@@ -121,14 +122,14 @@ export function mount(container: HTMLElement): ViewCleanup {
   centerWrap.className = "top-bar-center";
 
   const categoryTrack = createPillTrack({
-    items: MEDIA_CATEGORIES,
+    items: getLocalizedCategories(),
     activeId: mediaType === "movie" ? movieCategory : tvCategory,
     pillWidth: gridState.isMobileView
       ? CATEGORY_PILL_WIDTH_MOBILE
       : CATEGORY_PILL_WIDTH_DESKTOP,
     trackClass: "pill-track--category",
-    leftAriaLabel: "Scroll categories left",
-    rightAriaLabel: "Scroll categories right",
+    leftAriaLabel: t("common.scrollCatsLeft"),
+    rightAriaLabel: t("common.scrollCatsRight"),
     onSelect: (id) => {
       if (mediaType === "movie") {
         movieCategory = id;
@@ -159,13 +160,13 @@ export function mount(container: HTMLElement): ViewCleanup {
   const prevBtn = document.createElement("button");
   prevBtn.type = "button";
   prevBtn.className = "page-nav-btn";
-  prevBtn.setAttribute("aria-label", "Previous page");
+  prevBtn.setAttribute("aria-label", t("common.prevPage"));
   prevBtn.innerHTML = icons.chevronLeft("page-nav-icon");
 
   const nextBtn = document.createElement("button");
   nextBtn.type = "button";
   nextBtn.className = "page-nav-btn";
-  nextBtn.setAttribute("aria-label", "Next page");
+  nextBtn.setAttribute("aria-label", t("common.nextPage"));
   nextBtn.innerHTML = icons.chevronRight("page-nav-icon");
 
   rightWrap.append(prevBtn, nextBtn);
@@ -193,10 +194,10 @@ export function mount(container: HTMLElement): ViewCleanup {
     const idx = mediaType === "tv" ? 1 : 0;
     mediaIndicator.style.width = `${tabW}px`;
     mediaIndicator.style.transform = `translate3d(${idx * (tabW + 4)}px, 0, 0)`;
-    MEDIA_TYPES.forEach((t) => {
-      const btn = mediaBtns.get(t.id);
+    mediaTypes.forEach((ty) => {
+      const btn = mediaBtns.get(ty.id);
       if (!btn) return;
-      const active = t.id === mediaType;
+      const active = ty.id === mediaType;
       btn.style.width = `${tabW}px`;
       btn.classList.toggle("is-active", active);
       btn.setAttribute("aria-selected", String(active));
@@ -282,8 +283,8 @@ export function mount(container: HTMLElement): ViewCleanup {
       emptyWrap.className = "empty-state";
       emptyWrap.style.gridColumn = "1 / -1";
       emptyWrap.innerHTML = hasError
-        ? `<p class="empty-state-title">Unable to load titles</p><p class="empty-state-desc">Tap the selected category again to retry.</p>`
-        : `<p class="empty-state-title">No titles found</p><p class="empty-state-desc">Try switching categories or media type.</p>`;
+        ? `<p class="empty-state-title">${t("home.errorTitle")}</p><p class="empty-state-desc">${t("home.errorDesc")}</p>`
+        : `<p class="empty-state-title">${t("home.emptyTitle")}</p><p class="empty-state-desc">${t("home.emptyDesc")}</p>`;
       grid.replaceChildren(emptyWrap);
       return;
     }

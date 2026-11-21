@@ -13,7 +13,8 @@ body {
   background-color: #000000;
   color: #ffffff;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Noto Sans",
+    sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -232,6 +233,10 @@ svg {
   flex-shrink: 0;
 }
 
+.lang-toggle {
+  display: none;
+}
+
 @media (max-width: 500px) {
   .bottom-nav-icon {
     display: none;
@@ -240,6 +245,8 @@ svg {
 
 @media (min-width: 640px) {
   .bottom-nav-wrap {
+    align-items: center;
+    gap: 10px;
     padding-left: 16px;
     padding-right: 16px;
     padding-bottom: 16px;
@@ -270,6 +277,82 @@ svg {
     width: 18px;
     height: 18px;
   }
+
+  .lang-toggle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 9999px;
+    background-color: rgba(23, 23, 23, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    pointer-events: auto;
+    flex-shrink: 0;
+    touch-action: pan-y;
+  }
+
+  .lang-toggle-indicator {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 6px;
+    width: 42px;
+    z-index: 1;
+    background-color: #ffffff;
+    border-radius: 9999px;
+    transition: transform 500ms cubic-bezier(0.25, 1, 0.5, 1);
+    pointer-events: none;
+  }
+
+  .lang-toggle-btn {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    padding: 10px 0;
+    font-size: 13px;
+    line-height: 1.2;
+    border-radius: 9999px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    outline: none;
+    color: rgba(255, 255, 255, 0.75);
+    transition: color 500ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .lang-toggle-btn:hover:not(.is-active) {
+    color: #ffffff;
+  }
+
+  .lang-toggle-btn:focus-visible:not(.is-active) {
+    color: #ffffff;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.85);
+  }
+
+  .lang-toggle-btn.is-active,
+  .lang-toggle-btn.is-active:hover,
+  .lang-toggle-btn.is-active:focus {
+    color: #000000 !important;
+  }
+
+  .lang-toggle-btn.is-active:focus-visible {
+    color: #000000 !important;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+  }
+
+  .lang-toggle-btn-label {
+    display: inline-block;
+    transition: transform 500ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
+
+  .lang-toggle-btn:hover .lang-toggle-btn-label,
+  .lang-toggle-btn:focus-visible .lang-toggle-btn-label {
+    transform: scale(1.1);
+  }
 }
 
 @media (min-width: 768px) {
@@ -284,6 +367,10 @@ svg {
 
   .bottom-nav-link-inner {
     gap: 8px;
+  }
+
+  .lang-toggle-btn {
+    font-size: 14px;
   }
 }
 
@@ -3322,20 +3409,23 @@ svg {
 
 html.no-focus-visible .capsule-indicator,
 html.no-focus-visible .pill-indicator,
-html.no-focus-visible .bottom-nav-indicator {
+html.no-focus-visible .bottom-nav-indicator,
+html.no-focus-visible .lang-toggle-indicator {
   display: none !important;
 }
 
 html.no-focus-visible .capsule-btn,
 html.no-focus-visible .pill-btn,
-html.no-focus-visible .bottom-nav-link {
+html.no-focus-visible .bottom-nav-link,
+html.no-focus-visible .lang-toggle-btn {
   border-radius: 24px !important;
   transition: none !important;
 }
 
 html.no-focus-visible .capsule-btn:not(.is-active):hover,
 html.no-focus-visible .pill-btn:not(.is-active):hover,
-html.no-focus-visible .bottom-nav-link:not(.is-active):hover {
+html.no-focus-visible .bottom-nav-link:not(.is-active):hover,
+html.no-focus-visible .lang-toggle-btn:not(.is-active):hover {
   color: #ffffff;
   opacity: 1;
   background-color: rgba(255, 255, 255, 0.12);
@@ -3343,7 +3433,8 @@ html.no-focus-visible .bottom-nav-link:not(.is-active):hover {
 
 html.no-focus-visible .bottom-nav-link:not(.is-active):focus,
 html.no-focus-visible .capsule-btn:not(.is-active):focus,
-html.no-focus-visible .pill-btn:not(.is-active):focus {
+html.no-focus-visible .pill-btn:not(.is-active):focus,
+html.no-focus-visible .lang-toggle-btn:not(.is-active):focus {
   color: #ffffff;
   opacity: 1;
   background-color: rgba(255, 255, 255, 0.14);
@@ -3353,9 +3444,11 @@ html.no-focus-visible .pill-btn:not(.is-active):focus {
 html.no-focus-visible .bottom-nav-link.is-active,
 html.no-focus-visible .capsule-btn.is-active,
 html.no-focus-visible .pill-btn.is-active,
+html.no-focus-visible .lang-toggle-btn.is-active,
 html.no-focus-visible .bottom-nav-link.is-active:hover,
 html.no-focus-visible .capsule-btn.is-active:hover,
-html.no-focus-visible .pill-btn.is-active:hover {
+html.no-focus-visible .pill-btn.is-active:hover,
+html.no-focus-visible .lang-toggle-btn.is-active:hover {
   background-color: #ffffff !important;
   color: #000000 !important;
   border: 1px solid #ffffff !important;
@@ -3365,7 +3458,8 @@ html.no-focus-visible .pill-btn.is-active:hover {
 
 html.no-focus-visible .bottom-nav-link.is-active:focus,
 html.no-focus-visible .capsule-btn.is-active:focus,
-html.no-focus-visible .pill-btn.is-active:focus {
+html.no-focus-visible .pill-btn.is-active:focus,
+html.no-focus-visible .lang-toggle-btn.is-active:focus {
   background-color: #ffffff !important;
   color: #000000 !important;
   border: 1px solid #ffffff !important;
@@ -3377,6 +3471,7 @@ html.no-focus-visible .pill-btn.is-active:focus {
 html.no-focus-visible .bottom-nav-link-inner,
 html.no-focus-visible .capsule-btn-label,
 html.no-focus-visible .pill-btn-label,
+html.no-focus-visible .lang-toggle-btn-label,
 html.no-focus-visible .back-btn-inner,
 html.no-focus-visible .bottom-nav-link:hover .bottom-nav-link-inner,
 html.no-focus-visible .bottom-nav-link:focus .bottom-nav-link-inner,
@@ -3384,6 +3479,8 @@ html.no-focus-visible .capsule-btn:hover .capsule-btn-label,
 html.no-focus-visible .capsule-btn:focus .capsule-btn-label,
 html.no-focus-visible .pill-btn:hover .pill-btn-label,
 html.no-focus-visible .pill-btn:focus .pill-btn-label,
+html.no-focus-visible .lang-toggle-btn:hover .lang-toggle-btn-label,
+html.no-focus-visible .lang-toggle-btn:focus .lang-toggle-btn-label,
 html.no-focus-visible .back-btn:hover .back-btn-inner,
 html.no-focus-visible .back-btn:focus .back-btn-inner,
 html.no-focus-visible .media-card-poster,
@@ -3549,6 +3646,14 @@ html.ios-standalone .modal-backdrop {
 
 @supports not (display: grid) {
   .bottom-nav > .bottom-nav-link + .bottom-nav-link {
+    margin-left: 4px;
+  }
+
+  .bottom-nav-wrap > .lang-toggle {
+    margin-left: 10px;
+  }
+
+  .lang-toggle > .lang-toggle-btn + .lang-toggle-btn {
     margin-left: 4px;
   }
 

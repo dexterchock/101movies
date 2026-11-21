@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import {
   clearWatchHistory,
   loadWatchHistory,
@@ -8,17 +9,15 @@ import { mountSavedCollection } from "./SavedCollection";
 
 export function mount(container: HTMLElement): ViewCleanup {
   return mountSavedCollection(container, {
-    filterAriaLabel: "History Filter",
+    filterAriaLabel: t("history.filterAria"),
     storagePrefix: "history",
-    clearTitle: "Clear History",
-    removeLabel: "Remove from history",
-    emptyAllTitle: "No watch history yet",
-    emptyAllDesc:
-      "Start watching a movie or show to pick up right where you left off.",
+    clearTitle: t("history.clearTitle"),
+    removeLabel: t("history.removeLabel"),
+    emptyAllTitle: t("history.emptyAllTitle"),
+    emptyAllDesc: t("history.emptyAllDesc"),
     emptyFilteredTitle: (f) =>
-      f === "tv" ? "No shows in watch history" : "No movies in watch history",
-    emptyFilteredDesc:
-      "Try switching the filter tab or watching more titles.",
+      f === "tv" ? t("history.emptyShowsTitle") : t("history.emptyMoviesTitle"),
+    emptyFilteredDesc: t("history.emptyFilteredDesc"),
     loadItems: loadWatchHistory,
     clearItems: clearWatchHistory,
     removeItem: removeFromWatchHistory,

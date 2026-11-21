@@ -1,7 +1,11 @@
+import { isZh, t } from "../i18n";
 import { icons } from "../icons";
 import {
+  REUSABLE_SYNC_CODE_MIN_TTL_MS,
   checkPendingGroupPaired,
+  clearCachedActiveSyncCode,
   disconnectSync,
+  getCachedActiveSyncCode,
   isDeviceSynced,
   pairWithSyncCode,
   requestSyncCode,
@@ -40,7 +44,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   panel.className = "modal-panel sync-modal-panel";
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-modal", "true");
-  panel.setAttribute("aria-label", "Device Sync");
+  panel.setAttribute("aria-label", t("sync.title"));
   backdrop.appendChild(panel);
   document.body.appendChild(backdrop);
 
@@ -53,7 +57,10 @@ export function openSyncModal(onClose: () => void): SyncModalController {
 
   const h3 = document.createElement("h3");
   h3.className = "sync-modal-heading";
-  h3.innerHTML = `${icons.refreshCw("sync-modal-heading-icon", 17)}<span>Device Sync</span>`;
+  h3.innerHTML = `${icons.refreshCw("sync-modal-heading-icon", 17)}`;
+  const h3Title = document.createElement("span");
+  h3Title.textContent = t("sync.title");
+  h3.append(h3Title);
 
   const subtitle = document.createElement("p");
   subtitle.className = "sync-modal-subheading";
@@ -62,7 +69,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   const closeBtn = document.createElement("button");
   closeBtn.type = "button";
   closeBtn.className = "sync-modal-close";
-  closeBtn.setAttribute("aria-label", "Close sync dialog");
+  closeBtn.setAttribute("aria-label", t("sync.closeAria"));
   closeBtn.tabIndex = 0;
   closeBtn.innerHTML = icons.x("sync-modal-close-icon", 18);
 
@@ -75,7 +82,10 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   // Persistent DOM sections updated without blowing away input focus
   const statusBanner = document.createElement("div");
   statusBanner.className = "sync-status-banner";
-  statusBanner.innerHTML = `<span class="sync-status-dot" aria-hidden="true"></span><span>Synced across your devices</span>`;
+  statusBanner.innerHTML = `<span class="sync-status-dot" aria-hidden="true"></span>`;
+  const statusBannerText = document.createElement("span");
+  statusBannerText.textContent = t("sync.bannerSynced");
+  statusBanner.append(statusBannerText);
 
   const codeSection = document.createElement("div");
   codeSection.className = "sync-section";
@@ -104,7 +114,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
 
   const pairLabel = document.createElement("label");
   pairLabel.className = "sync-section-label";
-  pairLabel.textContent = "Enter code from another device";
+  pairLabel.textContent = t("sync.pairLabel");
 
   const inputId = `sync-code-input-${Date.now()}`;
   pairLabel.htmlFor = inputId;
@@ -118,7 +128,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   codeInput.autocomplete = "one-time-code";
   codeInput.placeholder = "0000";
   codeInput.className = "sync-code-input tabular-nums";
-  codeInput.setAttribute("aria-label", "Enter 4-digit pairing code");
+  codeInput.setAttribute("aria-label", t("sync.pairAria"));
 
   const pairFeedback = document.createElement("p");
   pairFeedback.className = "sync-feedback";
@@ -132,7 +142,10 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   const stopBtn = document.createElement("button");
   stopBtn.type = "button";
   stopBtn.className = "sync-stop-btn";
-  stopBtn.innerHTML = `<span class="sync-action-btn-inner">Stop Syncing</span>`;
+  const stopBtnLabel = document.createElement("span");
+  stopBtnLabel.className = "sync-action-btn-inner";
+  stopBtnLabel.textContent = t("sync.stop");
+  stopBtn.append(stopBtnLabel);
 
   const choicesRow = document.createElement("div");
   choicesRow.className = "sync-choices-row";
@@ -140,12 +153,18 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   const keepBtn = document.createElement("button");
   keepBtn.type = "button";
   keepBtn.className = "sync-choice-btn";
-  keepBtn.innerHTML = `<span class="sync-action-btn-inner">Keep local copy</span>`;
+  const keepBtnLabel = document.createElement("span");
+  keepBtnLabel.className = "sync-action-btn-inner";
+  keepBtnLabel.textContent = t("sync.keep");
+  keepBtn.append(keepBtnLabel);
 
   const clearDisconnectBtn = document.createElement("button");
   clearDisconnectBtn.type = "button";
   clearDisconnectBtn.className = "sync-choice-btn sync-choice-btn--danger";
-  clearDisconnectBtn.innerHTML = `<span class="sync-action-btn-inner">Clear &amp; disconnect</span>`;
+  const clearBtnLabel = document.createElement("span");
+  clearBtnLabel.className = "sync-action-btn-inner";
+  clearBtnLabel.textContent = t("sync.clearDisconnect");
+  clearDisconnectBtn.append(clearBtnLabel);
 
   choicesRow.append(keepBtn, clearDisconnectBtn);
   disconnectSection.append(stopBtn, choicesRow);
@@ -188,7 +207,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   function updateCountdownAndCode() {
     if (signal.aborted) return;
     if (loadingCode) {
-      countdownEl.textContent = "Generating...";
+      countdownEl.textContent = t("sync.generating");
       codeBox.textContent = "----";
       codeBox.classList.add("is-loading");
       codeHint.textContent = "";
@@ -206,11 +225,11 @@ export function openSyncModal(onClose: () => void): SyncModalController {
     }
 
     codeBox.textContent = code;
-    countdownEl.textContent = `Expires in ${formatCountdown(expiresAt)}`;
+    countdownEl.textContent = t("sync.expiresIn", {
+      time: formatCountdown(expiresAt),
+    });
     codeHint.classList.remove("is-error");
-    codeHint.textContent = synced
-      ? "Enter this code on another device to add it to sync"
-      : "Enter this code on your other device";
+    codeHint.textContent = synced ? t("sync.hintSynced") : t("sync.hintUnpaired");
   }
 
   function renderMode() {
@@ -218,15 +237,17 @@ export function openSyncModal(onClose: () => void): SyncModalController {
     synced = isDeviceSynced();
 
     subtitle.textContent = synced
-      ? "History & Saved stay synced in real time"
-      : "Sync History & Saved without creating an account";
+      ? t("sync.subtitleSynced")
+      : t("sync.subtitleUnpaired");
 
     statusBanner.hidden = !synced;
     divider.hidden = synced;
     pairSection.hidden = synced;
     disconnectSection.hidden = !synced;
 
-    codeLabel.textContent = synced ? "Add another device" : "This device's code";
+    codeLabel.textContent = synced
+      ? t("sync.labelAddDevice")
+      : t("sync.labelThisDevice");
 
     stopBtn.hidden = confirmingStop;
     choicesRow.hidden = !confirmingStop;
@@ -234,21 +255,24 @@ export function openSyncModal(onClose: () => void): SyncModalController {
     codeInput.disabled = pairing;
     codeInput.classList.toggle("is-pairing", pairing);
     if (pairing) {
-      pairFeedback.textContent = "Pairing and merging lists...";
+      pairFeedback.textContent = t("sync.pairing");
       pairFeedback.className = "sync-feedback is-pending";
     } else if (pairError) {
       pairFeedback.textContent = pairError;
       pairFeedback.className = "sync-feedback is-error";
     } else {
-      pairFeedback.textContent = "Auto-submits as soon as you enter the 4th digit";
+      pairFeedback.textContent = t("sync.pairAutoHint");
       pairFeedback.className = "sync-feedback";
     }
 
     updateCountdownAndCode();
   }
 
-  async function fetchFreshCode() {
+  async function fetchFreshCode(forceFresh = false) {
     if (signal.aborted) return;
+    if (forceFresh) {
+      clearCachedActiveSyncCode();
+    }
     codeFetchAc?.abort();
     const reqAc = new AbortController();
     codeFetchAc = reqAc;
@@ -258,7 +282,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
     updateCountdownAndCode();
 
     try {
-      const res = await requestSyncCode(reqAc.signal);
+      const res = await requestSyncCode(reqAc.signal, { forceFresh });
       if (signal.aborted || reqAc.signal.aborted) return;
       code = res.code;
       pendingGroupId = res.groupId;
@@ -275,7 +299,12 @@ export function openSyncModal(onClose: () => void): SyncModalController {
         return;
       }
       loadingCode = false;
-      codeError = err?.message || "Could not reach sync server.";
+      const rawMsg = typeof err?.message === "string" ? err.message.trim() : "";
+      if (isZh() && (!rawMsg || /^(failed to fetch|load failed|network)/i.test(rawMsg))) {
+        codeError = t("sync.errFetch");
+      } else {
+        codeError = rawMsg || t("sync.errFetch");
+      }
       updateCountdownAndCode();
     } finally {
       if (codeFetchAc === reqAc) {
@@ -295,7 +324,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
 
     pairing = false;
     if (!result.ok) {
-      pairError = result.error || "Invalid or expired pairing code.";
+      pairError = result.error || t("sync.errInvalidCode");
       codeInput.value = "";
       renderMode();
       codeInput.focus({ preventScroll: true });
@@ -309,7 +338,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
     renderMode();
     if (!alreadyTransitioned) {
       // Generate a fresh 4-digit code tied to the newly joined group so user can add another device
-      void fetchFreshCode();
+      void fetchFreshCode(true);
     }
   }
 
@@ -322,7 +351,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
       }
       if (pairError) {
         pairError = "";
-        pairFeedback.textContent = "Auto-submits as soon as you enter the 4th digit";
+        pairFeedback.textContent = t("sync.pairAutoHint");
         pairFeedback.className = "sync-feedback";
       }
       if (digits.length === 4) {
@@ -369,10 +398,11 @@ export function openSyncModal(onClose: () => void): SyncModalController {
         synced = nowSynced;
         pairing = false;
         confirmingStop = false;
+        pairError = "";
         codeInput.value = "";
         renderMode();
         if (synced) {
-          void fetchFreshCode();
+          void fetchFreshCode(true);
         }
       }
     },
@@ -382,10 +412,13 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   const countdownTimer = window.setInterval(() => {
     if (signal.aborted || loadingCode || codeError || !expiresAt) return;
     if (Date.now() >= expiresAt) {
-      void fetchFreshCode();
+      clearCachedActiveSyncCode();
+      void fetchFreshCode(true);
       return;
     }
-    countdownEl.textContent = `Expires in ${formatCountdown(expiresAt)}`;
+    countdownEl.textContent = t("sync.expiresIn", {
+      time: formatCountdown(expiresAt),
+    });
   }, 1000);
 
   const pollTimer = window.setInterval(() => {
@@ -403,13 +436,25 @@ export function openSyncModal(onClose: () => void): SyncModalController {
         synced = true;
         confirmingStop = false;
         renderMode();
-        void fetchFreshCode();
+        void fetchFreshCode(true);
       }
     });
-  }, 2500);
+  }, 3800);
 
-  renderMode();
-  void fetchFreshCode();
+  const cachedCode = getCachedActiveSyncCode(REUSABLE_SYNC_CODE_MIN_TTL_MS);
+  if (cachedCode) {
+    code = cachedCode.code;
+    pendingGroupId = cachedCode.groupId;
+    expiresAt = cachedCode.expiresAt;
+    loadingCode = false;
+    renderMode();
+    if (!synced && pendingGroupId) {
+      void checkPendingGroupPaired(pendingGroupId, signal);
+    }
+  } else {
+    renderMode();
+    void fetchFreshCode();
+  }
 
   return { destroy };
 }

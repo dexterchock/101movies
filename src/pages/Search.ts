@@ -1,5 +1,6 @@
 import { api } from "../api";
 import { createMediaCard } from "../components/MediaCard";
+import { t } from "../i18n";
 import { icons } from "../icons";
 import { MediaItem } from "../types";
 import {
@@ -70,15 +71,15 @@ export function mount(container: HTMLElement): ViewCleanup {
   input.type = "text";
   input.name = "search-query";
   input.className = "search-input";
-  input.placeholder = "Search movies, shows...";
+  input.placeholder = t("search.placeholder");
   input.value = query;
   input.tabIndex = 0;
-  input.setAttribute("aria-label", "Search movies and shows");
+  input.setAttribute("aria-label", t("search.aria"));
 
   const clearBtn = document.createElement("button");
   clearBtn.type = "button";
   clearBtn.className = "search-clear-btn";
-  clearBtn.setAttribute("aria-label", "Clear search");
+  clearBtn.setAttribute("aria-label", t("search.clearAria"));
   clearBtn.tabIndex = 0;
   clearBtn.innerHTML = `<span class="search-clear-inner">${icons.x("", 14, 2)}</span>`;
 
@@ -92,13 +93,13 @@ export function mount(container: HTMLElement): ViewCleanup {
   const prevBtn = document.createElement("button");
   prevBtn.type = "button";
   prevBtn.className = "page-nav-btn";
-  prevBtn.setAttribute("aria-label", "Previous page");
+  prevBtn.setAttribute("aria-label", t("common.prevPage"));
   prevBtn.innerHTML = icons.chevronLeft("page-nav-icon");
 
   const nextBtn = document.createElement("button");
   nextBtn.type = "button";
   nextBtn.className = "page-nav-btn";
-  nextBtn.setAttribute("aria-label", "Next page");
+  nextBtn.setAttribute("aria-label", t("common.nextPage"));
   nextBtn.innerHTML = icons.chevronRight("page-nav-icon");
 
   rightWrap.append(prevBtn, nextBtn);
@@ -358,11 +359,11 @@ export function mount(container: HTMLElement): ViewCleanup {
     const trimmed = query.trim();
 
     if (trimmed.length > 0) {
-      emptyWrap.innerHTML = `<p class="empty-state-title">No movies or shows found for &ldquo;${escapeHtml(
-        trimmed
-      )}&rdquo;</p><p class="empty-state-desc">Check your spelling or try a different keyword.</p>`;
+      emptyWrap.innerHTML = `<p class="empty-state-title">${escapeHtml(
+        t("search.noResultsTitle", { query: trimmed })
+      )}</p><p class="empty-state-desc">${escapeHtml(t("search.noResultsDesc"))}</p>`;
     } else {
-      emptyWrap.innerHTML = `<p class="empty-state-hint">Type to search movies and shows...</p>`;
+      emptyWrap.innerHTML = `<p class="empty-state-hint">${escapeHtml(t("search.emptyHint"))}</p>`;
     }
     stage.replaceChildren(emptyWrap);
   }

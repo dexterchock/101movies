@@ -1,3 +1,4 @@
+import { isZh, t } from "./i18n";
 import type { MediaItem } from "./types";
 
 const WATCH_HISTORY_KEY = "watch_history";
@@ -5,6 +6,8 @@ const WATCH_LATER_KEY = "watch_later";
 const SYNC_GROUP_ID_KEY = "sync_group_id";
 const SYNC_UPDATED_AT_KEY = "sync_updated_at";
 const PENDING_GROUP_ID_KEY = "sync_pending_group_id";
+const ACTIVE_SYNC_CODE_KEY = "sync_active_code";
+export const REUSABLE_SYNC_CODE_MIN_TTL_MS = 15_000;
 
 const PULL_THROTTLE_MS = 15_000;
 const PROGRESS_SYNC_INTERVAL_MS = 30_000;
@@ -103,7 +106,138 @@ export interface SyncCodeResponse {
   paired: boolean;
 }
 
-export async function requestSyncCode(signal?: AbortSignal): Promise<SyncCodeResponse> {
+interface CachedActiveSyncCode extends SyncCodeResponse {
+  dataFingerprint: string;
+}
+
+function hashString(input: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function computeSyncDataFingerprint(): string {
+  if (typeof window === "undefined") return "0";
+  try {
+    const h = localStorage.getItem(WATCH_HISTORY_KEY) || "";
+    const s = localStorage.getItem(WATCH_LATER_KEY) || "";
+    return `${h.length}:${hashString(h)}:${s.length}:${hashString(s)}`;
+  } catch {
+    return "0";
+  }
+}
+
+export function clearCachedActiveSyncCode(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(ACTIVE_SYNC_CODE_KEY);
+  } catch {}
+}
+
+export function getCachedActiveSyncCode(
+  minRemainingMs = REUSABLE_SYNC_CODE_MIN_TTL_MS
+): SyncCodeResponse | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(ACTIVE_SYNC_CODE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<CachedActiveSyncCode> | null;
+    if (
+      !parsed ||
+      typeof parsed.code !== "string" ||
+      !/^\d{4}$/.test(parsed.code) ||
+      typeof parsed.groupId !== "string" ||
+      !parsed.groupId ||
+      typeof parsed.expiresAt !== "number" ||
+      typeof parsed.paired !== "boolean" ||
+      typeof parsed.dataFingerprint !== "string"
+    ) {
+      sessionStorage.removeItem(ACTIVE_SYNC_CODE_KEY);
+      return null;
+    }
+
+    if (parsed.expiresAt - Date.now() <= minRemainingMs) {
+      sessionStorage.removeItem(ACTIVE_SYNC_CODE_KEY);
+      return null;
+    }
+
+    const activeGroupId = getSyncGroupId();
+    const expectedPaired = Boolean(activeGroupId);
+    const expectedGroupId = activeGroupId || getPendingGroupId();
+    if (
+      parsed.paired !== expectedPaired ||
+      !expectedGroupId ||
+      parsed.groupId !== expectedGroupId
+    ) {
+      return null;
+    }
+
+    if (parsed.dataFingerprint !== computeSyncDataFingerprint()) {
+      return null;
+    }
+
+    return {
+      code: parsed.code,
+      groupId: parsed.groupId,
+      expiresAt: parsed.expiresAt,
+      paired: parsed.paired,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function setCachedActiveSyncCode(
+  entry: SyncCodeResponse,
+  dataFingerprint = computeSyncDataFingerprint()
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: CachedActiveSyncCode = {
+      code: entry.code,
+      groupId: entry.groupId,
+      expiresAt: entry.expiresAt,
+      paired: entry.paired,
+      dataFingerprint,
+    };
+    sessionStorage.setItem(ACTIVE_SYNC_CODE_KEY, JSON.stringify(payload));
+  } catch {}
+}
+
+function localizeServerSyncError(rawError: unknown, fallback: string): string {
+  if (typeof rawError !== "string" || !rawError.trim()) {
+    return fallback;
+  }
+  if (!isZh()) {
+    return rawError;
+  }
+  const normalized = rawError.trim();
+  if (normalized === "Code is invalid or has expired.") {
+    return t("sync.errInvalidCode");
+  }
+  if (normalized === "Sync session not found.") {
+    return "同步会话不存在或已过期。";
+  }
+  if (normalized === "Please enter a 4-digit pairing code.") {
+    return t("sync.errFourDigits");
+  }
+  return rawError;
+}
+
+export async function requestSyncCode(
+  signal?: AbortSignal,
+  opts?: { forceFresh?: boolean }
+): Promise<SyncCodeResponse> {
+  if (!opts?.forceFresh) {
+    const cached = getCachedActiveSyncCode(REUSABLE_SYNC_CODE_MIN_TTL_MS);
+    if (cached) {
+      return cached;
+    }
+  }
+  const requestFingerprint = computeSyncDataFingerprint();
   const existingGroupId = getSyncGroupId() || getPendingGroupId() || undefined;
   const history = readJsonArray(WATCH_HISTORY_KEY);
   const saved = readJsonArray(WATCH_LATER_KEY);
@@ -128,19 +262,22 @@ export async function requestSyncCode(signal?: AbortSignal): Promise<SyncCodeRes
   };
 
   if (!res.ok || !data.ok || !data.code || !data.groupId || !data.expiresAt) {
-    throw new Error(data.error || "Failed to generate pairing code");
+    throw new Error(localizeServerSyncError(data.error, t("sync.errCreateFailed")));
   }
 
-  if (!data.paired && !getSyncGroupId()) {
-    setPendingGroupId(data.groupId);
-  }
-
-  return {
+  const result: SyncCodeResponse = {
     code: data.code,
     groupId: data.groupId,
     expiresAt: data.expiresAt,
     paired: Boolean(data.paired),
   };
+
+  if (!result.paired && !getSyncGroupId()) {
+    setPendingGroupId(result.groupId);
+  }
+
+  setCachedActiveSyncCode(result, requestFingerprint);
+  return result;
 }
 
 export async function checkPendingGroupPaired(
@@ -165,6 +302,7 @@ export async function checkPendingGroupPaired(
 
     localStorage.setItem(SYNC_GROUP_ID_KEY, pendingGroupId);
     setPendingGroupId(null);
+    clearCachedActiveSyncCode();
     if (Array.isArray(data.history)) writeJsonArray(WATCH_HISTORY_KEY, data.history);
     if (Array.isArray(data.saved)) writeJsonArray(WATCH_LATER_KEY, data.saved);
     setLocalUpdatedAt(data.updatedAt);
@@ -181,7 +319,7 @@ export async function pairWithSyncCode(
 ): Promise<{ ok: boolean; error?: string }> {
   const code = rawCode.replace(/\D/g, "");
   if (!/^\d{4}$/.test(code)) {
-    return { ok: false, error: "Please enter a 4-digit code." };
+    return { ok: false, error: t("sync.errFourDigits") };
   }
 
   try {
@@ -204,11 +342,15 @@ export async function pairWithSyncCode(
     };
 
     if (!res.ok || !data.ok || !data.groupId) {
-      return { ok: false, error: data.error || "Invalid or expired code." };
+      return {
+        ok: false,
+        error: localizeServerSyncError(data.error, t("sync.errInvalidCode")),
+      };
     }
 
     localStorage.setItem(SYNC_GROUP_ID_KEY, data.groupId);
     setPendingGroupId(null);
+    clearCachedActiveSyncCode();
     if (Array.isArray(data.history)) writeJsonArray(WATCH_HISTORY_KEY, data.history);
     if (Array.isArray(data.saved)) writeJsonArray(WATCH_LATER_KEY, data.saved);
     setLocalUpdatedAt(data.updatedAt);
@@ -216,7 +358,7 @@ export async function pairWithSyncCode(
     notifySyncUpdated();
     return { ok: true };
   } catch {
-    return { ok: false, error: "Network error while pairing. Please try again." };
+    return { ok: false, error: t("sync.errNetworkPair") };
   }
 }
 
@@ -380,6 +522,7 @@ export function disconnectSync(mode: "keep" | "clear"): void {
     localStorage.removeItem(SYNC_UPDATED_AT_KEY);
   } catch {}
   setPendingGroupId(null);
+  clearCachedActiveSyncCode();
 
   if (mode === "clear") {
     try {

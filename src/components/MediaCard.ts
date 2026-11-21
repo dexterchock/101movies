@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { isZh, t } from "../i18n";
 import { icons } from "../icons";
 import type { MediaItem } from "../types";
 import { cn, escapeHtml, resolveMediaItemType } from "../utils";
@@ -26,19 +27,20 @@ export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
     rank,
     className,
     onRemove,
-    removeLabel = "Remove from history",
+    removeLabel = t("history.removeLabel"),
     colsPerRow = 6,
     isPriority = false,
     signal,
   } = options;
   const type = resolveMediaItemType(item);
-  const title =
-    item.is_chinese_origin && item.zh_title
-      ? item.zh_title
-      : item.title || item.name || "Untitled";
+  const title = isZh()
+    ? item.zh_title || item.title || item.name || t("common.untitled")
+    : item.is_chinese_origin && item.zh_title
+    ? item.zh_title
+    : item.title || item.name || t("common.untitled");
   const yearOrType =
     (item.release_date || item.first_air_date)?.substring(0, 4) ||
-    (type === "tv" ? "Show" : "Movie");
+    (type === "tv" ? t("type.showSingular") : t("type.movieSingular"));
 
   const card = document.createElement("a");
   card.href = `/player/${type}/${item.id}`;

@@ -29,8 +29,10 @@ import {
   AWESOME_ZHUIJU_TVBOX_CONFIGS,
   filterItemsByServerAvailability,
   getAllVodSites,
+  parseSeasonInfo,
   parseTvboxConfig,
   pingVodSite,
+  resolveFallbackParentTitlesFromVod,
   resolveStreamsForMedia,
   toSimplifiedChinese,
 } from "./src/server/tvboxService";
@@ -158,13 +160,13 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
   });
 
   if (hasExactTitle) {
-    score += 1000;
+    score += 2000;
   } else if (startsWithQuery) {
-    score += 600;
+    score += 1000;
   } else if (containsQuery) {
-    score += 400;
+    score += 600;
   } else if (item.fromZhSearch) {
-    score += 450;
+    score += 350;
   } else if (typeof item.overview === "string" && item.overview) {
     const overviewLower = item.overview.toLowerCase();
     if (overviewLower.includes(q) || (cleanQ && overviewLower.includes(cleanQ))) {
@@ -172,8 +174,8 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
     }
   }
 
-  score += (Number(item.popularity) || 0) * 1.5;
-  score += Math.min(Number(item.vote_count) || 0, 10000) * 0.05;
+  score += Math.min(Number(item.popularity) || 0, 200) * 1.5;
+  score += Math.min(Number(item.vote_count) || 0, 10000) * 0.03;
 
   const year = Number((item.release_date || item.first_air_date || "").slice(0, 4));
   if (year >= 2000) {
@@ -181,6 +183,83 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
   }
 
   return score;
+}
+
+async function fetchAndScoreTmdbCandidates(
+  fetchConfigs: { url: string; isZh: boolean }[],
+  query: string,
+  cleanQuery: string,
+  isZhQuery: boolean
+): Promise<any[]> {
+  const responses = await Promise.allSettled<any>(
+    fetchConfigs.map((cfg) =>
+      fetch(cfg.url, { signal: AbortSignal.timeout(4500) }).then((r) => r.json())
+    )
+  );
+
+  const zhMap = new Map<string, string>();
+  const enMap = new Map<string, string>();
+  const rawCandidateMap = new Map<string, any>();
+
+  responses.forEach((res, i) => {
+    if (res.status !== "fulfilled" || !Array.isArray(res.value?.results)) return;
+    const isFromZhEndpoint = fetchConfigs[i].isZh;
+
+    for (const item of res.value.results) {
+      if (!item || typeof item.id !== "number") continue;
+      if (item.media_type !== "movie" && item.media_type !== "tv") continue;
+
+      const key = `${item.media_type}:${item.id}`;
+      const t = item.title || item.name;
+      if (t) {
+        if (/[\u4e00-\u9fff]/.test(t)) {
+          zhMap.set(key, toSimplifiedChinese(t.trim()));
+        } else {
+          enMap.set(key, t.trim());
+        }
+      }
+
+      if (!rawCandidateMap.has(key)) {
+        rawCandidateMap.set(key, {
+          ...item,
+          fromZhSearch: isFromZhEndpoint,
+        });
+      } else if (isFromZhEndpoint) {
+        rawCandidateMap.get(key).fromZhSearch = true;
+      }
+    }
+  });
+
+  const rawResults: any[] = [];
+  for (const item of rawCandidateMap.values()) {
+    const key = `${item.media_type}:${item.id}`;
+    const zhTitle =
+      zhMap.get(key) ||
+      (isZhQuery && /[\u4e00-\u9fff]/.test(item.title || item.name)
+        ? toSimplifiedChinese(item.title || item.name)
+        : undefined);
+    const enTitle =
+      enMap.get(key) ||
+      item.original_title ||
+      item.original_name ||
+      item.title ||
+      item.name;
+
+    rawResults.push({
+      ...item,
+      title: item.title !== undefined ? enTitle || item.title : undefined,
+      name: item.name !== undefined ? enTitle || item.name : undefined,
+      zh_title: zhTitle,
+    });
+  }
+
+  rawResults.sort(
+    (a, b) =>
+      computeSearchRelevance(b, query, cleanQuery) -
+      computeSearchRelevance(a, query, cleanQuery)
+  );
+
+  return rawResults;
 }
 
   app.get("/api/tmdb/search", async (req, res) => {
@@ -238,83 +317,68 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
         });
       }
 
-      const responses = await Promise.allSettled<any>(
-        fetchConfigs.map((cfg) =>
-          fetch(cfg.url, { signal: AbortSignal.timeout(4500) }).then((r) =>
-            r.json()
-          )
-        )
-      );
-
-      const zhMap = new Map<string, string>();
-      const enMap = new Map<string, string>();
-      const rawCandidateMap = new Map<string, any>();
-
-      responses.forEach((res, i) => {
-        if (res.status !== "fulfilled" || !Array.isArray(res.value?.results)) return;
-        const isFromZhEndpoint = fetchConfigs[i].isZh;
-
-        for (const item of res.value.results) {
-          if (!item || typeof item.id !== "number") continue;
-          if (item.media_type !== "movie" && item.media_type !== "tv") continue;
-
-          const key = `${item.media_type}:${item.id}`;
-          const t = item.title || item.name;
-          if (t) {
-            if (/[\u4e00-\u9fff]/.test(t)) {
-              zhMap.set(key, toSimplifiedChinese(t.trim()));
-            } else {
-              enMap.set(key, t.trim());
-            }
-          }
-
-          if (!rawCandidateMap.has(key)) {
-            rawCandidateMap.set(key, {
-              ...item,
-              fromZhSearch: isFromZhEndpoint,
-            });
-          } else if (isFromZhEndpoint) {
-            rawCandidateMap.get(key).fromZhSearch = true;
-          }
-        }
-      });
-
-      const rawResults: any[] = [];
-      for (const item of rawCandidateMap.values()) {
-        const key = `${item.media_type}:${item.id}`;
-        const zhTitle =
-          zhMap.get(key) ||
-          (isZhQuery && /[\u4e00-\u9fff]/.test(item.title || item.name)
-            ? toSimplifiedChinese(item.title || item.name)
-            : undefined);
-        const enTitle =
-          enMap.get(key) ||
-          item.original_title ||
-          item.original_name ||
-          item.title ||
-          item.name;
-
-        rawResults.push({
-          ...item,
-          title: item.title !== undefined ? enTitle || item.title : undefined,
-          name: item.name !== undefined ? enTitle || item.name : undefined,
-          zh_title: zhTitle,
+      const seasonBaseQuery = parseSeasonInfo(query).baseTitle;
+      if (
+        seasonBaseQuery &&
+        seasonBaseQuery.length >= 2 &&
+        seasonBaseQuery !== query &&
+        seasonBaseQuery !== cleanQuery &&
+        seasonBaseQuery !== compactQuery
+      ) {
+        const seasonIsZh = /[\u4e00-\u9fff]/.test(seasonBaseQuery);
+        fetchConfigs.push({
+          url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(seasonBaseQuery)}${
+            seasonIsZh ? "&language=zh-CN" : ""
+          }&page=1&api_key=${TMDB_API_KEY}`,
+          isZh: seasonIsZh,
         });
       }
 
-      // Sort by search relevance and popularity so blockbuster movies and direct title matches rank at the top
-      rawResults.sort(
-        (a, b) =>
-          computeSearchRelevance(b, query, cleanQuery) -
-          computeSearchRelevance(a, query, cleanQuery)
+      const rawResults = await fetchAndScoreTmdbCandidates(
+        fetchConfigs,
+        query,
+        cleanQuery,
+        isZhQuery
       );
 
       const releasedCandidates = filterReleasedMedia(rawResults, 1).slice(0, 26);
-      const verified = await filterItemsByServerAvailability(
+      let verified = await filterItemsByServerAvailability(
         releasedCandidates,
         "movie",
         TMDB_API_KEY
       );
+
+      if (verified.length === 0 && releasedCandidates.length <= 10) {
+        const fallbackTitles = await resolveFallbackParentTitlesFromVod(query);
+        if (fallbackTitles.length > 0) {
+          const primaryFallback = fallbackTitles[0];
+          const fallbackConfigs = fallbackTitles.slice(0, 1).flatMap((ft) => [
+            {
+              url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(ft)}&page=1&api_key=${TMDB_API_KEY}`,
+              isZh: false,
+            },
+            {
+              url: `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(ft)}&page=1&language=zh-CN&api_key=${TMDB_API_KEY}`,
+              isZh: true,
+            },
+          ]);
+          const fallbackRaw = await fetchAndScoreTmdbCandidates(
+            fallbackConfigs,
+            primaryFallback,
+            primaryFallback,
+            true
+          );
+          const fallbackReleased = filterReleasedMedia(fallbackRaw, 1).slice(0, 6);
+          if (fallbackReleased.length > 0) {
+            verified = await filterItemsByServerAvailability(
+              fallbackReleased,
+              "movie",
+              TMDB_API_KEY
+            );
+          }
+        }
+      }
+
       res.json({ page: 1, results: verified });
     } catch (err) {
       console.error(err);

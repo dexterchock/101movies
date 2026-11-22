@@ -2,6 +2,7 @@ import {
   computeTitleMatchScore,
   evaluateYearMatch,
   generateZhTitleVariants,
+  isIncompatibleVodCategory,
   parseSeasonInfo,
   prepareTargetTitles,
   setBoundedCache,
@@ -104,6 +105,7 @@ async function probeVodSiteForMedia(
 
       if (
         !vodPlayFrom ||
+        isIncompatibleVodCategory(item.type_name, mediaType) ||
         vodName.includes("解说") ||
         vodName.includes("预告") ||
         vodName.includes("短剧") ||
@@ -119,7 +121,8 @@ async function probeVodSiteForMedia(
         vodName,
         vodSub,
         targetTitles,
-        mediaType
+        mediaType,
+        targetYear
       );
       if (titleScore < 140) continue;
 

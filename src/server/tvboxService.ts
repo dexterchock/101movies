@@ -558,6 +558,24 @@ export function detectSourceQuality(
   return "1080P";
 }
 
+export function isIncompatibleVodCategory(
+  typeName?: string,
+  mediaType?: "movie" | "tv"
+): boolean {
+  const t = toSimplifiedChinese(String(typeName || "")).trim();
+  if (!t) return false;
+  if (/(解说|预告|短剧|爽剧|福利|伦理|论理)/.test(t)) return true;
+  if (mediaType === "tv") {
+    return /^(?:动作|剧情|喜剧|爱情|科幻|恐怖|战争|犯罪|悬疑|奇幻|冒险|灾难|惊悚|武侠|历史|古装)片$|电影/.test(
+      t
+    );
+  }
+  if (mediaType === "movie") {
+    return /(?:剧$|综艺)/.test(t);
+  }
+  return false;
+}
+
 export function stripLanguageAndStatusTags(input: string): string {
   let clean = input.trim();
   // Strip bracketed tags like [美剧], (粤语), (国语版), 【更新至16集】
@@ -588,6 +606,40 @@ export function parseSeasonInfo(rawTitle: string): {
   const audioLang = extractAudioLangFromText(simpRaw);
 
   let clean = stripLanguageAndStatusTags(simpRaw);
+
+  // Match colon-subtitled seasons first, e.g. "溏心风暴2：家好月圆粤语" or "法证先锋6：幸存者的救赎"
+  const zhSubtitledSeasonMatch = clean.match(
+    /^(.+?)\s*第\s*([一二两三四五六七八九十\d]+)\s*[季部]\s*[:：]\s*.+$/
+  );
+  if (zhSubtitledSeasonMatch) {
+    const base = stripLanguageAndStatusTags(zhSubtitledSeasonMatch[1]);
+    const num = parseChineseNumeral(zhSubtitledSeasonMatch[2]);
+    if (base.length >= 1 && num !== null && num > 0 && num <= 50) {
+      return { baseTitle: base, seasonNumber: num, audioLang };
+    }
+  }
+
+  const enSubtitledSeasonMatch = clean.match(
+    /^(.+?)\s*(?:Season\s*0*(\d+)|S0*(\d+))\s*[:：]\s*.+$/i
+  );
+  if (enSubtitledSeasonMatch) {
+    const base = stripLanguageAndStatusTags(enSubtitledSeasonMatch[1]);
+    const num = parseInt(enSubtitledSeasonMatch[2] || enSubtitledSeasonMatch[3], 10);
+    if (base.length >= 1 && !Number.isNaN(num) && num > 0 && num <= 50) {
+      return { baseTitle: base, seasonNumber: num, audioLang };
+    }
+  }
+
+  const digitSubtitledSeasonMatch = clean.match(
+    /^([\u4e00-\u9fffA-Za-z][^\d:：]*?[^\d\s:：])\s*([2-9])\s*[:：]\s*.+$/
+  );
+  if (digitSubtitledSeasonMatch) {
+    const base = stripLanguageAndStatusTags(digitSubtitledSeasonMatch[1]);
+    const num = parseInt(digitSubtitledSeasonMatch[2], 10);
+    if (base.length >= 2 && !Number.isNaN(num)) {
+      return { baseTitle: base, seasonNumber: num, audioLang };
+    }
+  }
 
   // Match Chinese "第X季" or "第X部" at or near the end
   const zhSeasonMatch = clean.match(
@@ -752,7 +804,7 @@ export function buildSearchKeywords(
       if (!raw || typeof raw !== "string") continue;
       const simp = toSimplifiedChinese(stripYearSuffix(raw)).trim();
       if (!simp) continue;
-      if (/[\u4e00-\u9fff]/.test(simp)) {
+      if (/[\u4e00-\u9fff]|^(?:19|20)\d{2}$/.test(simp)) {
         zh.push(simp);
       } else {
         other.push(simp);
@@ -777,7 +829,10 @@ export function buildSearchKeywords(
   // Pass 2: Franchise/colon-stripped reduced query from the primary Chinese title
   if (firstZhQuery) {
     const beforeColon = firstZhQuery.split(/[:：]/)[0].trim();
-    if (beforeColon.length >= 2 && !/^\d+$/.test(beforeColon)) {
+    if (
+      beforeColon.length >= 2 &&
+      (!/^\d+$/.test(beforeColon) || /^(19|20)\d{2}$/.test(beforeColon))
+    ) {
       pushKeyword(beforeColon);
     }
     const baseFranchise = beforeColon.replace(/\d+$/, "").trim();
@@ -852,7 +907,8 @@ export function computeTitleMatchScore(
   vodName: string,
   vodSub: string,
   targetTitles: string[] | PreparedTargetTitle[],
-  mediaType?: "movie" | "tv"
+  mediaType?: "movie" | "tv",
+  targetYear?: string
 ): number {
   if (!targetTitles || targetTitles.length === 0) return 0;
 
@@ -868,9 +924,18 @@ export function computeTitleMatchScore(
   const normCleanVod = normalizeTitleForComparison(cleanVod);
   if (!normVodName) return 0;
 
-  const bareYearStrippedVod = cleanVod.replace(/\s*(?:19|20)\d{2}\s*$/, "").trim();
+  const bareYearMatch = cleanVod.match(/\s*((?:19|20)\d{2})\s*$/);
+  const bareYearStrippedVod = bareYearMatch
+    ? cleanVod.slice(0, bareYearMatch.index).trim()
+    : "";
+  const bareYear = bareYearMatch ? Number(bareYearMatch[1]) : NaN;
+  const targetYearNum = targetYear ? Number(targetYear) : NaN;
+  const bareYearMatchesTarget =
+    !targetYear ||
+    !Number.isFinite(targetYearNum) ||
+    (Number.isFinite(bareYear) && Math.abs(bareYear - targetYearNum) <= 2);
   const normVodNoBareYear =
-    bareYearStrippedVod.length >= 2 && bareYearStrippedVod !== cleanVod
+    bareYearMatchesTarget && bareYearStrippedVod.length >= 2
       ? normalizeTitleForComparison(
           mediaType === "tv"
             ? parseSeasonInfo(bareYearStrippedVod).baseTitle
@@ -879,13 +944,14 @@ export function computeTitleMatchScore(
       : "";
 
   const normAliases = vodSub
-    .split(/[\/|,，;；、]+/)
+    .split(/[\/|,，;；、]+|\s{2,}/)
     .map((s) => {
+      const noRegionTag = s.replace(/\s*[(（][港台陆美英日中韩新马澳加]+[)）]\s*/g, "").trim();
       const cleaned = stripLanguageAndStatusTags(
-        toSimplifiedChinese(stripYearSuffix(s))
+        toSimplifiedChinese(stripYearSuffix(noRegionTag))
       );
       const base =
-        mediaType === "tv" ? parseSeasonInfo(s).baseTitle : cleaned;
+        mediaType === "tv" ? parseSeasonInfo(noRegionTag).baseTitle : cleaned;
       return normalizeTitleForComparison(base);
     })
     .filter(Boolean);
@@ -918,9 +984,20 @@ export function computeTitleMatchScore(
     }
 
     for (const alias of normAliases) {
+      const aliasNumbers = extractNumbers(alias);
+      const aliasNumbersKey = aliasNumbers.join(",");
+      if (
+        (hasNumbers || aliasNumbers.length > 0) &&
+        aliasNumbersKey !== numbersKey
+      ) {
+        continue;
+      }
       if (alias.includes(target) || alias.includes(normFullTarget)) {
+        const minLen = Math.min(alias.length, target.length);
+        const maxLen = Math.max(alias.length, target.length);
         const extraLen = alias.length - target.length;
-        if (target.length >= 8 || extraLen <= 25) {
+        const ratio = maxLen > 0 ? minLen / maxLen : 0;
+        if (ratio >= 0.75 || (target.length >= 8 && extraLen <= 20)) {
           bestScore = Math.max(bestScore, 185);
         }
       }
@@ -1091,8 +1168,9 @@ async function searchSingleVodSite(
       const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
       const vodYear = vodYearMatch ? vodYearMatch[0] : "";
 
-      // Reject recaps ("解说") and trailer-only placeholders ("预告"/"花絮"/"先导") or short-drama parodies ("短剧版")
+      // Reject recaps ("解说"), trailers ("预告"/"花絮"/"先导"), micro-dramas ("短剧"), and wrong movie/tv categories
       if (
+        isIncompatibleVodCategory(item.type_name, mediaType) ||
         vodName.includes("解说") ||
         vodName.includes("预告") ||
         vodName.includes("短剧") ||
@@ -1108,7 +1186,8 @@ async function searchSingleVodSite(
         vodName,
         vodSub,
         targetTitles,
-        mediaType
+        mediaType,
+        targetYear
       );
       if (titleScore < 140) {
         continue;
@@ -1437,7 +1516,7 @@ async function getTmdbCandidateMetadata(
     typeof caches !== "undefined" ? (caches as any).default : null;
   const edgeCacheReq =
     tmdbId && edgeCache
-      ? new Request(`https://tmdb-meta.101movies.internal/v2/${type}/${tmdbId}`, {
+      ? new Request(`https://tmdb-meta.101movies.internal/v3/${type}/${tmdbId}`, {
           method: "GET",
         })
       : null;
@@ -1518,9 +1597,9 @@ async function getTmdbCandidateMetadata(
         }
         isUnreleased = isMediaUnreleased(type, d);
 
-        const allFoundZh = new Set<string>();
+        const officialZhTitles = new Set<string>();
         if (zhTitle && /[\u4e00-\u9fff]/.test(zhTitle)) {
-          allFoundZh.add(zhTitle.trim());
+          officialZhTitles.add(zhTitle.trim());
         }
 
         const transList = Array.isArray(d?.translations?.translations)
@@ -1531,13 +1610,18 @@ async function getTmdbCandidateMetadata(
           for (const tr of transList) {
             if (tr?.iso_639_1 === "zh" && tr?.iso_3166_1 === region) {
               const trTitle = tr?.data?.title || tr?.data?.name;
-              if (trTitle && /[\u4e00-\u9fff]/.test(trTitle)) {
-                allFoundZh.add(trTitle.trim());
+              if (
+                trTitle &&
+                (/[\u4e00-\u9fff]/.test(trTitle) ||
+                  (region === "CN" && String(trTitle).trim().length >= 2))
+              ) {
+                officialZhTitles.add(String(trTitle).trim());
               }
             }
           }
         }
 
+        const altZhTitles = new Set<string>();
         const altList = Array.isArray(d?.alternative_titles?.results)
           ? d.alternative_titles.results
           : Array.isArray(d?.alternative_titles?.titles)
@@ -1546,12 +1630,12 @@ async function getTmdbCandidateMetadata(
         for (const alt of altList) {
           const altTitle = alt?.title || alt?.name;
           if (altTitle && /[\u4e00-\u9fff]/.test(altTitle)) {
-            allFoundZh.add(altTitle.trim());
+            altZhTitles.add(String(altTitle).trim());
           }
         }
 
-        for (const t of allFoundZh) {
-          if (!primaryZhTitle) {
+        for (const t of officialZhTitles) {
+          if (!primaryZhTitle && /[\u4e00-\u9fff]/.test(t)) {
             primaryZhTitle = toSimplifiedChinese(t);
           }
           addPrimaryTitle(t);
@@ -1585,6 +1669,18 @@ async function getTmdbCandidateMetadata(
         if (origTitle) {
           addPrimaryTitle(origTitle);
           addCandidateTitle(origTitle);
+        }
+
+        for (const t of altZhTitles) {
+          if (!primaryZhTitle) {
+            primaryZhTitle = toSimplifiedChinese(t);
+          }
+          addPrimaryTitle(t);
+          addCandidateTitle(t);
+          const { variants } = generateZhTitleVariants(t, type);
+          for (const v of variants) {
+            addCandidateTitle(v);
+          }
         }
       }
     } catch {}
@@ -1797,14 +1893,20 @@ export async function resolveStreamsForMedia(params: {
   }
 
   const normPrimary = normalizeTitleForComparison(
-    parseSeasonInfo(primaryQuery).baseTitle
+    type === "tv"
+      ? parseSeasonInfo(primaryQuery).baseTitle
+      : stripLanguageAndStatusTags(toSimplifiedChinese(stripYearSuffix(primaryQuery)))
   );
   matchedSources.sort((a, b) => {
     const aBase = normalizeTitleForComparison(
-      parseSeasonInfo(a.vodName).baseTitle
+      type === "tv"
+        ? parseSeasonInfo(a.vodName).baseTitle
+        : stripLanguageAndStatusTags(toSimplifiedChinese(stripYearSuffix(a.vodName)))
     );
     const bBase = normalizeTitleForComparison(
-      parseSeasonInfo(b.vodName).baseTitle
+      type === "tv"
+        ? parseSeasonInfo(b.vodName).baseTitle
+        : stripLanguageAndStatusTags(toSimplifiedChinese(stripYearSuffix(b.vodName)))
     );
     const aExactTitle = aBase === normPrimary ? 1 : 0;
     const bExactTitle = bBase === normPrimary ? 1 : 0;
@@ -1993,4 +2095,80 @@ export async function filterItemsByServerAvailability(
 
   await Promise.all(workers);
   return results.filter(Boolean);
+}
+
+const PARENT_FALLBACK_PROBE_SITE = "https://bfzyapi.com/api.php/provide/vod";
+
+export async function resolveFallbackParentTitlesFromVod(
+  query: string
+): Promise<string[]> {
+  const trimmed = toSimplifiedChinese(query.trim());
+  const normQuery = normalizeTitleForComparison(trimmed);
+  if (!normQuery || normQuery.length < 2) return [];
+
+  const queryParts = trimmed.includes("之")
+    ? trimmed
+        .split("之")
+        .map((p) => normalizeTitleForComparison(p))
+        .filter((p) => p.length >= 2)
+    : [];
+
+  try {
+    const res = await fetch(
+      `${PARENT_FALLBACK_PROBE_SITE}?ac=videolist&wd=${encodeURIComponent(trimmed)}`,
+      {
+        headers: {
+          "User-Agent": "okhttp/4.12.0",
+          Accept: "application/json, text/plain, */*",
+        },
+        signal: AbortSignal.timeout(2200),
+      }
+    );
+    if (!res.ok) return [];
+    const data: any = await res.json();
+    const list = Array.isArray(data?.list) ? data.list : [];
+    if (list.length === 0) return [];
+
+    const candidates: string[] = [];
+    const seenNorm = new Set<string>();
+
+    const tryPush = (raw?: string) => {
+      if (!raw) return;
+      const cleaned = stripLanguageAndStatusTags(
+        toSimplifiedChinese(stripYearSuffix(raw))
+      ).trim();
+      const norm = normalizeTitleForComparison(cleaned);
+      if (!norm || norm.length < 2 || norm === normQuery || seenNorm.has(norm)) {
+        return;
+      }
+      seenNorm.add(norm);
+      candidates.push(cleaned);
+    };
+
+    for (const item of list) {
+      const vodName = String(item.vod_name || "").trim();
+      const vodSub = String(item.vod_sub || "").trim();
+      const typeName = toSimplifiedChinese(String(item.type_name || "")).trim();
+      if (!vodName || !item.vod_play_from || !item.vod_play_url) continue;
+      if (isIncompatibleVodCategory(typeName)) continue;
+      if (typeName && !/(?:剧$|片$|电影|动漫)/.test(typeName)) continue;
+
+      const haystack = normalizeTitleForComparison(`${vodName} ${vodSub}`);
+      const isRelevant =
+        haystack.includes(normQuery) ||
+        (queryParts.length >= 2 && queryParts.every((p) => haystack.includes(p)));
+      if (!isRelevant) continue;
+
+      const { baseTitle } = parseSeasonInfo(vodName);
+      tryPush(baseTitle);
+      const colonBase = baseTitle.split(/[:：]/)[0].trim();
+      tryPush(colonBase);
+
+      if (candidates.length >= 2) break;
+    }
+
+    return candidates.slice(0, 2);
+  } catch {
+    return [];
+  }
 }

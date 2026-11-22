@@ -165,11 +165,11 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
     score += 400;
   } else if (item.fromZhSearch) {
     score += 450;
-  } else if (
-    item.overview &&
-    (item.overview.includes(q) || (cleanQ && item.overview.includes(cleanQ)))
-  ) {
-    score += 150;
+  } else if (typeof item.overview === "string" && item.overview) {
+    const overviewLower = item.overview.toLowerCase();
+    if (overviewLower.includes(q) || (cleanQ && overviewLower.includes(cleanQ))) {
+      score += 150;
+    }
   }
 
   score += (Number(item.popularity) || 0) * 1.5;
@@ -246,9 +246,9 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
         )
       );
 
-      const zhMap = new Map<number, string>();
-      const enMap = new Map<number, string>();
-      const rawCandidateMap = new Map<number, any>();
+      const zhMap = new Map<string, string>();
+      const enMap = new Map<string, string>();
+      const rawCandidateMap = new Map<string, any>();
 
       responses.forEach((res, i) => {
         if (res.status !== "fulfilled" || !Array.isArray(res.value?.results)) return;
@@ -258,35 +258,37 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
           if (!item || typeof item.id !== "number") continue;
           if (item.media_type !== "movie" && item.media_type !== "tv") continue;
 
+          const key = `${item.media_type}:${item.id}`;
           const t = item.title || item.name;
           if (t) {
             if (/[\u4e00-\u9fff]/.test(t)) {
-              zhMap.set(item.id, toSimplifiedChinese(t.trim()));
+              zhMap.set(key, toSimplifiedChinese(t.trim()));
             } else {
-              enMap.set(item.id, t.trim());
+              enMap.set(key, t.trim());
             }
           }
 
-          if (!rawCandidateMap.has(item.id)) {
-            rawCandidateMap.set(item.id, {
+          if (!rawCandidateMap.has(key)) {
+            rawCandidateMap.set(key, {
               ...item,
               fromZhSearch: isFromZhEndpoint,
             });
           } else if (isFromZhEndpoint) {
-            rawCandidateMap.get(item.id).fromZhSearch = true;
+            rawCandidateMap.get(key).fromZhSearch = true;
           }
         }
       });
 
       const rawResults: any[] = [];
       for (const item of rawCandidateMap.values()) {
+        const key = `${item.media_type}:${item.id}`;
         const zhTitle =
-          zhMap.get(item.id) ||
+          zhMap.get(key) ||
           (isZhQuery && /[\u4e00-\u9fff]/.test(item.title || item.name)
             ? toSimplifiedChinese(item.title || item.name)
             : undefined);
         const enTitle =
-          enMap.get(item.id) ||
+          enMap.get(key) ||
           item.original_title ||
           item.original_name ||
           item.title ||
@@ -307,7 +309,7 @@ function computeSearchRelevance(item: any, query: string, cleanQuery: string): n
           computeSearchRelevance(a, query, cleanQuery)
       );
 
-      const releasedCandidates = filterReleasedMedia(rawResults, 1).slice(0, 36);
+      const releasedCandidates = filterReleasedMedia(rawResults, 1).slice(0, 26);
       const verified = await filterItemsByServerAvailability(
         releasedCandidates,
         "movie",

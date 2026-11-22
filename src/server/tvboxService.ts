@@ -508,7 +508,7 @@ function parseChineseNumeral(str: string): number | null {
 }
 
 export function stripYearSuffix(title: string): string {
-  return title.replace(/\s*[(（【[]?(19|20)\d{2}[)）】\]]?\s*$/, "").trim();
+  return title.replace(/\s*[(（【\[{](?:19|20)\d{2}[)）】\]}]\s*$/, "").trim();
 }
 
 export function extractAudioLangFromText(
@@ -639,7 +639,10 @@ export function extractNumbers(str: string): string[] {
   return str.match(/\d+/g) || [];
 }
 
-export function generateZhTitleVariants(rawZh?: string): {
+export function generateZhTitleVariants(
+  rawZh?: string,
+  mediaType?: "movie" | "tv"
+): {
   variants: string[];
   probeKeyword: string;
 } {
@@ -652,79 +655,155 @@ export function generateZhTitleVariants(rawZh?: string): {
   const variants = new Set<string>();
   variants.add(simp);
 
-  // Check colon or space separating subtitle: e.g. "生化危机6：终章" or "生化危机：终章" or "蜘蛛侠：英雄归来"
-  const colonMatch = simp.match(
-    /^(.+?)(?:\s*([0-9一二两三四五六七八九十]+)\s*)?[:：\s]+(.+)$/
-  );
   let probeKeyword = simp;
 
+  // Only treat explicit colons (: / ：) as title:subtitle separators so space-separated
+  // sequels like "沙丘 2" or "唐探 1900" are never rewritten with a bogus colon.
+  const colonMatch = simp.match(/^([^:：]+?)[:：]\s*(.+)$/);
   if (colonMatch) {
-    const base = colonMatch[1].trim();
-    const num = colonMatch[2] ? colonMatch[2].trim() : "";
-    const sub = colonMatch[3].trim();
+    const left = colonMatch[1].trim();
+    const sub = colonMatch[2].trim();
+    // Require at least one non-numeral char before a trailing sequel number so prefixes
+    // like "007：无暇赴死" stay intact instead of splitting into "0" + "07".
+    const leftNumMatch = left.match(
+      /^(.+?[^\d一二两三四五六七八九十\s])\s*([0-9]+|[一二两三四五六七八九十]+)$/
+    );
 
-    // Prefer clean base + subtitle (e.g. "蜘蛛侠：英雄无归" or "生化危机：终章") for exact VOD matching
-    probeKeyword = base + "：" + sub; // e.g. "生化危机" or "蜘蛛侠"
+    if (leftNumMatch) {
+      const base = leftNumMatch[1].trim();
+      const num = leftNumMatch[2].trim();
+      probeKeyword = `${base}：${sub}`;
 
-    variants.add(base + "：" + sub);
-    variants.add(base + " " + sub);
-    variants.add(base + sub);
-    if (num) {
-      variants.add(base + num + "：" + sub);
-      variants.add(base + num + " " + sub);
-      variants.add(base + num + sub);
-      variants.add(base + num);
+      variants.add(`${base}：${sub}`);
+      variants.add(`${base} ${sub}`);
+      variants.add(`${base}${sub}`);
+      variants.add(`${base}${num}：${sub}`);
+      variants.add(`${base}${num} ${sub}`);
+      variants.add(`${base}${num}${sub}`);
+      variants.add(`${base}${num}`);
+    } else {
+      probeKeyword = `${left}：${sub}`;
+      variants.add(`${left}：${sub}`);
+      variants.add(`${left} ${sub}`);
+      variants.add(`${left}${sub}`);
     }
   } else {
-    // Check trailing sequel number: e.g. "生化危机6" or "蜘蛛侠3"
-    const trailMatch = simp.match(/^(.+?)\s*([0-9一二两三四五六七八九十]+)$/);
+    // Trailing sequel/year number (e.g. "沙丘 2", "流浪地球 2", "唐探 1900", "庆余年 2");
+    // never splits purely numeric titles like "1917", "2012", or "二十二".
+    const trailMatch = simp.match(
+      /^(.+?[^\d一二两三四五六七八九十\s])\s*([0-9]+|[一二两三四五六七八九十]+)$/
+    );
     if (trailMatch) {
       const base = trailMatch[1].trim();
-      probeKeyword = base;
-      variants.add(base + " " + trailMatch[2].trim());
+      const num = trailMatch[2].trim();
+      const compact = `${base}${num}`;
+      variants.add(compact);
+      variants.add(`${base} ${num}`);
+      probeKeyword = mediaType === "tv" ? base : compact;
+    } else {
+      const cjkSpaceMatch = simp.match(/^([\u4e00-\u9fff]+)\s+([\u4e00-\u9fff]+)$/);
+      if (cjkSpaceMatch) {
+        variants.add(`${cjkSpaceMatch[1]}：${cjkSpaceMatch[2]}`);
+        variants.add(`${cjkSpaceMatch[1]}${cjkSpaceMatch[2]}`);
+      }
     }
   }
 
   return { variants: Array.from(variants), probeKeyword };
 }
 
-function buildSearchKeywords(titles: string[]): string[] {
+export function buildSearchKeywords(
+  primaryTitles: string[],
+  fallbackTitles: string[] = [],
+  mediaType?: "movie" | "tv"
+): string[] {
   const candidates: string[] = [];
-  const addCandidate = (t?: string) => {
-    if (!t) return;
-    const simp = toSimplifiedChinese(stripYearSuffix(t)).trim();
-    const { baseTitle } = parseSeasonInfo(simp);
-    for (const variant of [baseTitle, simp]) {
-      if (variant.length >= 1 && !candidates.includes(variant)) {
-        candidates.push(variant);
-      }
-      const beforeColon = variant.split(/[:：]/)[0].trim();
-      if (
-        beforeColon.length >= 2 &&
-        beforeColon !== variant &&
-        !candidates.includes(beforeColon)
-      ) {
-        candidates.push(beforeColon);
-      }
-      // Also extract base franchise by stripping trailing digits from beforeColon (e.g. "生化危机6" -> "生化危机")
-      const baseFranchise = beforeColon.replace(/\d+$/, "").trim();
-      if (
-        baseFranchise.length >= 2 &&
-        baseFranchise !== beforeColon &&
-        !candidates.includes(baseFranchise)
-      ) {
-        candidates.push(baseFranchise);
-      }
-    }
+  const seenNorm = new Set<string>();
+
+  const pushKeyword = (raw?: string): string => {
+    if (!raw) return "";
+    const trimmed = raw.trim();
+    if (!trimmed) return "";
+    const norm = normalizeTitleForComparison(trimmed);
+    if (!norm || seenNorm.has(norm)) return "";
+    seenNorm.add(norm);
+    candidates.push(trimmed);
+    return trimmed;
   };
 
-  // Prioritize titles containing Chinese characters first since VOD CMS sites index primarily in Chinese
-  const zhTitles = titles.filter((t) => /[\u4e00-\u9fff]/.test(t));
-  const otherTitles = titles.filter((t) => !/[\u4e00-\u9fff]/.test(t));
+  const toPreferredQuery = (raw: string): string => {
+    const simp = toSimplifiedChinese(stripYearSuffix(raw)).trim();
+    if (!simp) return "";
+    if (mediaType === "tv" && /[\u4e00-\u9fff]/.test(simp)) {
+      const { baseTitle } = parseSeasonInfo(simp);
+      const target = baseTitle || simp;
+      return generateZhTitleVariants(target, "tv").probeKeyword || target;
+    }
+    if (/[\u4e00-\u9fff]/.test(simp)) {
+      return generateZhTitleVariants(simp, mediaType).probeKeyword || simp;
+    }
+    return simp;
+  };
 
-  for (const t of [...zhTitles, ...otherTitles]) {
-    addCandidate(t);
+  const partitionByScript = (list: string[]) => {
+    const zh: string[] = [];
+    const other: string[] = [];
+    for (const raw of list) {
+      if (!raw || typeof raw !== "string") continue;
+      const simp = toSimplifiedChinese(stripYearSuffix(raw)).trim();
+      if (!simp) continue;
+      if (/[\u4e00-\u9fff]/.test(simp)) {
+        zh.push(simp);
+      } else {
+        other.push(simp);
+      }
+    }
+    return { zh, other };
+  };
+
+  const { zh: zhPrimary, other: otherPrimary } = partitionByScript(primaryTitles);
+
+  // Pass 1: First 2 distinct regional Chinese base titles (e.g. CN + TW/HK) before variants
+  let firstZhQuery = "";
+  for (const title of zhPrimary) {
+    if (candidates.length >= 2) break;
+    const preferred = toPreferredQuery(title);
+    const added = pushKeyword(preferred);
+    if (!firstZhQuery && (added || preferred)) {
+      firstZhQuery = added || preferred;
+    }
   }
+
+  // Pass 2: Franchise/colon-stripped reduced query from the primary Chinese title
+  if (firstZhQuery) {
+    const beforeColon = firstZhQuery.split(/[:：]/)[0].trim();
+    if (beforeColon.length >= 2 && !/^\d+$/.test(beforeColon)) {
+      pushKeyword(beforeColon);
+    }
+    const baseFranchise = beforeColon.replace(/\d+$/, "").trim();
+    if (baseFranchise.length >= 2 && !/^\d+$/.test(baseFranchise)) {
+      pushKeyword(baseFranchise);
+    }
+  }
+
+  // Pass 3: Remaining distinct primary Chinese titles, then EN / original titles
+  for (let i = 0; i < zhPrimary.length; i++) {
+    pushKeyword(toPreferredQuery(zhPrimary[i]));
+  }
+  for (const title of otherPrimary) {
+    pushKeyword(toPreferredQuery(title));
+  }
+
+  // Pass 4: Fallback titles (normalized-deduplicated so punctuation variants never starve)
+  const { zh: zhFallback, other: otherFallback } = partitionByScript(fallbackTitles);
+  for (const title of [...zhFallback, ...otherFallback]) {
+    if (mediaType === "tv") {
+      const { baseTitle } = parseSeasonInfo(title);
+      pushKeyword(baseTitle);
+    }
+    pushKeyword(title);
+  }
+
   return candidates;
 }
 
@@ -789,6 +868,16 @@ export function computeTitleMatchScore(
   const normCleanVod = normalizeTitleForComparison(cleanVod);
   if (!normVodName) return 0;
 
+  const bareYearStrippedVod = cleanVod.replace(/\s*(?:19|20)\d{2}\s*$/, "").trim();
+  const normVodNoBareYear =
+    bareYearStrippedVod.length >= 2 && bareYearStrippedVod !== cleanVod
+      ? normalizeTitleForComparison(
+          mediaType === "tv"
+            ? parseSeasonInfo(bareYearStrippedVod).baseTitle
+            : bareYearStrippedVod
+        )
+      : "";
+
   const normAliases = vodSub
     .split(/[\/|,，;；、]+/)
     .map((s) => {
@@ -815,6 +904,11 @@ export function computeTitleMatchScore(
 
     if (normVodName === target || normCleanVod === normFullTarget) {
       bestScore = Math.max(bestScore, 260);
+      continue;
+    }
+
+    if (normVodNoBareYear && !hasNumbers && normVodNoBareYear === target) {
+      bestScore = Math.max(bestScore, 250);
       continue;
     }
 
@@ -851,6 +945,59 @@ export function computeTitleMatchScore(
   }
 
   return bestScore;
+}
+
+export function evaluateYearMatch(
+  mediaType: "movie" | "tv" | undefined,
+  targetYear: string | undefined,
+  vodYear: string | undefined,
+  titleScore: number,
+  seasonNumber = 1
+): { matched: boolean; bonus: number } {
+  if (!targetYear || !vodYear) {
+    return { matched: true, bonus: 0 };
+  }
+  const targetY = Number(targetYear);
+  const vodY = Number(vodYear);
+  if (!Number.isFinite(targetY) || !Number.isFinite(vodY) || targetY <= 0 || vodY <= 0) {
+    return { matched: true, bonus: 0 };
+  }
+
+  const yearDiff = Math.abs(vodY - targetY);
+
+  if (mediaType === "tv") {
+    // Multi-season TV shows have Season 1 in targetYear and Season 2..N in subsequent years
+    if (vodY === targetY) {
+      return { matched: true, bonus: 120 };
+    }
+    if (
+      seasonNumber > 1 &&
+      vodY >= targetY &&
+      vodY <= targetY + Math.max(seasonNumber * 3, seasonNumber + 6) &&
+      titleScore >= 185
+    ) {
+      return { matched: true, bonus: 95 };
+    }
+    if (yearDiff === 1 && titleScore >= 185) {
+      return { matched: true, bonus: 40 };
+    }
+    if (vodY > targetY && titleScore >= 210) {
+      return { matched: true, bonus: 30 };
+    }
+    return { matched: false, bonus: 0 };
+  }
+
+  // Movie release year verification (allows +-1yr for festival vs theatrical, +-2yr for exact title)
+  if (vodY === targetY) {
+    return { matched: true, bonus: 120 };
+  }
+  if (yearDiff === 1 && titleScore >= 185) {
+    return { matched: true, bonus: titleScore >= 240 ? 35 : 25 };
+  }
+  if (yearDiff === 2 && titleScore >= 260) {
+    return { matched: true, bonus: 0 };
+  }
+  return { matched: false, bonus: 0 };
 }
 
 const SITE_CIRCUIT_THRESHOLD = 3;
@@ -944,12 +1091,15 @@ async function searchSingleVodSite(
       const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
       const vodYear = vodYearMatch ? vodYearMatch[0] : "";
 
-      // Reject recaps ("解说") and trailer-only placeholders ("预告") or short-drama parodies ("短剧版")
+      // Reject recaps ("解说") and trailer-only placeholders ("预告"/"花絮"/"先导") or short-drama parodies ("短剧版")
       if (
         vodName.includes("解说") ||
         vodName.includes("预告") ||
         vodName.includes("短剧") ||
-        vodRemarks.includes("预告")
+        vodRemarks.includes("预告") ||
+        vodRemarks.includes("花絮") ||
+        vodRemarks.includes("先导") ||
+        vodRemarks.includes("电影解说")
       ) {
         continue;
       }
@@ -972,41 +1122,18 @@ async function searchSingleVodSite(
 
       let score = titleScore;
 
-      // Release year verification
-      if (targetYear && vodYear) {
-        const targetY = Number(targetYear);
-        const vodY = Number(vodYear);
-        const yearDiff = Math.abs(vodY - targetY);
-
-        if (mediaType === "tv") {
-          // Multi-season TV shows have Season 1 in targetYear and Season 2..N in subsequent years
-          if (vodY === targetY) {
-            score += 120;
-          } else if (
-            seasonNumber > 1 &&
-            vodY >= targetY &&
-            vodY <= targetY + seasonNumber + 3 &&
-            titleScore >= 200
-          ) {
-            score += 95;
-          } else if (yearDiff === 1 && titleScore >= 210) {
-            score += 40;
-          } else if (vodY > targetY && titleScore >= 250) {
-            score += 30;
-          } else {
-            continue;
-          }
-        } else {
-          // Strict release year verification for movies
-          if (vodY === targetY) {
-            score += 120;
-          } else if (yearDiff === 1 && titleScore >= 240) {
-            score += 25;
-          } else {
-            continue;
-          }
-        }
+      // Shared release year verification (kept in sync with fast availability probe)
+      const yearCheck = evaluateYearMatch(
+        mediaType,
+        targetYear,
+        vodYear,
+        titleScore,
+        seasonNumber
+      );
+      if (!yearCheck.matched) {
+        continue;
       }
+      score += yearCheck.bonus;
 
       const { playGroups, bestEpisodes } = parseVodPlayGroups(
         item.vod_play_from,
@@ -1221,6 +1348,7 @@ export async function pingVodSite(siteId: string): Promise<{
 
 interface TmdbCandidateMetadata {
   candidateTitles: string[];
+  primaryTitles?: string[];
   releaseYear?: string;
   isUnreleased: boolean;
   primaryZhTitle?: string;
@@ -1250,13 +1378,48 @@ const availabilityCache = new Map<
   { available: boolean; primaryZhTitle?: string; expiresAt: number }
 >();
 
-const UNRELEASED_STATUSES = new Set([
+const MOVIE_UNRELEASED_STATUSES = new Set([
   "Rumored",
   "Planned",
   "In Production",
   "Post Production",
   "Canceled",
 ]);
+const TV_UNRELEASED_STATUSES = new Set(["Rumored", "Planned"]);
+
+export function isMediaUnreleased(
+  type: "movie" | "tv",
+  data: {
+    status?: unknown;
+    release_date?: unknown;
+    first_air_date?: unknown;
+    number_of_episodes?: unknown;
+    vote_count?: unknown;
+  },
+  todayIso = new Date().toISOString().slice(0, 10)
+): boolean {
+  const rawDate =
+    type === "tv"
+      ? data.first_air_date || data.release_date
+      : data.release_date || data.first_air_date;
+  const dateStr = typeof rawDate === "string" ? rawDate.trim() : "";
+  const status = data.status ? String(data.status).trim() : "";
+  const voteCount = Number(data.vote_count || 0);
+
+  if (type === "tv") {
+    // TMDB TV "Canceled" = already-aired series not renewed; "In Production" can also have aired episodes.
+    if (TV_UNRELEASED_STATUSES.has(status)) return true;
+    if (!dateStr || dateStr > todayIso) return true;
+    if (typeof data.number_of_episodes === "number" && data.number_of_episodes <= 0) {
+      return true;
+    }
+    return voteCount === 0;
+  }
+
+  if (MOVIE_UNRELEASED_STATUSES.has(status)) return true;
+  if (dateStr && dateStr > todayIso) return true;
+  return voteCount === 0;
+}
 
 async function getTmdbCandidateMetadata(
   type: "movie" | "tv",
@@ -1274,7 +1437,7 @@ async function getTmdbCandidateMetadata(
     typeof caches !== "undefined" ? (caches as any).default : null;
   const edgeCacheReq =
     tmdbId && edgeCache
-      ? new Request(`https://tmdb-meta.101movies.internal/v1/${type}/${tmdbId}`, {
+      ? new Request(`https://tmdb-meta.101movies.internal/v2/${type}/${tmdbId}`, {
           method: "GET",
         })
       : null;
@@ -1297,6 +1460,8 @@ async function getTmdbCandidateMetadata(
   }
 
   const candidateTitles: string[] = [];
+  const primaryTitles: string[] = [];
+  const primaryNorms = new Set<string>();
   let releaseYear: string | undefined;
   let isUnreleased = false;
   let primaryZhTitle: string | undefined;
@@ -1312,6 +1477,15 @@ async function getTmdbCandidateMetadata(
     if (trimmed !== simp && !candidateTitles.includes(trimmed)) {
       candidateTitles.push(trimmed);
     }
+  };
+
+  const addPrimaryTitle = (raw?: string) => {
+    if (!raw || typeof raw !== "string") return;
+    const clean = toSimplifiedChinese(stripYearSuffix(raw)).trim();
+    const norm = normalizeTitleForComparison(clean);
+    if (!norm || primaryNorms.has(norm)) return;
+    primaryNorms.add(norm);
+    primaryTitles.push(clean);
   };
 
   if (hintItem) {
@@ -1341,17 +1515,8 @@ async function getTmdbCandidateMetadata(
         const dateStr = d.release_date || d.first_air_date;
         if (dateStr && typeof dateStr === "string") {
           releaseYear = dateStr.slice(0, 4);
-          const todayIso = new Date().toISOString().slice(0, 10);
-          if (dateStr > todayIso) {
-            isUnreleased = true;
-          }
         }
-        if (
-          (d.status && UNRELEASED_STATUSES.has(String(d.status))) ||
-          Number(d.vote_count || 0) === 0
-        ) {
-          isUnreleased = true;
-        }
+        isUnreleased = isMediaUnreleased(type, d);
 
         const allFoundZh = new Set<string>();
         if (zhTitle && /[\u4e00-\u9fff]/.test(zhTitle)) {
@@ -1389,8 +1554,9 @@ async function getTmdbCandidateMetadata(
           if (!primaryZhTitle) {
             primaryZhTitle = toSimplifiedChinese(t);
           }
+          addPrimaryTitle(t);
           addCandidateTitle(t);
-          const { variants } = generateZhTitleVariants(t);
+          const { variants } = generateZhTitleVariants(t, type);
           for (const v of variants) {
             addCandidateTitle(v);
           }
@@ -1405,13 +1571,21 @@ async function getTmdbCandidateMetadata(
               (tr?.data?.title || tr?.data?.name)
           );
           if (enTr) {
-            addCandidateTitle(String(enTr.data.title || enTr.data.name));
+            const enStr = String(enTr.data.title || enTr.data.name);
+            addPrimaryTitle(enStr);
+            addCandidateTitle(enStr);
             break;
           }
         }
 
-        if (zhTitle) addCandidateTitle(zhTitle);
-        if (origTitle) addCandidateTitle(origTitle);
+        if (zhTitle) {
+          addPrimaryTitle(zhTitle);
+          addCandidateTitle(zhTitle);
+        }
+        if (origTitle) {
+          addPrimaryTitle(origTitle);
+          addCandidateTitle(origTitle);
+        }
       }
     } catch {}
   }
@@ -1419,12 +1593,19 @@ async function getTmdbCandidateMetadata(
   if (hintItem) {
     const hintEn = hintItem.en_title || hintItem.title || hintItem.name;
     const hintOrig = hintItem.original_title || hintItem.original_name;
-    if (hintEn) addCandidateTitle(String(hintEn));
-    if (hintOrig) addCandidateTitle(String(hintOrig));
+    if (hintEn) {
+      addPrimaryTitle(String(hintEn));
+      addCandidateTitle(String(hintEn));
+    }
+    if (hintOrig) {
+      addPrimaryTitle(String(hintOrig));
+      addCandidateTitle(String(hintOrig));
+    }
   }
 
   const meta: TmdbCandidateMetadata = {
     candidateTitles,
+    primaryTitles,
     releaseYear,
     isUnreleased,
     primaryZhTitle,
@@ -1466,19 +1647,34 @@ export async function resolveStreamsForMedia(params: {
 
   const meta = await getTmdbCandidateMetadata(type, tmdbId, tmdbApiKey);
   const candidateTitles = [...meta.candidateTitles];
+  const primaryTitles =
+    Array.isArray(meta.primaryTitles) && meta.primaryTitles.length > 0
+      ? [...meta.primaryTitles]
+      : [...meta.candidateTitles];
   const releaseYear = meta.releaseYear;
   const isUnreleased = meta.isUnreleased;
 
-  if (customKeyword && customKeyword.trim()) {
-    const trimmed = customKeyword.trim();
-    const simp = toSimplifiedChinese(trimmed);
+  const trimmedCustomKeyword = customKeyword?.trim() || "";
+  if (trimmedCustomKeyword) {
+    const simp = toSimplifiedChinese(trimmedCustomKeyword);
     if (!candidateTitles.includes(simp)) candidateTitles.unshift(simp);
-    if (trimmed !== simp && !candidateTitles.includes(trimmed)) {
-      candidateTitles.unshift(trimmed);
+    if (trimmedCustomKeyword !== simp && !candidateTitles.includes(trimmedCustomKeyword)) {
+      candidateTitles.unshift(trimmedCustomKeyword);
     }
+    primaryTitles.unshift(simp);
   }
 
-  const searchKeywords = buildSearchKeywords(candidateTitles);
+  const baseKeywords = buildSearchKeywords(primaryTitles, candidateTitles, type);
+  const searchKeywords = trimmedCustomKeyword
+    ? (() => {
+        const customQuery = toSimplifiedChinese(trimmedCustomKeyword);
+        const customNorm = normalizeTitleForComparison(customQuery);
+        return [
+          customQuery,
+          ...baseKeywords.filter((k) => normalizeTitleForComparison(k) !== customNorm),
+        ];
+      })()
+    : baseKeywords;
   const primaryQuery = searchKeywords[0] || "";
 
   // Do not resolve streams for unreleased movies/shows
@@ -1634,7 +1830,7 @@ export async function resolveStreamsForMedia(params: {
     sources: matchedSources,
   };
 
-  const ttl = matchedSources.length > 0 ? 30 * 60 * 1000 : 15 * 60 * 1000;
+  const ttl = matchedSources.length > 0 ? 30 * 60 * 1000 : 60 * 1000;
   setBoundedCache(
     resolvedStreamsCache,
     cacheKey,
@@ -1644,16 +1840,18 @@ export async function resolveStreamsForMedia(params: {
     },
     300
   );
-  setBoundedCache(
-    availabilityCache,
-    `${type}:${tmdbId}`,
-    {
-      available: matchedSources.length > 0,
-      primaryZhTitle: meta.primaryZhTitle,
-      expiresAt: Date.now() + ttl,
-    },
-    1000
-  );
+  if (matchedSources.length > 0) {
+    setBoundedCache(
+      availabilityCache,
+      `${type}:${tmdbId}`,
+      {
+        available: true,
+        primaryZhTitle: meta.primaryZhTitle,
+        expiresAt: Date.now() + ttl,
+      },
+      1000
+    );
+  }
 
   return response;
 }
@@ -1701,7 +1899,11 @@ export async function checkMediaHasPlayableStreams(
     return { available: false, primaryZhTitle: meta.primaryZhTitle };
   }
 
-  const searchKeywords = buildSearchKeywords(meta.candidateTitles);
+  const searchKeywords = buildSearchKeywords(
+    meta.primaryTitles || meta.candidateTitles,
+    meta.candidateTitles,
+    type
+  );
   if (searchKeywords.length === 0) {
     return { available: false, primaryZhTitle: meta.primaryZhTitle };
   }

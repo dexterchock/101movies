@@ -1,6 +1,8 @@
 import {
   computeTitleMatchScore,
+  evaluateYearMatch,
   generateZhTitleVariants,
+  parseSeasonInfo,
   prepareTargetTitles,
   setBoundedCache,
   stripYearSuffix,
@@ -30,16 +32,15 @@ function consumeBudget(tracker: { used: number; max: number }): boolean {
   return true;
 }
 
-function hasPlayableStreamWithoutParsing(
+export function hasPlayableStreamWithoutParsing(
   vodPlayFrom: unknown,
   vodPlayUrl: unknown
 ): boolean {
   const fromStr = String(vodPlayFrom || "").trim();
   const urlStr = String(vodPlayUrl || "").trim();
-  if (!fromStr && !urlStr) return false;
-  if (!urlStr) return fromStr.length > 0;
+  if (!fromStr || !urlStr) return false;
 
-  // Lightweight episode check without allocating play-group objects
+  // Lightweight episode check without allocating play-group objects (aligned with parseVodPlayGroups)
   const groups = urlStr.split("$$$");
   for (let g = 0; g < groups.length; g++) {
     const items = groups[g].split("#");
@@ -49,13 +50,21 @@ function hasPlayableStreamWithoutParsing(
       const dollarIdx = part.indexOf("$");
       const epName = dollarIdx >= 0 ? part.slice(0, dollarIdx) : "";
       const epUrl = (dollarIdx >= 0 ? part.slice(dollarIdx + 1) : part).trim();
-      if (!epUrl.startsWith("http")) continue;
+      const lowerUrl = epUrl.toLowerCase();
+      if (
+        !(lowerUrl.startsWith("http://") || lowerUrl.startsWith("https://")) ||
+        !(lowerUrl.includes(".m3u8") || lowerUrl.includes(".mp4"))
+      ) {
+        continue;
+      }
       if (epName.includes("预告") || epName.includes("花絮")) continue;
       return true;
     }
   }
   return false;
 }
+
+type ProbeResult = "hit" | "miss" | "error";
 
 async function probeVodSiteForMedia(
   siteUrl: string,
@@ -65,7 +74,7 @@ async function probeVodSiteForMedia(
   mediaType: "movie" | "tv" = "movie",
   useVideoList = true,
   timeoutMs = 2000
-): Promise<boolean> {
+): Promise<ProbeResult> {
   const sep = siteUrl.includes("?") ? "&" : "?";
   const ac = useVideoList ? "videolist" : "list";
   const searchUrl = `${siteUrl}${sep}ac=${ac}&wd=${encodeURIComponent(keyword)}`;
@@ -79,10 +88,11 @@ async function probeVodSiteForMedia(
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-    if (!res.ok) return false;
+    if (!res.ok) return "error";
     const data: any = await res.json();
+    if (!data || typeof data !== "object") return "error";
     const list = Array.isArray(data?.list) ? data.list : [];
-    if (list.length === 0) return false;
+    if (list.length === 0) return "miss";
 
     for (const item of list) {
       const vodName = String(item.vod_name || "").trim();
@@ -113,19 +123,18 @@ async function probeVodSiteForMedia(
       );
       if (titleScore < 140) continue;
 
-      if (targetYear && vodYear) {
-        const targetY = Number(targetYear);
-        const vodY = Number(vodYear);
-        if (
-          mediaType === "movie" &&
-          Number.isFinite(targetY) &&
-          Number.isFinite(vodY) &&
-          targetY > 0 &&
-          vodY > 0 &&
-          Math.abs(vodY - targetY) > 2
-        ) {
-          continue;
-        }
+      const seasonNumber =
+        mediaType === "tv" ? parseSeasonInfo(vodName).seasonNumber || 1 : 1;
+      if (
+        !evaluateYearMatch(
+          mediaType,
+          targetYear,
+          vodYear,
+          titleScore,
+          seasonNumber
+        ).matched
+      ) {
+        continue;
       }
 
       if (
@@ -135,10 +144,12 @@ async function probeVodSiteForMedia(
         continue;
       }
 
-      return true;
+      return "hit";
     }
-  } catch {}
-  return false;
+    return "miss";
+  } catch {
+    return "error";
+  }
 }
 
 interface ProbeContext {
@@ -250,14 +261,14 @@ async function prepareProbeContext(
 
         for (const t of allZhTitles) {
           if (!primaryZhTitle) primaryZhTitle = toSimplifiedChinese(t);
-          const { variants, probeKeyword } = generateZhTitleVariants(t);
+          const { variants, probeKeyword } = generateZhTitleVariants(t, type);
           if (!probeQuery) probeQuery = probeKeyword;
           for (const v of variants) addTitle(v);
         }
       }
     } catch {}
   } else if (primaryZhTitle) {
-    const { variants, probeKeyword } = generateZhTitleVariants(primaryZhTitle);
+    const { variants, probeKeyword } = generateZhTitleVariants(primaryZhTitle, type);
     probeQuery = probeKeyword;
     for (const v of variants) {
       addTitle(v);
@@ -314,12 +325,11 @@ export async function checkMediaHasPlayableStreams(
   }
 
   let available = false;
-  let checkedAtLeastOneSite = false;
+  let verifiedMissCount = 0;
 
   for (const site of FAST_PROBE_SITES) {
     if (!consumeBudget(tracker)) break;
-    checkedAtLeastOneSite = true;
-    const found = await probeVodSiteForMedia(
+    const outcome = await probeVodSiteForMedia(
       site.url,
       ctx.primaryQuery,
       ctx.preparedTargets,
@@ -327,13 +337,16 @@ export async function checkMediaHasPlayableStreams(
       ctx.type,
       true
     );
-    if (found) {
+    if (outcome === "hit") {
       available = true;
       break;
     }
+    if (outcome === "miss") {
+      verifiedMissCount++;
+    }
   }
 
-  if (available || checkedAtLeastOneSite) {
+  if (available || verifiedMissCount === FAST_PROBE_SITES.length) {
     storeAvailabilityCache(ctx.availKey, available, ctx.primaryZhTitle);
   }
 
@@ -401,22 +414,41 @@ export async function filterItemsByServerAvailability(
   preparedContexts.sort((a, b) => a.idx - b.idx);
   const pass1Site = FAST_PROBE_SITES[0];
   const pass2Site = FAST_PROBE_SITES[1];
-  const pass1Misses: ProbeContext[] = [];
+  const pass1Misses: { ctx: ProbeContext; pass1VerifiedMiss: boolean }[] = [];
 
-  // Pass 1: Probe primary high-coverage site (bfzy) in parallel across uncached items
-  if (pass1Site && preparedContexts.length > 0 && availableCount < maxAvailableItems) {
+  const remainingForProbes = Math.max(0, budgetTracker.max - budgetTracker.used);
+  const pass1Limit = pass2Site
+    ? Math.min(
+        preparedContexts.length,
+        Math.max(1, Math.min(22, Math.ceil(remainingForProbes * 0.68)))
+      )
+    : preparedContexts.length;
+
+  let pass1Errors = 0;
+  let pass1VerifiedCount = 0;
+  let pass1BailOut = false;
+  const pass1AttemptedIndices = new Set<number>();
+
+  // Pass 1: Probe primary high-coverage site (bfzy) with budget cap so Pass 2 (lzzy) isn't starved
+  if (
+    pass1Site &&
+    pass1Limit > 0 &&
+    remainingForProbes > 0 &&
+    availableCount < maxAvailableItems
+  ) {
     let pass1Cursor = 0;
     const workers = Array.from(
-      { length: Math.min(concurrency, preparedContexts.length) },
+      { length: Math.min(concurrency, pass1Limit) },
       async () => {
         while (true) {
-          if (availableCount >= maxAvailableItems) break;
+          if (availableCount >= maxAvailableItems || pass1BailOut) break;
           const pos = pass1Cursor++;
-          if (pos >= preparedContexts.length) break;
+          if (pos >= pass1Limit) break;
           const ctx = preparedContexts[pos];
           if (!consumeBudget(budgetTracker)) break;
+          pass1AttemptedIndices.add(ctx.idx);
 
-          const found = await probeVodSiteForMedia(
+          const outcome = await probeVodSiteForMedia(
             pass1Site.url,
             ctx.primaryQuery,
             ctx.preparedTargets,
@@ -424,12 +456,20 @@ export async function filterItemsByServerAvailability(
             ctx.type,
             true
           );
-          if (found) {
+          if (outcome === "hit") {
+            pass1VerifiedCount++;
             availableCount++;
             results[ctx.idx] = applyAvailabilityTitle(ctx.item, ctx.primaryZhTitle);
             storeAvailabilityCache(ctx.availKey, true, ctx.primaryZhTitle);
+          } else if (outcome === "miss") {
+            pass1VerifiedCount++;
+            pass1Misses.push({ ctx, pass1VerifiedMiss: true });
           } else {
-            pass1Misses.push(ctx);
+            pass1Errors++;
+            pass1Misses.push({ ctx, pass1VerifiedMiss: false });
+            if (pass1Errors >= 4 && pass1VerifiedCount === 0) {
+              pass1BailOut = true;
+            }
           }
         }
       }
@@ -437,14 +477,23 @@ export async function filterItemsByServerAvailability(
     await Promise.all(workers);
   }
 
-  // Pass 2: Probe backup high-coverage site (lzzy) in parallel ONLY for Pass 1 misses
+  // If Pass 1 aborted early because primary site errored out, forward remaining top contexts to Pass 2
+  if (pass1BailOut) {
+    for (const ctx of preparedContexts) {
+      if (!pass1AttemptedIndices.has(ctx.idx)) {
+        pass1Misses.push({ ctx, pass1VerifiedMiss: false });
+      }
+    }
+  }
+
+  // Pass 2: Probe backup high-coverage site (lzzy) in parallel ONLY for Pass 1 misses/errors
   if (
     pass2Site &&
     pass1Misses.length > 0 &&
     availableCount < maxAvailableItems &&
     budgetTracker.used < budgetTracker.max
   ) {
-    pass1Misses.sort((a, b) => a.idx - b.idx);
+    pass1Misses.sort((a, b) => a.ctx.idx - b.ctx.idx);
     let pass2Cursor = 0;
     const workers = Array.from(
       { length: Math.min(concurrency, pass1Misses.length) },
@@ -453,10 +502,10 @@ export async function filterItemsByServerAvailability(
           if (availableCount >= maxAvailableItems) break;
           const pos = pass2Cursor++;
           if (pos >= pass1Misses.length) break;
-          const ctx = pass1Misses[pos];
+          const { ctx, pass1VerifiedMiss } = pass1Misses[pos];
           if (!consumeBudget(budgetTracker)) break;
 
-          const found = await probeVodSiteForMedia(
+          const outcome = await probeVodSiteForMedia(
             pass2Site.url,
             ctx.primaryQuery,
             ctx.preparedTargets,
@@ -464,11 +513,11 @@ export async function filterItemsByServerAvailability(
             ctx.type,
             true
           );
-          if (found) {
+          if (outcome === "hit") {
             availableCount++;
             results[ctx.idx] = applyAvailabilityTitle(ctx.item, ctx.primaryZhTitle);
             storeAvailabilityCache(ctx.availKey, true, ctx.primaryZhTitle);
-          } else {
+          } else if (outcome === "miss" && pass1VerifiedMiss) {
             storeAvailabilityCache(ctx.availKey, false, ctx.primaryZhTitle);
           }
         }

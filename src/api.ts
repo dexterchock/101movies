@@ -425,7 +425,7 @@ export const api = {
       signal
     );
     const items: MediaItem[] = data.results || [];
-    setBoundedCache(searchCache, trimmed, items, 60);
+    if (items.length > 0) setBoundedCache(searchCache, trimmed, items, 60);
     return items;
   },
 

@@ -5,11 +5,13 @@ interface BufferedResponse {
   body: ArrayBuffer;
 }
 
+const EDGE_CACHE_VERSION = "v6";
 const inflightMisses = new Map<string, Promise<BufferedResponse>>();
 const inflightRevalidations = new Set<string>();
 
 function normalizeCacheKeyUrl(url: URL): string {
   const normalized = new URL(url.origin + url.pathname);
+  normalized.searchParams.set("__ecv", EDGE_CACHE_VERSION);
   const sortedParams = Array.from(url.searchParams.entries()).sort((a, b) =>
     a[0] === b[0]
       ? a[1] < b[1]

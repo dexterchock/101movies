@@ -94,7 +94,7 @@
           var t = ss("trending_media_type") === "tv" ? "tv" : "movie";
           var cat = normCat(ss(t === "tv" ? "home_tv_category" : "home_movie_category")) || "all";
           var r = resolveGenre(t, cat);
-          var q = r && r !== "all" ? "?genre=" + encodeURIComponent(r) + "&v=5" : "?v=5";
+          var q = r && r !== "all" ? "?genre=" + encodeURIComponent(r) + "&v=6" : "?v=6";
           kick("/api/tmdb/trending/" + t + q);
         } else if (p === "/rankings") {
           var rt = ss("rankings_media_type") === "tv" ? "tv" : "movie";
@@ -103,12 +103,12 @@
           var rCat = normCat(ss("rankings_genre")) || "all";
           var rr = resolveGenre(rt, rCat);
           var rq = rr && rr !== "all" ? "&genre=" + encodeURIComponent(rr) : "";
-          kick("/api/tmdb/discover/" + rt + "?year=" + ry + rq + "&v=5");
+          kick("/api/tmdb/discover/" + rt + "?year=" + ry + rq + "&v=6");
         } else {
           var pm = p.match(/^\/player\/(movie|tv)\/(\d+)$/);
           if (pm) {
-            kick("/api/tmdb/" + pm[1] + "/" + pm[2] + "?v=5");
-            kick("/api/vod/resolve?type=" + encodeURIComponent(pm[1]) + "&id=" + encodeURIComponent(pm[2]));
+            kick("/api/tmdb/" + pm[1] + "/" + pm[2] + "?v=6");
+            kick("/api/vod/resolve?type=" + encodeURIComponent(pm[1]) + "&id=" + encodeURIComponent(pm[2]) + "&v=6");
           }
         }
       })();

@@ -1916,6 +1916,12 @@ export async function resolveStreamsForMedia(params: {
     const bHasFull = b.episodes.some((e) => !e.name.includes("预告")) ? 1 : 0;
     if (aHasFull !== bHasFull) return bHasFull - aHasFull;
 
+    if (type === "tv") {
+      const aSeasons = a.seasons?.length || 1;
+      const bSeasons = b.seasons?.length || 1;
+      if (aSeasons !== bSeasons) return bSeasons - aSeasons;
+    }
+
     const aTier = getSourceQualityTier(a.sourceId);
     const bTier = getSourceQualityTier(b.sourceId);
     if (aTier !== bTier) return bTier - aTier;

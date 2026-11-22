@@ -1183,9 +1183,18 @@ export function mount(
       `;
       btn.addEventListener("click", () => {
         const seekTime = isPlaying ? currentVideoTime : 0;
+        const currentSeasonNum = getDerivedState().currentSeasonGroup?.seasonNumber;
+        const nextSeasons = src.seasons || [];
+        let nextSeasonIdx = activeSeasonIndex;
+        if (nextSeasons.length > 0 && currentSeasonNum !== undefined) {
+          const matchedIdx = nextSeasons.findIndex(
+            (s) => s.seasonNumber === currentSeasonNum
+          );
+          if (matchedIdx >= 0) nextSeasonIdx = matchedIdx;
+        }
         startPlaybackWithProgress(
           absoluteIndex,
-          activeSeasonIndex,
+          nextSeasonIdx,
           activeEpisodeIndex,
           seekTime
         );

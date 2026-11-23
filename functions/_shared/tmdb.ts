@@ -2,7 +2,7 @@ import {
   filterItemsByServerAvailability,
   setBoundedCache,
   toSimplifiedChinese,
-} from "./tvboxService";
+} from "./tvboxService.js";
 
 export const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 

@@ -1,4 +1,4 @@
-import { stripM3u8Ads } from "../../src/m3u8Filter";
+import { stripM3u8Ads } from "../../src/m3u8Filter.js";
 
 export interface ProxyUrlValidationOk {
   ok: true;

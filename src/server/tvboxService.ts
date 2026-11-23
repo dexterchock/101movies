@@ -1,4 +1,4 @@
-import {
+import type {
   TvboxConfigItem,
   VodSite,
   VodEpisode,
@@ -6,8 +6,8 @@ import {
   VodSeasonGroup,
   ResolvedStreamSource,
   VodResolveResponse,
-} from "../types";
-import { toSimplifiedChinese } from "../zhSimp";
+} from "../types.js";
+import { toSimplifiedChinese } from "../zhSimp.js";
 
 export const AWESOME_ZHUIJU_TVBOX_CONFIGS: TvboxConfigItem[] = [
   {

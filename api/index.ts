@@ -4,10 +4,10 @@ import {
   fetchTrendingHk,
   getTmdbKey,
   resolveTmdbGenre,
-} from "../functions/_shared/tmdb";
-import { searchTmdbWithVodAvailability } from "../functions/_shared/tmdbSearch";
-import { resolveStreamsForMedia } from "../functions/_shared/tvboxService";
-import { handleVodProxyRequest } from "../functions/_shared/vodProxy";
+} from "../functions/_shared/tmdb.js";
+import { searchTmdbWithVodAvailability } from "../functions/_shared/tmdbSearch.js";
+import { resolveStreamsForMedia } from "../functions/_shared/tvboxService.js";
+import { handleVodProxyRequest } from "../functions/_shared/vodProxy.js";
 
 const PAGES_PREVIEW_ORIGIN_RE = /^https:\/\/[a-z0-9-]+\.101movies\.pages\.dev$/i;
 const ALLOWED_PROXY_ORIGINS = new Set([

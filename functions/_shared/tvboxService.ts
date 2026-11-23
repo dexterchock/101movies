@@ -9,10 +9,10 @@ import {
   stripYearSuffix,
   toSimplifiedChinese,
   type PreparedTargetTitle,
-} from "../../src/server/tvboxService";
+} from "../../src/server/tvboxService.js";
 
 // Re-export everything from the original tvboxService
-export * from "../../src/server/tvboxService";
+export * from "../../src/server/tvboxService.js";
 
 // In-memory cache for stream availability (bounded)
 const availabilityCache = new Map<

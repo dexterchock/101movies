@@ -2,13 +2,13 @@ import {
   TMDB_BASE_URL,
   filterReleasedMedia,
   getTmdbKey,
-} from "./tmdb";
+} from "./tmdb.js";
 import {
   filterItemsByServerAvailability,
   parseSeasonInfo,
   resolveFallbackParentTitlesFromVod,
   toSimplifiedChinese,
-} from "./tvboxService";
+} from "./tvboxService.js";
 
 export function computeSearchRelevance(
   item: any,

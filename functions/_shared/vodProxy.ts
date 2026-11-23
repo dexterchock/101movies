@@ -1,3 +1,5 @@
+import { stripM3u8Ads } from "../../src/m3u8Filter";
+
 export interface ProxyUrlValidationOk {
   ok: true;
   url: URL;
@@ -236,30 +238,60 @@ function isAllowedMediaMime(contentType: string): boolean {
   return ALLOWED_MEDIA_MIME_TYPES.has(mime);
 }
 
-export function rewriteM3u8Playlist(text: string, baseUrl: URL): string {
-  return text
+export function rewriteM3u8Playlist(
+  text: string,
+  baseUrl: URL,
+  options?: { manifestOnly?: boolean; reqOrigin?: string }
+): string {
+  const cleaned = stripM3u8Ads(text, baseUrl.toString()).content;
+  const manifestOnly = options?.manifestOnly === true;
+  const reqIsHttps = (options?.reqOrigin || "").startsWith("https:");
+  let nextUriIsPlaylist = false;
+
+  const rewriteUri = (rawUri: string, forcePlaylist: boolean): string | null => {
+    try {
+      const abs = new URL(rawUri, baseUrl);
+      if (abs.protocol !== "http:" && abs.protocol !== "https:") {
+        return null;
+      }
+      const absStr = abs.toString();
+      if (!manifestOnly) {
+        return `/api/vod/proxy?url=${encodeURIComponent(absStr)}`;
+      }
+      const looksLikePlaylist =
+        forcePlaylist ||
+        /\.m3u8(\?|$)/i.test(abs.pathname) ||
+        /\.m3u8(\?|$)/i.test(absStr);
+      if (looksLikePlaylist) {
+        return `/api/vod/proxy?mode=manifest&url=${encodeURIComponent(absStr)}`;
+      }
+      if (abs.protocol === "http:" && reqIsHttps) {
+        return `/api/vod/proxy?url=${encodeURIComponent(absStr)}`;
+      }
+      return absStr;
+    } catch {
+      return null;
+    }
+  };
+
+  return cleaned
     .split(/\r?\n/)
     .map((line) => {
       const trimmed = line.trim();
       if (!trimmed) return line;
       if (trimmed.startsWith("#")) {
+        if (/^#EXT-X-STREAM-INF\b/i.test(trimmed)) {
+          nextUriIsPlaylist = true;
+        }
+        const forcePlaylistTag = /^#EXT-X-I-FRAME-STREAM-INF\b/i.test(trimmed);
         return trimmed.replace(/URI="([^"]+)"/g, (_, uri) => {
-          try {
-            const abs = new URL(uri, baseUrl);
-            if (abs.protocol === "http:" || abs.protocol === "https:") {
-              return `URI="/api/vod/proxy?url=${encodeURIComponent(abs.toString())}"`;
-            }
-          } catch {}
-          return `URI="${uri}"`;
+          const rewritten = rewriteUri(uri, forcePlaylistTag);
+          return rewritten !== null ? `URI="${rewritten}"` : `URI="${uri}"`;
         });
       }
-      try {
-        const absUrl = new URL(trimmed, baseUrl);
-        if (absUrl.protocol === "http:" || absUrl.protocol === "https:") {
-          return `/api/vod/proxy?url=${encodeURIComponent(absUrl.toString())}`;
-        }
-      } catch {}
-      return line;
+      const rewritten = rewriteUri(trimmed, nextUriIsPlaylist);
+      nextUriIsPlaylist = false;
+      return rewritten !== null ? rewritten : line;
     })
     .join("\n");
 }
@@ -347,14 +379,24 @@ export async function fetchWithSafeRedirects(
 export interface VodProxyRequestOptions {
   targetUrl: string;
   reqOrigin: string;
+  allowedCorsOrigin?: string;
   rangeHeader?: string | null;
   timeoutMs?: number;
+  mode?: "full" | "manifest";
+  manifestOnlyEnforced?: boolean;
 }
 
 export async function handleVodProxyRequest(
   opts: VodProxyRequestOptions
 ): Promise<Response> {
-  const corsHeaders = buildProxyCorsHeaders(opts.reqOrigin);
+  const corsHeaders = buildProxyCorsHeaders(
+    opts.allowedCorsOrigin || opts.reqOrigin
+  );
+  const effectiveMode: "full" | "manifest" = opts.manifestOnlyEnforced
+    ? "manifest"
+    : opts.mode === "manifest"
+    ? "manifest"
+    : "full";
   const validation = validateProxyTargetUrl(opts.targetUrl);
 
   if ("reason" in validation) {
@@ -419,7 +461,10 @@ export async function handleVodProxyRequest(
         });
       }
 
-      const rewritten = rewriteM3u8Playlist(text, finalUrl);
+      const rewritten = rewriteM3u8Playlist(text, finalUrl, {
+        manifestOnly: effectiveMode === "manifest",
+        reqOrigin: opts.reqOrigin,
+      });
       return new Response(rewritten, {
         status: 200,
         headers: {
@@ -434,7 +479,10 @@ export async function handleVodProxyRequest(
       const buf = new Uint8Array(await upstream.arrayBuffer());
       const decoded = new TextDecoder("utf-8", { fatal: false }).decode(buf);
       if (startsWithExtM3u(decoded)) {
-        const rewritten = rewriteM3u8Playlist(decoded, finalUrl);
+        const rewritten = rewriteM3u8Playlist(decoded, finalUrl, {
+          manifestOnly: effectiveMode === "manifest",
+          reqOrigin: opts.reqOrigin,
+        });
         return new Response(rewritten, {
           status: 200,
           headers: {
@@ -479,6 +527,23 @@ export async function handleVodProxyRequest(
         status: 415,
         headers: corsHeaders,
       });
+    }
+
+    if (opts.manifestOnlyEnforced) {
+      const isKeyRequest =
+        initialPathLower.endsWith(".key") || finalPathLower.endsWith(".key");
+      const contentLenHeader = upstream.headers.get("content-length");
+      const contentLen = contentLenHeader ? Number(contentLenHeader) : NaN;
+      const isSmallKey = Number.isFinite(contentLen) && contentLen > 0 && contentLen <= 64;
+      if (!isKeyRequest && !isSmallKey) {
+        try {
+          await upstream.body?.cancel();
+        } catch {}
+        return new Response("Segment proxying disabled on backup origin", {
+          status: 403,
+          headers: corsHeaders,
+        });
+      }
     }
 
     const responseHeaders = new Headers(corsHeaders);

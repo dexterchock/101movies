@@ -36,7 +36,7 @@ export const onRequestGet: PagesFunction = async (context) => {
     return Response.json(data, {
       headers: {
         "Cache-Control": hasResults
-          ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+          ? "public, max-age=1800, s-maxage=3600, stale-while-revalidate=86400"
           : "public, max-age=0, s-maxage=60",
       },
     });

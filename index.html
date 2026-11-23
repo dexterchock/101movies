@@ -10,8 +10,24 @@
         if (typeof window.fetch !== "function") return;
         var host = window.location.hostname;
         if (host === "localhost" || host === "127.0.0.1") return;
+        try {
+          var bu = window.sessionStorage ? window.sessionStorage.getItem("api_backup_until") : null;
+          if (bu && Number(bu) > Date.now()) return;
+        } catch (e) {}
         var ef = (window.__EARLY_FETCH__ = {});
+        function hasFreshCache(u) {
+          try {
+            if (!window.localStorage) return false;
+            var raw = window.localStorage.getItem("api_cache_v6:" + u);
+            if (!raw) return false;
+            var parsed = JSON.parse(raw);
+            return Boolean(parsed && typeof parsed.e === "number" && parsed.e > Date.now());
+          } catch (e) {
+            return false;
+          }
+        }
         function kick(u) {
+          if (hasFreshCache(u)) return;
           try {
             ef[u] = window.fetch(u);
           } catch (e) {}

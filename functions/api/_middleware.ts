@@ -53,7 +53,7 @@ function applyDefaultCacheControl(headers: Headers, pathname: string): void {
   if (pathname.includes("/tmdb/")) {
     headers.set(
       "Cache-Control",
-      "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+      "public, max-age=1800, s-maxage=3600, stale-while-revalidate=86400"
     );
   } else if (pathname.includes("/vod/resolve")) {
     headers.set(

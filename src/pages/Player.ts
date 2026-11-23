@@ -1,4 +1,4 @@
-import { api, prewarmStreamManifests } from "../api";
+import { api, isBackupApiActive, prewarmStreamManifests } from "../api";
 import {
   createHlsPlayer,
   HlsPlayerController,
@@ -319,6 +319,9 @@ export function mount(
 
   let hlsController: HlsPlayerController | null = null;
   let currentPlayedUrl = "";
+  let proxyFallbackPass = false;
+  let triedServerIndices = new Set<number>();
+  let failoverStartServerIndex = 0;
   let renderedHeroKey = "";
   let backdropLoaded = false;
 
@@ -621,10 +624,17 @@ export function mount(
     serverIdx: number,
     seasonIdx: number,
     episodeIdx: number,
-    seekTime = 0
+    seekTime = 0,
+    preserveFailover = false
   ) {
     const targetServer = sources[serverIdx];
     if (!targetServer) return;
+
+    if (!preserveFailover) {
+      proxyFallbackPass = false;
+      triedServerIndices.clear();
+      failoverStartServerIndex = serverIdx;
+    }
 
     const targetSeasons = targetServer.seasons || [];
     const clampedSeasonIdx =
@@ -708,16 +718,43 @@ export function mount(
   }
 
   function handleStreamError() {
-    if (signal.aborted) return;
-    if (activeServerIndex !== null && activeServerIndex + 1 < sources.length) {
-      const nextIndex = activeServerIndex + 1;
+    if (signal.aborted || activeServerIndex === null || sources.length === 0) {
+      return;
+    }
+
+    triedServerIndices.add(activeServerIndex);
+
+    for (let offset = 1; offset < sources.length; offset++) {
+      const candidateIdx = (activeServerIndex + offset) % sources.length;
+      if (!triedServerIndices.has(candidateIdx)) {
+        const pages = buildServerPages(sources, serverBarWidth, detectedQualities);
+        serverPage = findPageForSourceIndex(pages, candidateIdx);
+        startPlaybackWithProgress(
+          candidateIdx,
+          activeSeasonIndex,
+          activeEpisodeIndex,
+          currentVideoTime,
+          true
+        );
+        return;
+      }
+    }
+
+    if (!proxyFallbackPass && !isBackupApiActive()) {
+      proxyFallbackPass = true;
+      triedServerIndices.clear();
+      const restartIdx =
+        failoverStartServerIndex >= 0 && failoverStartServerIndex < sources.length
+          ? failoverStartServerIndex
+          : 0;
       const pages = buildServerPages(sources, serverBarWidth, detectedQualities);
-      serverPage = findPageForSourceIndex(pages, nextIndex);
+      serverPage = findPageForSourceIndex(pages, restartIdx);
       startPlaybackWithProgress(
-        nextIndex,
+        restartIdx,
         activeSeasonIndex,
         activeEpisodeIndex,
-        currentVideoTime
+        currentVideoTime,
+        true
       );
     }
   }
@@ -820,9 +857,12 @@ export function mount(
     const isPlayerMounted = Boolean(isPlaying && derived.activeStreamUrl);
     syncUpscaleBtnVisibility(isPlayerMounted);
 
-    // Playing state: maintain active HLS video instance unless URL changed
+    // Playing state: maintain active HLS video instance unless URL or proxy pass changed
     if (isPlayerMounted && derived.activeStreamUrl) {
-      if (hlsController && currentPlayedUrl === derived.activeStreamUrl) {
+      const nextPlayedKey = `${derived.activeStreamUrl}|${
+        proxyFallbackPass ? "proxy" : "direct"
+      }`;
+      if (hlsController && currentPlayedUrl === nextPlayedKey) {
         return;
       }
       if (hlsController) {
@@ -830,7 +870,7 @@ export function mount(
         hlsController = null;
       }
       renderedHeroKey = "";
-      currentPlayedUrl = derived.activeStreamUrl;
+      currentPlayedUrl = nextPlayedKey;
 
       const videoWrap = document.createElement("div");
       videoWrap.className = "player-video-wrap";
@@ -840,6 +880,8 @@ export function mount(
         src: derived.activeStreamUrl,
         initialTime: initialSeekTime,
         isAnimation: isAnimationTitle(details),
+        allowProxyFallback: sources.length <= 1,
+        forceProxy: proxyFallbackPass,
         onTimeUpdate: handleTimeUpdate,
         onPersistProgress: (ct, dur) => savePlaybackProgress(ct, dur, false),
         onError: handleStreamError,

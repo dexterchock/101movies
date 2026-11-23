@@ -6,5 +6,6 @@ export const onRequestGet: PagesFunction = async (context) => {
     targetUrl: reqUrl.searchParams.get("url") || "",
     reqOrigin: reqUrl.origin,
     rangeHeader: context.request.headers.get("Range"),
+    mode: reqUrl.searchParams.get("mode") === "manifest" ? "manifest" : "full",
   });
 };

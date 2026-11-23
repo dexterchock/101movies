@@ -601,12 +601,14 @@ async function fetchAndScoreTmdbCandidates(
     const host = req.get("host") || `localhost:${PORT}`;
     const reqOrigin = `${proto}://${host}`;
     const targetUrl = typeof req.query.url === "string" ? req.query.url : "";
+    const mode = req.query.mode === "manifest" ? "manifest" : "full";
 
     const proxyRes = await handleVodProxyRequest({
       targetUrl,
       reqOrigin,
       rangeHeader: req.get("range") || null,
       timeoutMs: 12000,
+      mode,
     });
 
     res.status(proxyRes.status);

@@ -1,4 +1,6 @@
 import type HlsType from "hls.js";
+import { buildVodProxyUrl, isBackupApiActive } from "../api";
+import { stripM3u8Ads } from "../m3u8Filter";
 import {
   createVideoUpscaler,
   isDesktopUpscaleSupported,
@@ -22,6 +24,126 @@ function hasStandardMSE(): boolean {
     (typeof (window as any).MediaSource === "function" ||
       typeof (window as any).WebKitMediaSource === "function")
   );
+}
+
+/**
+ * Wraps Hls.js's built-in playlist loader via ES5-safe composition (no `class extends`)
+ * so Samsung Tizen 4.0 / Chromium 56 works cleanly with the ES5 light bundle while
+ * stripping confirmed spliced ad blocks before segments are queued.
+ */
+function createAdFilterPlaylistLoader(HlsCtor: typeof HlsType): any {
+  const BaseLoader =
+    (HlsCtor as any)?.DefaultConfig?.pLoader ||
+    (HlsCtor as any)?.DefaultConfig?.loader;
+  if (typeof BaseLoader !== "function") {
+    return undefined;
+  }
+
+  function AdFilterPlaylistLoader(this: any, config: any) {
+    this._inner = new BaseLoader(config);
+  }
+
+  Object.defineProperty(AdFilterPlaylistLoader.prototype, "context", {
+    get: function (this: any) {
+      return this._inner ? this._inner.context : null;
+    },
+    set: function (this: any, val: any) {
+      if (this._inner) {
+        this._inner.context = val;
+      }
+    },
+  });
+
+  Object.defineProperty(AdFilterPlaylistLoader.prototype, "stats", {
+    get: function (this: any) {
+      return this._inner ? this._inner.stats : null;
+    },
+    set: function (this: any, val: any) {
+      if (this._inner) {
+        this._inner.stats = val;
+      }
+    },
+  });
+
+  AdFilterPlaylistLoader.prototype.load = function (
+    this: any,
+    context: any,
+    config: any,
+    callbacks: any
+  ) {
+    const inner = this._inner;
+    const isPlaylist =
+      context && (context.type === "level" || context.type === "manifest");
+
+    const wrappedCallbacks =
+      isPlaylist && callbacks && typeof callbacks.onSuccess === "function"
+        ? Object.assign({}, callbacks, {
+            onSuccess: (
+              response: any,
+              stats: any,
+              ctx: any,
+              networkDetails: any
+            ) => {
+              let nextResponse = response;
+              if (nextResponse && typeof nextResponse.data === "string") {
+                const baseUrl =
+                  (nextResponse.url as string | undefined) ||
+                  (ctx && (ctx.url as string | undefined)) ||
+                  undefined;
+                const alreadyFilteredByProxy =
+                  typeof baseUrl === "string" &&
+                  /\/api\/vod\/proxy\b/i.test(baseUrl);
+                if (!alreadyFilteredByProxy) {
+                  try {
+                    const filtered = stripM3u8Ads(nextResponse.data, baseUrl);
+                    if (filtered.removedCount > 0) {
+                      nextResponse = Object.assign({}, nextResponse, {
+                        data: filtered.content,
+                      });
+                    }
+                  } catch {
+                    // Fall back to unfiltered manifest on unexpected parser errors
+                  }
+                }
+              }
+              callbacks.onSuccess(nextResponse, stats, ctx, networkDetails);
+            },
+          })
+        : callbacks;
+
+    return inner.load(context, config, wrappedCallbacks);
+  };
+
+  AdFilterPlaylistLoader.prototype.abort = function (this: any) {
+    if (this._inner && typeof this._inner.abort === "function") {
+      this._inner.abort();
+    }
+  };
+
+  AdFilterPlaylistLoader.prototype.destroy = function (this: any) {
+    if (this._inner && typeof this._inner.destroy === "function") {
+      this._inner.destroy();
+    }
+  };
+
+  AdFilterPlaylistLoader.prototype.getCacheAge = function (this: any) {
+    if (this._inner && typeof this._inner.getCacheAge === "function") {
+      return this._inner.getCacheAge();
+    }
+    return null;
+  };
+
+  AdFilterPlaylistLoader.prototype.getResponseHeader = function (
+    this: any,
+    name: string
+  ) {
+    if (this._inner && typeof this._inner.getResponseHeader === "function") {
+      return this._inner.getResponseHeader(name);
+    }
+    return null;
+  };
+
+  return AdFilterPlaylistLoader;
 }
 
 /**
@@ -61,6 +183,8 @@ export interface HlsPlayerOptions {
   src: string;
   initialTime?: number;
   isAnimation?: boolean;
+  allowProxyFallback?: boolean;
+  forceProxy?: boolean;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onPersistProgress?: (currentTime: number, duration: number) => void;
   onError?: () => void;
@@ -100,15 +224,24 @@ export function createHlsPlayer(
   let playbackGen = 0;
   let pendingSeek = options.initialTime ?? 0;
 
-  let useProxy =
+  const allowProxyFallback = options.allowProxyFallback !== false;
+  const isHttpOnHttps =
     typeof window !== "undefined" &&
     window.location.protocol === "https:" &&
     options.src.startsWith("http://");
 
-  const getEffectiveSrc = () =>
-    useProxy
-      ? `/api/vod/proxy?url=${encodeURIComponent(options.src)}`
-      : options.src;
+  let useProxy =
+    Boolean(options.forceProxy) || (allowProxyFallback && isHttpOnHttps);
+
+  const getEffectiveSrc = () => {
+    if (useProxy) {
+      return buildVodProxyUrl(options.src, "full");
+    }
+    if (isHttpOnHttps) {
+      return options.src.replace(/^http:\/\//i, "https://");
+    }
+    return options.src;
+  };
 
   const exitCurrentFullscreen = () => {
     if (document.exitFullscreen) {
@@ -266,7 +399,7 @@ export function createHlsPlayer(
     "error",
     () => {
       if (destroyed || hls !== null) return;
-      if (!useProxy) {
+      if (!useProxy && allowProxyFallback && !isBackupApiActive()) {
         pendingSeek = video.currentTime || pendingSeek;
         useProxy = true;
         void startPlayback();
@@ -322,6 +455,7 @@ export function createHlsPlayer(
 
     if (Hls && Hls.isSupported()) {
       let mediaErrorRetries = 0;
+      const pLoader = createAdFilterPlaylistLoader(Hls);
       // NOTE: DO NOT raise buffer limits; capped for low-RAM Smart TVs (Samsung Tizen 4.0) to avoid OOM crashes.
       hls = new Hls({
         enableWorker: true,
@@ -332,6 +466,7 @@ export function createHlsPlayer(
         startPosition: pendingSeek > 0 ? pendingSeek : -1,
         startFragPrefetch: true,
         testBandwidth: false,
+        ...(pLoader ? { pLoader } : {}),
         manifestLoadPolicy: {
           default: {
             maxTimeToFirstByteMs: 8000,
@@ -381,7 +516,12 @@ export function createHlsPlayer(
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (destroyed || gen !== playbackGen || !data.fatal) return;
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !useProxy) {
+        if (
+          data.type === Hls.ErrorTypes.NETWORK_ERROR &&
+          !useProxy &&
+          allowProxyFallback &&
+          !isBackupApiActive()
+        ) {
           pendingSeek = video.currentTime || pendingSeek;
           destroyHlsInstance();
           useProxy = true;
@@ -405,7 +545,11 @@ export function createHlsPlayer(
         }
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = effectiveSrc;
+      const alreadyProxied = options.src.startsWith("/api/vod/proxy");
+      video.src =
+        useProxy || alreadyProxied
+          ? effectiveSrc
+          : buildVodProxyUrl(options.src, "manifest");
       video.addEventListener(
         "loadedmetadata",
         () => {

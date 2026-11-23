@@ -1,3 +1,4 @@
+import { isBackupApiActive } from "./api";
 import { isZh, t } from "./i18n";
 import type { MediaItem } from "./types";
 
@@ -363,6 +364,7 @@ export async function pairWithSyncCode(
 }
 
 export async function pullSyncState(force = false): Promise<boolean> {
+  if (isBackupApiActive()) return false;
   const groupId = getSyncGroupId();
   if (!groupId || progressDirty) return false;
 
@@ -417,6 +419,7 @@ export interface PushSyncOptions {
 }
 
 export async function pushSyncState(opts: PushSyncOptions): Promise<boolean> {
+  if (isBackupApiActive()) return false;
   const groupId = getSyncGroupId();
   if (!groupId) return false;
 

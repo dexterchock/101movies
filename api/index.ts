@@ -305,6 +305,8 @@ export async function GET(request: Request): Promise<Response> {
       return jsonWithCors(resolved, {
         cacheControl: hasSources
           ? "public, max-age=1800, s-maxage=3600, stale-while-revalidate=43200"
+          : resolved?.hadTransientErrors
+          ? "no-store"
           : "public, max-age=0, s-maxage=60",
       });
     } catch (err) {

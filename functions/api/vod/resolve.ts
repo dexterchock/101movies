@@ -26,11 +26,14 @@ export const onRequestGet: PagesFunction = async (context) => {
       tmdbApiKey: apiKey,
     });
     const hasSources = Array.isArray(resolved?.sources) && resolved.sources.length > 0;
+    const cacheControl = hasSources
+      ? "public, max-age=1800, s-maxage=3600, stale-while-revalidate=43200"
+      : resolved?.hadTransientErrors
+      ? "no-store"
+      : "public, max-age=0, s-maxage=60";
     return Response.json(resolved, {
       headers: {
-        "Cache-Control": hasSources
-          ? "public, max-age=1800, s-maxage=3600, stale-while-revalidate=43200"
-          : "public, max-age=0, s-maxage=60",
+        "Cache-Control": cacheControl,
       },
     });
   } catch (err: any) {

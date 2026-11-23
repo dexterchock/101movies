@@ -192,4 +192,5 @@ export interface VodResolveResponse {
   candidateTitles: string[];
   releaseYear?: string;
   sources: ResolvedStreamSource[];
+  hadTransientErrors?: boolean;
 }

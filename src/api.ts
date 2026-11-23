@@ -923,11 +923,21 @@ export const api = {
     id: string,
     customKeyword?: string,
     disabledIds: string[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    bypassCache = false
   ): Promise<VodResolveResponse> {
     const key = buildVodResolveKey(type, id, customKeyword, disabledIds);
-    const cached = this.getCachedVodStreams(type, id, customKeyword, disabledIds);
-    if (cached) return cached;
+    if (bypassCache) {
+      vodResolveCache.delete(key);
+    } else {
+      const cached = this.getCachedVodStreams(
+        type,
+        id,
+        customKeyword,
+        disabledIds
+      );
+      if (cached) return cached;
+    }
 
     const existing = vodResolveInflight.get(key);
     if (existing) {
@@ -946,6 +956,9 @@ export const api = {
     }
     if (disabledIds.length > 0) {
       queryParts.push(`disabled=${encodeURIComponent(disabledIds.join(","))}`);
+    }
+    if (bypassCache) {
+      queryParts.push(`_r=${Date.now()}`);
     }
 
     const apiPath = `/api/vod/resolve?${queryParts.join("&")}`;

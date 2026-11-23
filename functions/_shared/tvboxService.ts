@@ -74,7 +74,7 @@ async function probeVodSiteForMedia(
   targetYear?: string,
   mediaType: "movie" | "tv" = "movie",
   useVideoList = true,
-  timeoutMs = 2000
+  timeoutMs = 3200
 ): Promise<ProbeResult> {
   const sep = siteUrl.includes("?") ? "&" : "?";
   const ac = useVideoList ? "videolist" : "list";
@@ -490,6 +490,8 @@ export async function filterItemsByServerAvailability(
   }
 
   // Pass 2: Probe backup high-coverage site (lzzy) in parallel ONLY for Pass 1 misses/errors
+  let pass2VerifiedCount = 0;
+  let pass2Errors = 0;
   if (
     pass2Site &&
     pass1Misses.length > 0 &&
@@ -517,16 +519,37 @@ export async function filterItemsByServerAvailability(
             true
           );
           if (outcome === "hit") {
+            pass2VerifiedCount++;
             availableCount++;
             results[ctx.idx] = applyAvailabilityTitle(ctx.item, ctx.primaryZhTitle);
             storeAvailabilityCache(ctx.availKey, true, ctx.primaryZhTitle);
-          } else if (outcome === "miss" && pass1VerifiedMiss) {
-            storeAvailabilityCache(ctx.availKey, false, ctx.primaryZhTitle);
+          } else if (outcome === "miss") {
+            pass2VerifiedCount++;
+            if (pass1VerifiedMiss) {
+              storeAvailabilityCache(ctx.availKey, false, ctx.primaryZhTitle);
+            }
+          } else {
+            pass2Errors++;
           }
         }
       }
     );
     await Promise.all(workers);
+  }
+
+  // Fail-open when all VOD probes timed out/errored so browse/search grids never go blank on transient lag
+  if (
+    availableCount === 0 &&
+    pass1VerifiedCount === 0 &&
+    pass2VerifiedCount === 0 &&
+    pass1Errors + pass2Errors > 0
+  ) {
+    if (preparedContexts.length > 0) {
+      return preparedContexts
+        .slice(0, maxAvailableItems)
+        .map((ctx) => applyAvailabilityTitle(ctx.item, ctx.primaryZhTitle));
+    }
+    return items.slice(0, maxAvailableItems);
   }
 
   return results.filter(Boolean).slice(0, maxAvailableItems);

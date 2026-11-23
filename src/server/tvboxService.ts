@@ -1077,8 +1077,8 @@ export function evaluateYearMatch(
   return { matched: false, bonus: 0 };
 }
 
-const SITE_CIRCUIT_THRESHOLD = 3;
-const SITE_CIRCUIT_COOLDOWN_MS = 120_000;
+const SITE_CIRCUIT_THRESHOLD = 4;
+const SITE_CIRCUIT_COOLDOWN_MS = 60_000;
 const siteCircuitMap = new Map<string, { failures: number; openUntil: number }>();
 
 function isSiteInCooldown(siteId: string): boolean {
@@ -1112,16 +1112,21 @@ async function searchSingleVodSite(
   targetYear?: string,
   mediaType?: "movie" | "tv",
   timeoutMs = 2400,
-  externalSignal?: AbortSignal
+  externalSignal?: AbortSignal,
+  onOutcome?: (outcome: "ok" | "error" | "timeout") => void
 ): Promise<ResolvedStreamSource[]> {
   if (externalSignal?.aborted) return [];
   const start = Date.now();
   const sep = site.api.includes("?") ? "&" : "?";
   const searchUrl = `${site.api}${sep}ac=videolist&wd=${encodeURIComponent(keyword)}`;
 
+  let timedOut = false;
   const reqAc = new AbortController();
   const onExternalAbort = () => reqAc.abort();
-  const timer = setTimeout(() => reqAc.abort(), timeoutMs);
+  const timer = setTimeout(() => {
+    timedOut = true;
+    reqAc.abort();
+  }, timeoutMs);
   if (externalSignal) {
     externalSignal.addEventListener("abort", onExternalAbort, { once: true });
   }
@@ -1137,10 +1142,12 @@ async function searchSingleVodSite(
 
     if (!res.ok) {
       recordSiteFailure(site.id);
+      onOutcome?.("error");
       return [];
     }
     const data: any = await res.json();
     recordSiteSuccess(site.id);
+    onOutcome?.("ok");
     const list = Array.isArray(data?.list) ? data.list : [];
     if (list.length === 0) return [];
 
@@ -1391,7 +1398,16 @@ async function searchSingleVodSite(
     return singleSource ? [singleSource] : [];
   } catch {
     if (!externalSignal?.aborted) {
-      recordSiteFailure(site.id);
+      if (timedOut) {
+        onOutcome?.("timeout");
+        // Skip tripping circuit cooldown on short timeouts (slow PHP search != broken video CDN)
+        if (timeoutMs >= 5000) {
+          recordSiteFailure(site.id);
+        }
+      } else {
+        onOutcome?.("error");
+        recordSiteFailure(site.id);
+      }
     }
     return [];
   } finally {
@@ -1801,7 +1817,11 @@ export async function resolveStreamsForMedia(params: {
     (s) => s.enabled !== false && !disabledSet.has(s.id)
   );
   const healthySites = enabledSites.filter((s) => !isSiteInCooldown(s.id));
-  const activeSites = healthySites.length >= 3 ? healthySites : enabledSites;
+  const useHealthyFilter = healthySites.length >= 3;
+  const activeSites = useHealthyFilter ? healthySites : enabledSites;
+  const skippedCooldownSites = useHealthyFilter
+    ? enabledSites.filter((s) => isSiteInCooldown(s.id))
+    : [];
 
   if (!primaryQuery || activeSites.length === 0) {
     return {
@@ -1820,18 +1840,25 @@ export async function resolveStreamsForMedia(params: {
   const maxKeywordsToTry = Math.min(searchKeywords.length, 3);
   // NOTE: Stay under Cloudflare Pages Functions' 50-subrequest ceiling across TMDB + up to 3 keyword rounds.
   const MAX_VOD_SUBREQUESTS = 26;
-  const OVERALL_DEADLINE_MS = 3400;
+  const OVERALL_WITH_SOURCES_DEADLINE_MS = 3800;
+  const OVERALL_EMPTY_DEADLINE_MS = 8500;
   const resolveStart = Date.now();
   let vodSubrequestsUsed = 0;
+  let hadUpstreamErrors = false;
 
   for (let kIdx = 0; kIdx < maxKeywordsToTry; kIdx++) {
     if (vodSubrequestsUsed >= MAX_VOD_SUBREQUESTS) break;
-    if (kIdx > 0 && matchedBaseSiteIds.size >= 4) break;
+    if (kIdx > 0 && matchedBaseSiteIds.size >= 2) break;
     if (kIdx > 1 && matchedBaseSiteIds.size > 0) break;
 
-    const remainingWallMs = OVERALL_DEADLINE_MS - (Date.now() - resolveStart);
-    if (kIdx > 0 && remainingWallMs < 600) break;
-    const roundTimeoutMs = Math.max(600, Math.min(2400, remainingWallMs));
+    const overallBudgetMs =
+      matchedBaseSiteIds.size > 0
+        ? OVERALL_WITH_SOURCES_DEADLINE_MS
+        : OVERALL_EMPTY_DEADLINE_MS;
+    const remainingWallMs = overallBudgetMs - (Date.now() - resolveStart);
+    if (kIdx > 0 && remainingWallMs < 800) break;
+    const maxRoundCapMs = matchedBaseSiteIds.size > 0 ? 2600 : 6000;
+    const roundTimeoutMs = Math.max(800, Math.min(maxRoundCapMs, remainingWallMs));
 
     const kw = searchKeywords[kIdx];
     const remainingBudget = MAX_VOD_SUBREQUESTS - vodSubrequestsUsed;
@@ -1845,6 +1872,23 @@ export async function resolveStreamsForMedia(params: {
     const roundAc = new AbortController();
     const roundStart = Date.now();
     let softDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
+    let softDeadlineAt = Infinity;
+
+    const tightenSoftDeadline = (delayMs: number) => {
+      const clampedDelay = Math.max(0, delayMs);
+      const targetAt = Date.now() + clampedDelay;
+      if (targetAt >= softDeadlineAt) return;
+      softDeadlineAt = targetAt;
+      if (softDeadlineTimer) {
+        clearTimeout(softDeadlineTimer);
+        softDeadlineTimer = null;
+      }
+      if (clampedDelay === 0) {
+        roundAc.abort();
+      } else {
+        softDeadlineTimer = setTimeout(() => roundAc.abort(), clampedDelay);
+      }
+    };
 
     try {
       await Promise.allSettled(
@@ -1856,7 +1900,12 @@ export async function resolveStreamsForMedia(params: {
             releaseYear,
             type,
             roundTimeoutMs,
-            roundAc.signal
+            roundAc.signal,
+            (outcome) => {
+              if (outcome === "error" || outcome === "timeout") {
+                hadUpstreamErrors = true;
+              }
+            }
           );
           if (siteSources.length > 0 && !matchedBaseSiteIds.has(site.id)) {
             matchedBaseSiteIds.add(site.id);
@@ -1865,21 +1914,19 @@ export async function resolveStreamsForMedia(params: {
             const tier3MatchedCount = Array.from(matchedBaseSiteIds).filter(
               (baseId) => getSourceQualityTier(baseId) >= 3
             ).length;
+            const elapsed = Date.now() - roundStart;
 
             if (matchedBaseSiteIds.size >= 6 && tier3MatchedCount >= 3) {
-              if (softDeadlineTimer) {
-                clearTimeout(softDeadlineTimer);
-                softDeadlineTimer = null;
-              }
-              roundAc.abort();
+              tightenSoftDeadline(0);
             } else if (
-              !softDeadlineTimer &&
               matchedBaseSiteIds.size >= 4 &&
               tier3MatchedCount >= 2
             ) {
-              const elapsed = Date.now() - roundStart;
-              const graceMs = Math.max(250, 750 - elapsed);
-              softDeadlineTimer = setTimeout(() => roundAc.abort(), graceMs);
+              tightenSoftDeadline(Math.max(250, 900 - elapsed));
+            } else if (matchedBaseSiteIds.size >= 2) {
+              tightenSoftDeadline(Math.max(550, 2100 - elapsed));
+            } else if (matchedBaseSiteIds.size >= 1) {
+              tightenSoftDeadline(Math.max(700, 2800 - elapsed));
             }
           }
         })
@@ -1888,6 +1935,59 @@ export async function resolveStreamsForMedia(params: {
       if (softDeadlineTimer) {
         clearTimeout(softDeadlineTimer);
         softDeadlineTimer = null;
+      }
+    }
+  }
+
+  // Cooldown rescue pass: if all healthy sites yielded 0 matches, try skipped cooldown sites within budget
+  if (
+    matchedSources.length === 0 &&
+    skippedCooldownSites.length > 0 &&
+    vodSubrequestsUsed < MAX_VOD_SUBREQUESTS
+  ) {
+    const rescueRemainingMs =
+      OVERALL_EMPTY_DEADLINE_MS - (Date.now() - resolveStart);
+    if (rescueRemainingMs >= 1000) {
+      const rescueSites = skippedCooldownSites.slice(
+        0,
+        MAX_VOD_SUBREQUESTS - vodSubrequestsUsed
+      );
+      vodSubrequestsUsed += rescueSites.length;
+      const rescueTimeoutMs = Math.min(4500, rescueRemainingMs);
+      const rescueAc = new AbortController();
+      let rescueTimer: ReturnType<typeof setTimeout> | null = null;
+
+      try {
+        await Promise.allSettled(
+          rescueSites.map(async (site) => {
+            const siteSources = await searchSingleVodSite(
+              site,
+              primaryQuery,
+              preparedTargets,
+              releaseYear,
+              type,
+              rescueTimeoutMs,
+              rescueAc.signal,
+              (outcome) => {
+                if (outcome === "error" || outcome === "timeout") {
+                  hadUpstreamErrors = true;
+                }
+              }
+            );
+            if (siteSources.length > 0 && !matchedBaseSiteIds.has(site.id)) {
+              matchedBaseSiteIds.add(site.id);
+              matchedSources.push(...siteSources);
+              if (!rescueTimer) {
+                rescueTimer = setTimeout(() => rescueAc.abort(), 600);
+              }
+            }
+          })
+        );
+      } finally {
+        if (rescueTimer) {
+          clearTimeout(rescueTimer);
+          rescueTimer = null;
+        }
       }
     }
   }
@@ -1929,6 +2029,7 @@ export async function resolveStreamsForMedia(params: {
     return a.latencyMs - b.latencyMs;
   });
 
+  const hasTransientEmpty = matchedSources.length === 0 && hadUpstreamErrors;
   const response: VodResolveResponse = {
     tmdbId,
     mediaType: type,
@@ -1936,18 +2037,21 @@ export async function resolveStreamsForMedia(params: {
     candidateTitles,
     releaseYear,
     sources: matchedSources,
+    ...(hasTransientEmpty ? { hadTransientErrors: true } : {}),
   };
 
-  const ttl = matchedSources.length > 0 ? 30 * 60 * 1000 : 60 * 1000;
-  setBoundedCache(
-    resolvedStreamsCache,
-    cacheKey,
-    {
-      data: response,
-      expiresAt: Date.now() + ttl,
-    },
-    300
-  );
+  if (!hasTransientEmpty) {
+    const ttl = matchedSources.length > 0 ? 30 * 60 * 1000 : 60 * 1000;
+    setBoundedCache(
+      resolvedStreamsCache,
+      cacheKey,
+      {
+        data: response,
+        expiresAt: Date.now() + ttl,
+      },
+      300
+    );
+  }
   if (matchedSources.length > 0) {
     setBoundedCache(
       availabilityCache,
@@ -1955,7 +2059,7 @@ export async function resolveStreamsForMedia(params: {
       {
         available: true,
         primaryZhTitle: meta.primaryZhTitle,
-        expiresAt: Date.now() + ttl,
+        expiresAt: Date.now() + 30 * 60 * 1000,
       },
       1000
     );
@@ -2034,7 +2138,7 @@ export async function checkMediaHasPlayableStreams(
             meta.candidateTitles,
             meta.releaseYear,
             type,
-            1800
+            3200
           );
           if (sources.length === 0) {
             throw new Error("no_match");

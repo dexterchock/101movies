@@ -20,8 +20,8 @@ import { escapeHtml, isInWatchLater, toggleWatchLater } from "../utils";
 import { flushHistoryProgressSync, queueHistoryProgressSync } from "../sync";
 import type { ViewCleanup } from "./Home";
 
-// VOD APIs responding >= 800ms indicate high latency / slow stream segment delivery
-const HIGH_PING_THRESHOLD_MS = 800;
+// VOD search APIs responding >= 2500ms indicate high latency; PHP search APIs under 2.5s often still deliver fast CDN segments
+const HIGH_PING_THRESHOLD_MS = 2500;
 
 export type EpisodeLayoutMode = "compact" | "medium" | "list";
 
@@ -1194,11 +1194,24 @@ export function mount(
     }
 
     if (sources.length === 0) {
+      const row = document.createElement("div");
+      row.className = "server-bar-row";
+      row.style.maxWidth = "100%";
+
       const msg = document.createElement("p");
       msg.style.cssText =
-        "margin:0;font-size:13px;color:rgba(255,255,255,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+        "margin:0;font-size:13px;color:rgba(255,255,255,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;";
       msg.textContent = t("player.noStreams");
-      serverBarEl.replaceChildren(msg);
+
+      const retryBtn = document.createElement("button");
+      retryBtn.type = "button";
+      retryBtn.className = "server-pill";
+      retryBtn.tabIndex = 0;
+      retryBtn.textContent = t("player.retry");
+      retryBtn.addEventListener("click", () => loadVodStreams(true));
+
+      row.append(msg, retryBtn);
+      serverBarEl.replaceChildren(row);
       return;
     }
 
@@ -1757,11 +1770,15 @@ export function mount(
       .catch(() => {});
   }
 
-  // Fetch VOD stream sources if not already cached
-  if (!cachedVod) {
+  function loadVodStreams(bypassCache = false) {
+    if (signal.aborted) return;
+    const wasResolving = resolving;
     resolving = true;
+    if (!wasResolving) {
+      renderServerBar();
+    }
     api
-      .resolveVodStreams(type, id, undefined, [], signal)
+      .resolveVodStreams(type, id, undefined, [], signal, bypassCache)
       .then((res) => {
         if (signal.aborted) return;
         sources = res.sources || [];
@@ -1783,6 +1800,11 @@ export function mount(
         resolving = false;
         renderBottomBar();
       });
+  }
+
+  // Fetch VOD stream sources if not already cached
+  if (!cachedVod) {
+    loadVodStreams(false);
   }
 
   return {

@@ -23,6 +23,33 @@ import type { ViewCleanup } from "./Home";
 // VOD APIs responding >= 800ms indicate high latency / slow stream segment delivery
 const HIGH_PING_THRESHOLD_MS = 800;
 
+export type EpisodeLayoutMode = "compact" | "medium" | "list";
+
+export function measureLabelVisualWidth(label: string): number {
+  let w = 0;
+  for (let i = 0; i < label.length; i++) {
+    w += label.charCodeAt(i) > 0x7f ? 1.75 : 1;
+  }
+  return w;
+}
+
+export function getEpisodeLayoutMode(labels: string[]): EpisodeLayoutMode {
+  let mediumCount = 0;
+  let listCount = 0;
+  for (let i = 0; i < labels.length; i++) {
+    const w = measureLabelVisualWidth(labels[i]);
+    if (w > 15) listCount++;
+    else if (w > 8.5) mediumCount++;
+  }
+  if (listCount >= 2 || (labels.length > 0 && listCount / labels.length >= 0.25)) {
+    return "list";
+  }
+  if (mediumCount >= 2 || listCount >= 1) {
+    return "medium";
+  }
+  return "compact";
+}
+
 const DEFAULT_SITE_TITLE = "101Movies";
 const DEFAULT_SITE_DESC =
   "Discover and stream trending movies and popular TV shows in high definition. Fast, ad-free streaming with smart TV navigation and real-time TMDB integration.";
@@ -281,6 +308,8 @@ export function mount(
   let activeEpisodeIndex = 0;
   let isPlaying = false;
   let isEpisodePopoverOpen = false;
+  let episodeSortDesc = false;
+  let shouldScrollActiveEp = false;
   let initialSeekTime = 0;
   let lastSaveTime = 0;
   let currentVideoTime = 0;
@@ -757,10 +786,16 @@ export function mount(
     if (type === "tv") {
       const epIdx = savedProgress.episodeIndex ?? 0;
       const epNum = epIdx + 1;
-      const epLabel = formatEpisodeLabel(
+      const epLabelRaw = formatEpisodeLabel(
         savedProgress.episodeLabel || String(epNum),
         epIdx
       );
+      const epLabel =
+        measureLabelVisualWidth(epLabelRaw) > 12
+          ? isZh()
+            ? `第${epNum}集`
+            : `Ep ${epNum}`
+          : epLabelRaw;
       const epPart =
         derived.hasMultipleSeasons && savedProgress.seasonNumber
           ? isZh()
@@ -1354,13 +1389,24 @@ export function mount(
 
       triggerBtn.addEventListener("click", () => {
         isEpisodePopoverOpen = !isEpisodePopoverOpen;
+        shouldScrollActiveEp = isEpisodePopoverOpen;
         renderActionsRight();
       });
       wrap.appendChild(triggerBtn);
 
       if (isEpisodePopoverOpen) {
+        const formattedLabels = derived.episodes.map((ep, idx) =>
+          formatEpisodeLabel(ep.name, idx)
+        );
+        const layoutMode = getEpisodeLayoutMode(formattedLabels);
+        const canReverseSort = derived.episodes.length >= 24;
+        const effectiveSortDesc = canReverseSort && episodeSortDesc;
+
         const popover = document.createElement("div");
-        popover.className = "episodes-popover";
+        popover.className =
+          layoutMode === "compact"
+            ? "episodes-popover"
+            : "episodes-popover episodes-popover--wide";
 
         const header = document.createElement("div");
         header.className = "episodes-popover-header";
@@ -1377,6 +1423,40 @@ export function mount(
           </div>
         `;
 
+        const headerActions = document.createElement("div");
+        headerActions.className = "episodes-popover-actions";
+
+        if (canReverseSort) {
+          const sortBtn = document.createElement("button");
+          sortBtn.type = "button";
+          sortBtn.dataset.epSort = "true";
+          sortBtn.className = effectiveSortDesc
+            ? "episodes-popover-action is-active"
+            : "episodes-popover-action";
+          const sortLabel = effectiveSortDesc
+            ? t("player.sortOldestAria")
+            : t("player.sortNewestAria");
+          sortBtn.setAttribute("aria-label", sortLabel);
+          sortBtn.setAttribute("aria-pressed", String(effectiveSortDesc));
+          sortBtn.title = sortLabel;
+          sortBtn.innerHTML = `<span class="episodes-trigger-inner">${icons.arrowUpDown(
+            "",
+            14
+          )}</span>`;
+          sortBtn.addEventListener("click", () => {
+            const wasFocused = document.activeElement === sortBtn;
+            episodeSortDesc = !episodeSortDesc;
+            shouldScrollActiveEp = false;
+            renderActionsRight();
+            if (wasFocused) {
+              actionsRightEl
+                .querySelector<HTMLElement>("[data-ep-sort]")
+                ?.focus({ preventScroll: true });
+            }
+          });
+          headerActions.appendChild(sortBtn);
+        }
+
         const closeBtn = document.createElement("button");
         closeBtn.type = "button";
         closeBtn.className = "episodes-popover-close";
@@ -1390,7 +1470,8 @@ export function mount(
           isEpisodePopoverOpen = false;
           renderActionsRight();
         });
-        header.appendChild(closeBtn);
+        headerActions.appendChild(closeBtn);
+        header.appendChild(headerActions);
         popover.appendChild(header);
 
         if (derived.hasMultipleSeasons) {
@@ -1418,10 +1499,16 @@ export function mount(
         }
 
         const epGrid = document.createElement("div");
-        epGrid.className = "episodes-grid no-scrollbar";
-        derived.episodes.forEach((ep, idx) => {
+        epGrid.className =
+          layoutMode === "compact"
+            ? "episodes-grid no-scrollbar"
+            : `episodes-grid episodes-grid--${layoutMode} no-scrollbar`;
+
+        const totalEps = derived.episodes.length;
+        for (let step = 0; step < totalEps; step++) {
+          const idx = effectiveSortDesc ? totalEps - 1 - step : step;
           const isCurrentEp = isPlaying && derived.safeEpisodeIndex === idx;
-          const epLabel = formatEpisodeLabel(ep.name, idx);
+          const epLabel = formattedLabels[idx];
           const epBtn = document.createElement("button");
           epBtn.type = "button";
           epBtn.className = isCurrentEp
@@ -1429,7 +1516,14 @@ export function mount(
             : "episode-btn tabular-nums";
           epBtn.title = epLabel;
           epBtn.tabIndex = 0;
-          epBtn.textContent = epLabel;
+          if (layoutMode === "list") {
+            const labelSpan = document.createElement("span");
+            labelSpan.className = "episode-btn-label";
+            labelSpan.textContent = epLabel;
+            epBtn.appendChild(labelSpan);
+          } else {
+            epBtn.textContent = epLabel;
+          }
           epBtn.addEventListener("click", () => {
             const targetServerIdx =
               activeServerIndex !== null ? activeServerIndex : 0;
@@ -1442,9 +1536,26 @@ export function mount(
             );
           });
           epGrid.appendChild(epBtn);
-        });
+        }
         popover.appendChild(epGrid);
         wrap.appendChild(popover);
+
+        if (shouldScrollActiveEp) {
+          shouldScrollActiveEp = false;
+          window.requestAnimationFrame(() => {
+            if (signal.aborted) return;
+            const activeBtn =
+              epGrid.querySelector<HTMLElement>(".episode-btn.is-active");
+            if (!activeBtn) return;
+            const epRect = epGrid.getBoundingClientRect();
+            const btnRect = activeBtn.getBoundingClientRect();
+            const targetTop =
+              epGrid.scrollTop +
+              (btnRect.top - epRect.top) -
+              Math.max(0, (epGrid.clientHeight - btnRect.height) / 2);
+            epGrid.scrollTop = Math.max(0, targetTop);
+          });
+        }
       }
 
       frag.appendChild(wrap);

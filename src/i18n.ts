@@ -156,9 +156,27 @@ export function formatEpisodeLabel(
   lang: UiLang = currentLang
 ): string {
   const trimmed = rawName.trim();
+
+  // Format air-date variety episodes (e.g. "20230730", "20260905回顾特辑", "2026428特别加更")
+  const fullDateMatch = trimmed.match(
+    /^((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(.*)$/
+  );
+  if (fullDateMatch) {
+    const datePart = `${fullDateMatch[1]}-${fullDateMatch[2]}-${fullDateMatch[3]}`;
+    const suffix = fullDateMatch[4].trim();
+    return suffix ? `${datePart} ${suffix}` : datePart;
+  }
+
+  const shortMonthDateMatch = trimmed.match(
+    /^((?:19|20)\d{2})([1-9])(0[1-9]|[12]\d|3[01])([\u4e00-\u9fff].+)$/
+  );
+  if (shortMonthDateMatch) {
+    return `${shortMonthDateMatch[1]}-0${shortMonthDateMatch[2]}-${shortMonthDateMatch[3]} ${shortMonthDateMatch[4].trim()}`;
+  }
+
   if (lang === "zh") {
     if (!trimmed) return `第${index + 1}集`;
-    if (/^\d+$/.test(trimmed)) return `第${parseInt(trimmed, 10)}集`;
+    if (/^\d{1,4}$/.test(trimmed)) return `第${parseInt(trimmed, 10)}集`;
     const enEpMatch = trimmed.match(/^Ep\s*0*(\d+)$/i);
     if (enEpMatch) return `第${enEpMatch[1]}集`;
     const zhEpMatch = trimmed.match(/^第\s*0*(\d+)\s*([集期话回])$/);
@@ -173,7 +191,7 @@ export function formatEpisodeLabel(
   if (epMatch) {
     return `Ep ${epMatch[1]}`;
   }
-  if (/^\d+$/.test(trimmed)) {
+  if (/^\d{1,4}$/.test(trimmed)) {
     return `Ep ${parseInt(trimmed, 10)}`;
   }
   if (/^(正片|高清|超清|蓝光|HD|Full|BD|TC|1080[pP]|720[pP]|4[kK])$/i.test(trimmed)) {
@@ -290,6 +308,8 @@ const MESSAGES = {
     "player.selectEpisode": "Select Episode",
     "player.selectSeasonEpisode": "Select Season & Episode",
     "player.epsCount": "{count} eps",
+    "player.sortNewestAria": "Show newest episodes first",
+    "player.sortOldestAria": "Show oldest episodes first",
     "player.closeEpisodesAria": "Close episodes",
     "player.noStreams": "No playable streams found from enabled sources.",
     "player.prevServersAria": "Previous servers",
@@ -396,6 +416,8 @@ const MESSAGES = {
     "player.selectEpisode": "选择剧集",
     "player.selectSeasonEpisode": "选择季与剧集",
     "player.epsCount": "共 {count} 集",
+    "player.sortNewestAria": "切换为最新集数在前",
+    "player.sortOldestAria": "切换为最早集数在前",
     "player.closeEpisodesAria": "关闭选集列表",
     "player.noStreams": "暂未找到可用播放源。",
     "player.prevServersAria": "上一组线路",

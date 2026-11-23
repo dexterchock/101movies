@@ -2803,15 +2803,31 @@ svg {
   flex-direction: column;
 }
 
+.episodes-popover--wide {
+  width: 440px;
+  width: min(440px, calc(100vw - 32px));
+  max-height: 65vh;
+}
+
 .episodes-popover-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding-bottom: 12px;
   margin-bottom: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
+.episodes-popover-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.episodes-popover-action,
 .episodes-popover-close {
   display: flex;
   align-items: center;
@@ -2822,14 +2838,27 @@ svg {
   color: #ffffff;
   cursor: pointer;
   outline: none;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
+.episodes-popover-action {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.episodes-popover-action:hover,
 .episodes-popover-close:hover {
   background-color: rgba(38, 38, 38, 0.8);
+  color: #ffffff;
 }
 
+.episodes-popover-action:focus-visible,
 .episodes-popover-close:focus-visible {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.episodes-popover-action.is-active {
+  background-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 
 .season-bar {
@@ -2877,21 +2906,46 @@ svg {
 .episodes-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
   gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding-right: 2px;
+}
+
+.episodes-grid--medium {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.episodes-grid--list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
 }
 
 @media (min-width: 640px) {
   .episodes-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
+  .episodes-grid--medium {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .episodes-grid--list {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .episode-btn {
-  padding: 8px 12px;
+  min-height: 36px;
+  padding: 8px 10px;
   border-radius: 12px;
   font-size: 12px;
+  line-height: 1.3;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -2902,6 +2956,22 @@ svg {
   background-color: rgba(23, 23, 23, 0.7);
   color: rgba(255, 255, 255, 0.8);
   transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+.episodes-grid--list .episode-btn {
+  text-align: left;
+  white-space: normal;
+  padding: 8px 12px;
+  line-height: 1.35;
+}
+
+.episode-btn-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  text-align: left;
 }
 
 .episode-btn:hover {
@@ -3509,6 +3579,7 @@ html.no-focus-visible .back-btn:focus,
 html.no-focus-visible .server-pill:focus,
 html.no-focus-visible .server-nav-btn:focus,
 html.no-focus-visible .resume-pill:focus,
+html.no-focus-visible .episodes-popover-action:focus,
 html.no-focus-visible .episodes-popover-close:focus,
 html.no-focus-visible .season-btn:focus,
 html.no-focus-visible .episode-btn:focus {
@@ -3779,18 +3850,45 @@ html.ios-standalone .modal-backdrop {
     margin-left: 6px;
   }
 
+  .episodes-popover-actions > * + * {
+    margin-left: 4px;
+  }
+
   .episodes-grid {
     display: flex;
     flex-wrap: wrap;
+    align-content: flex-start;
     margin: -4px;
   }
 
   .episode-btn {
+    flex-shrink: 0;
     width: calc(33.333% - 8px);
     margin: 4px;
   }
 
+  .episodes-grid--medium .episode-btn {
+    width: calc(50% - 8px);
+  }
+
+  .episodes-grid--list .episode-btn {
+    width: calc(100% - 8px);
+    margin: 3px 4px;
+  }
+
   @media (min-width: 640px) {
+    .episode-btn {
+      width: calc(25% - 8px);
+    }
+
+    .episodes-grid--medium .episode-btn {
+      width: calc(33.333% - 8px);
+    }
+
+    .episodes-grid--list .episode-btn {
+      width: calc(100% - 8px);
+    }
+
     .bottom-nav > .bottom-nav-link + .bottom-nav-link {
       margin-left: 8px;
     }

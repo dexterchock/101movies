@@ -10,6 +10,7 @@ const REMOTE_API_ORIGIN = "https://101movies.pages.dev";
 const BACKUP_UNTIL_KEY = "api_backup_until";
 const BACKUP_ORIGIN_OVERRIDE_KEY = "backup_api_origin";
 const BACKUP_FAILOVER_TTL_MS = 30 * 60 * 1000;
+const PRIMARY_FAILOVER_TIMEOUT_MS = 18_000;
 
 const API_LS_PREFIX = "api_cache_v6:";
 const API_SS_PREFIX = "api_search_v6:";
@@ -91,15 +92,24 @@ export function activateBackupApi(ttlMs = BACKUP_FAILOVER_TTL_MS): boolean {
   }
 }
 
+export function getBackupVodProxyUrl(targetUrl: string): string | null {
+  if (isLocalhost()) return null;
+  const backupOrigin = getBackupApiOrigin();
+  if (!backupOrigin) return null;
+  return `${backupOrigin}/api/vod/proxy?mode=manifest&url=${encodeURIComponent(
+    targetUrl
+  )}`;
+}
+
 export function buildVodProxyUrl(
   targetUrl: string,
   mode: "full" | "manifest" = "full"
 ): string {
-  const encoded = encodeURIComponent(targetUrl);
-  const backupOrigin = getBackupApiOrigin();
-  if (!isLocalhost() && backupOrigin && isBackupApiActive()) {
-    return `${backupOrigin}/api/vod/proxy?mode=manifest&url=${encoded}`;
+  if (isBackupApiActive()) {
+    const backupProxyUrl = getBackupVodProxyUrl(targetUrl);
+    if (backupProxyUrl) return backupProxyUrl;
   }
+  const encoded = encodeURIComponent(targetUrl);
   return mode === "manifest"
     ? `/api/vod/proxy?mode=manifest&url=${encoded}`
     : `/api/vod/proxy?url=${encoded}`;
@@ -213,20 +223,31 @@ function writePersistentCache<T>(
 
 let localTmdbConfigured: boolean | null = null;
 
+function getPrimaryFailoverTimeoutMs(): number {
+  if (typeof window !== "undefined") {
+    const override = Number((window as any).__PRIMARY_API_TIMEOUT_MS__);
+    if (Number.isFinite(override) && override > 0) {
+      return override;
+    }
+  }
+  return PRIMARY_FAILOVER_TIMEOUT_MS;
+}
+
 function isQuotaOrFailOpenResponse(res: Response): boolean {
   if (
     res.status === 429 ||
     res.status === 502 ||
     res.status === 503 ||
-    res.status === 504
+    res.status === 504 ||
+    (res.status >= 520 && res.status <= 530)
   ) {
     return true;
   }
-  if (res.ok) {
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
-    if (!ct.includes("json")) {
-      return true;
-    }
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  const isJson = ct.includes("json");
+  // Legitimate API Functions return JSON; non-JSON 200/404/5xx indicates fail_open SPA fallback or Cloudflare error HTML
+  if (!isJson && (res.ok || res.status === 404 || res.status >= 500)) {
+    return true;
   }
   return false;
 }
@@ -278,12 +299,54 @@ async function consumeEarlyFetch(
           );
         })
       : await earlyPromise;
-    return res.ok ? res : null;
+    return res;
   } catch (err: any) {
     if (err?.name === "AbortError" || signal?.aborted) {
       throw err;
     }
     return null;
+  }
+}
+
+async function fetchPrimaryWithTimeout(
+  path: string,
+  externalSignal?: AbortSignal
+): Promise<Response> {
+  if (externalSignal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+
+  const controller = new AbortController();
+  let abortedByCaller = false;
+  let timedOut = false;
+
+  const onExternalAbort = () => {
+    abortedByCaller = true;
+    controller.abort();
+  };
+  externalSignal?.addEventListener("abort", onExternalAbort, { once: true });
+
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, getPrimaryFailoverTimeoutMs());
+
+  try {
+    const earlyRes = await consumeEarlyFetch(path, controller.signal);
+    return earlyRes || (await fetch(path, { signal: controller.signal }));
+  } catch (err: any) {
+    if (abortedByCaller || externalSignal?.aborted) {
+      throw err?.name === "AbortError"
+        ? err
+        : new DOMException("Aborted", "AbortError");
+    }
+    if (timedOut) {
+      throw new Error("Primary API timeout");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+    externalSignal?.removeEventListener("abort", onExternalAbort);
   }
 }
 
@@ -312,8 +375,12 @@ async function fetchJsonWithLocalFallback<T>(
 
   let res: Response;
   try {
-    const earlyRes = !isLocalhost() ? await consumeEarlyFetch(path, signal) : null;
-    res = earlyRes || (await fetch(path, { signal }));
+    if (!isLocalhost() && backupOrigin) {
+      res = await fetchPrimaryWithTimeout(path, signal);
+    } else {
+      const earlyRes = !isLocalhost() ? await consumeEarlyFetch(path, signal) : null;
+      res = earlyRes || (await fetch(path, { signal }));
+    }
   } catch (err: any) {
     if (
       err?.name !== "AbortError" &&
@@ -353,7 +420,16 @@ async function fetchJsonWithLocalFallback<T>(
     throw new Error(`HTTP ${res.status}`);
   }
 
-  const data = await res.json();
+  let data: any;
+  try {
+    data = await res.json();
+  } catch (err) {
+    if (!signal?.aborted && !isLocalhost() && backupOrigin) {
+      activateBackupApi();
+      return fetchJsonFromOrigin<T>(`${backupOrigin}${path}`, signal);
+    }
+    throw err;
+  }
 
   if (
     isLocalhost() &&

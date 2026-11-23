@@ -1,5 +1,9 @@
 import type HlsType from "hls.js";
-import { buildVodProxyUrl, isBackupApiActive } from "../api";
+import {
+  buildVodProxyUrl,
+  getBackupVodProxyUrl,
+  isBackupApiActive,
+} from "../api";
 import { stripM3u8Ads } from "../m3u8Filter";
 import {
   createVideoUpscaler,
@@ -232,6 +236,7 @@ export function createHlsPlayer(
 
   let useProxy =
     Boolean(options.forceProxy) || (allowProxyFallback && isHttpOnHttps);
+  let useBackupManifest = false;
 
   const getEffectiveSrc = () => {
     if (useProxy) {
@@ -403,6 +408,18 @@ export function createHlsPlayer(
         pendingSeek = video.currentTime || pendingSeek;
         useProxy = true;
         void startPlayback();
+      } else if (
+        !useBackupManifest &&
+        !isBackupApiActive() &&
+        !options.src.toLowerCase().includes(".mp4") &&
+        video.canPlayType("application/vnd.apple.mpegurl") &&
+        (video.currentSrc || video.src || "").includes("/api/vod/proxy") &&
+        getBackupVodProxyUrl(options.src)
+      ) {
+        pendingSeek = video.currentTime || pendingSeek;
+        useBackupManifest = true;
+        useProxy = false;
+        void startPlayback();
       } else {
         options.onError?.();
       }
@@ -546,10 +563,14 @@ export function createHlsPlayer(
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       const alreadyProxied = options.src.startsWith("/api/vod/proxy");
-      video.src =
-        useProxy || alreadyProxied
-          ? effectiveSrc
-          : buildVodProxyUrl(options.src, "manifest");
+      const backupManifestUrl = useBackupManifest
+        ? getBackupVodProxyUrl(options.src)
+        : null;
+      video.src = backupManifestUrl
+        ? backupManifestUrl
+        : useProxy || alreadyProxied
+        ? effectiveSrc
+        : buildVodProxyUrl(options.src, "manifest");
       video.addEventListener(
         "loadedmetadata",
         () => {

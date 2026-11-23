@@ -3,6 +3,9 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist"
 
+[vars]
+VITE_BACKUP_API_ORIGIN = "https://101movies-api.vercel.app"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "101movies-sync"

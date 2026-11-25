@@ -524,7 +524,7 @@ function bootstrap() {
   initRouter(mainStage, (pathname) => {
     currentPath = pathname;
     updateBottomNav();
-    kickIosStandaloneBlurFix();
+    syncIosStandaloneViewport();
     void checkForNewBundle(currentPath);
     if (pathname === "/history" || pathname === "/saved" || pathname === "/watch-later") {
       void pullSyncState();

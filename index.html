@@ -7,6 +7,17 @@
     <link rel="dns-prefetch" href="https://image.tmdb.org" />
     <script>
       (function () {
+        try {
+          if (window.navigator && window.navigator.standalone === true) {
+            var de = document.documentElement;
+            if ((" " + de.className + " ").indexOf(" ios-standalone ") === -1) {
+              de.className = de.className ? de.className + " ios-standalone" : "ios-standalone";
+            }
+            if (window.innerHeight > 0) {
+              de.style.setProperty("--app-height", Math.round(window.innerHeight) + "px");
+            }
+          }
+        } catch (e) {}
         if (typeof window.fetch !== "function") return;
         var host = window.location.hostname;
         if (host === "localhost" || host === "127.0.0.1") return;
@@ -152,7 +163,6 @@
     <!-- Mobile / Smart TV App Capabilities -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="101Movies" />
     <meta name="application-name" content="101Movies" />
 

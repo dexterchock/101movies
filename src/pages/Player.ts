@@ -1544,8 +1544,8 @@ export function mount(
             sBtn.type = "button";
             sBtn.className =
               derived.safeSeasonIndex === sIdx
-                ? "season-btn is-active"
-                : "season-btn";
+                ? "season-btn is-active tabular-nums"
+                : "season-btn tabular-nums";
             sBtn.tabIndex = 0;
             const sLabel = isZh()
               ? t("player.seasonName", { season: season.seasonNumber })

@@ -240,18 +240,33 @@ export function isIosWebKit(): boolean {
   return isIosStandalone() || /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
 }
 
+function measureSafeAreaTopInset(): number {
+  if (typeof document === "undefined" || !document.body) return 0;
+  try {
+    if (!safeAreaProbeEl || !document.body.contains(safeAreaProbeEl)) {
+      safeAreaProbeEl = document.createElement("div");
+      safeAreaProbeEl.className = "safe-area-probe";
+      safeAreaProbeEl.setAttribute("aria-hidden", "true");
+      document.body.appendChild(safeAreaProbeEl);
+    }
+    const cs = window.getComputedStyle(safeAreaProbeEl);
+    return parseFloat(cs.paddingTop) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 /**
- * Suppress iOS 26/27 top progressive blur (`WKUIScrollEdgeEffect`) on both installed PWAs
- * and Safari webpages by keeping a solid `#000000` fixed shield pinned at `top: 0`
- * (>= 12px tall, full width, high z-index) so WebKit's `(W/2, 4)` hit-test always hits it,
- * and nudging `paddingBottom` (`1px` -> `0px`) across animation frames to trigger
- * `setNeedsFixedContainerEdgesUpdate()` without moving the shield out of `y = 4px`.
+ * Suppress iOS 26/27 top progressive blur (`WKUIScrollEdgeEffect`) on installed standalone PWAs
+ * by keeping a solid `#000000` fixed shield pinned at `top: 0` (11px tall, high z-index, zero paint
+ * via `background-clip: text`), and nudging `paddingBottom` (`1px` -> `0px`) across animation frames
+ * to trigger `setNeedsFixedContainerEdgesUpdate()` on navigation/visibility changes.
  */
 export function kickIosStandaloneBlurFix(): void {
   if (
     typeof document === "undefined" ||
     !document.body ||
-    (!isIosWebKit() && !isIosStandalone())
+    !isIosStandalone()
   ) {
     return;
   }
@@ -289,21 +304,37 @@ export function kickIosStandaloneBlurFix(): void {
   }
 }
 
-/** Sync `--app-height` and `html.ios-standalone` to bypass WebKit's standalone `viewport-fit=cover` bottom truncation bug. */
+/** Sync `--app-height` and `html.ios-standalone` for standalone PWAs (without touching iOS Safari). */
 export function syncIosStandaloneViewport(): number | null {
   if (typeof document === "undefined") return null;
   const docEl = document.documentElement;
   if (!isIosStandalone()) {
-    docEl.classList.remove("ios-standalone");
+    docEl.classList.remove("ios-standalone", "ios-standalone-legacy");
     docEl.style.removeProperty("--app-height");
-    if (isIosWebKit()) {
-      kickIosStandaloneBlurFix();
-    }
     return null;
   }
 
   docEl.classList.add("ios-standalone");
   kickIosStandaloneBlurFix();
+  const topInset = measureSafeAreaTopInset();
+  if (topInset <= 1) {
+    // Installed without black-translucent: status bar is outside the layout viewport (_obscuredInsets.top > 0),
+    // while CSS 100vh/100dvh has WebKit Bug 316008 (includes status bar height). Use visualViewport/innerHeight.
+    docEl.classList.remove("ios-standalone-legacy");
+    const vvH = window.visualViewport?.height;
+    const visibleH = Math.round(
+      vvH && vvH > 0 ? vvH : window.innerHeight
+    );
+    if (visibleH > 0 && Number.isFinite(visibleH)) {
+      docEl.style.setProperty("--app-height", `${visibleH}px`);
+      return visibleH;
+    }
+    docEl.style.removeProperty("--app-height");
+    return null;
+  }
+
+  // Legacy cached black-translucent WebClip (env(safe-area-inset-top) > 1): recover bottom truncation via screen dimension.
+  docEl.classList.add("ios-standalone-legacy");
   const sw = window.screen?.width ?? 0;
   const sh = window.screen?.height ?? 0;
   const iw = window.innerWidth;

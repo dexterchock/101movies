@@ -220,7 +220,7 @@ export interface ResponsiveGridState {
 }
 
 let safeAreaProbeEl: HTMLDivElement | null = null;
-let iosTopShieldEl: HTMLDivElement | null = null;
+let iosTopShieldEl: HTMLElement | null = null;
 let iosTopShieldRaf = 0;
 
 export function isIosStandalone(): boolean {
@@ -228,28 +228,54 @@ export function isIosStandalone(): boolean {
   return (window.navigator as { standalone?: boolean }).standalone === true;
 }
 
+export function isIosWebKit(): boolean {
+  if (typeof navigator === "undefined") return false;
+  if (
+    typeof CSS !== "undefined" &&
+    typeof CSS.supports === "function" &&
+    CSS.supports("-webkit-touch-callout", "none")
+  ) {
+    return true;
+  }
+  return isIosStandalone() || /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+}
+
 /**
- * Remove iOS 26/27 standalone PWA's forced top progressive blur by dynamically moving
- * a painted full-width fixed black strip from `top: 5px` into `top <= 4px` (`0px`).
+ * Suppress iOS 26/27 top progressive blur (`WKUIScrollEdgeEffect`) on both installed PWAs
+ * and Safari webpages by keeping a solid `#000000` fixed shield pinned at `top: 0`
+ * (>= 12px tall, full width, high z-index) so WebKit's `(W/2, 4)` hit-test always hits it,
+ * and nudging `paddingBottom` (`1px` -> `0px`) across animation frames to trigger
+ * `setNeedsFixedContainerEdgesUpdate()` without moving the shield out of `y = 4px`.
  */
 export function kickIosStandaloneBlurFix(): void {
-  if (typeof document === "undefined" || !isIosStandalone() || !document.body) {
+  if (
+    typeof document === "undefined" ||
+    !document.body ||
+    (!isIosWebKit() && !isIosStandalone())
+  ) {
     return;
   }
   if (!iosTopShieldEl || !document.body.contains(iosTopShieldEl)) {
-    iosTopShieldEl = document.createElement("div");
-    iosTopShieldEl.className = "ios-pwa-top-shield";
-    iosTopShieldEl.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iosTopShieldEl);
+    const existing = document.getElementById("ios-top-edge-shield");
+    if (existing) {
+      iosTopShieldEl = existing;
+    } else {
+      const created = document.createElement("div");
+      created.id = "ios-top-edge-shield";
+      created.className = "top-edge-shield";
+      created.setAttribute("aria-hidden", "true");
+      document.body.insertBefore(created, document.body.firstChild);
+      iosTopShieldEl = created;
+    }
   }
   const el = iosTopShieldEl;
   if (iosTopShieldRaf && typeof cancelAnimationFrame === "function") {
     cancelAnimationFrame(iosTopShieldRaf);
     iosTopShieldRaf = 0;
   }
-  el.style.top = "5px";
+  el.style.paddingBottom = "1px";
   const settle = () => {
-    el.style.top = "0px";
+    el.style.paddingBottom = "0px";
   };
   if (typeof requestAnimationFrame === "function") {
     iosTopShieldRaf = requestAnimationFrame(() => {
@@ -270,6 +296,9 @@ export function syncIosStandaloneViewport(): number | null {
   if (!isIosStandalone()) {
     docEl.classList.remove("ios-standalone");
     docEl.style.removeProperty("--app-height");
+    if (isIosWebKit()) {
+      kickIosStandaloneBlurFix();
+    }
     return null;
   }
 

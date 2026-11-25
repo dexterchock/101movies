@@ -1103,9 +1103,10 @@ export function mount(
     const renderWatchLaterBtn = (saved: boolean) => {
       watchLaterBtn.classList.toggle("is-saved", saved);
       watchLaterBtn.setAttribute("aria-pressed", String(saved));
-      watchLaterBtn.innerHTML = `${icons.bookmark("", 15)}<span>${escapeHtml(
-        saved ? t("player.saved") : t("player.save")
-      )}</span>`;
+      watchLaterBtn.innerHTML = `<span class="player-action-btn-inner">${icons.bookmark(
+        "",
+        15
+      )}<span>${escapeHtml(saved ? t("player.saved") : t("player.save"))}</span></span>`;
     };
     renderWatchLaterBtn(isInWatchLater(type, details.id));
     watchLaterBtn.addEventListener("click", () => {
@@ -1135,7 +1136,10 @@ export function mount(
     imdbLink.setAttribute("aria-label", t("player.imdbAria"));
     imdbLink.tabIndex = 0;
     imdbLink.href = imdbHref;
-    imdbLink.innerHTML = `<span>IMDb</span>${icons.externalLink("", 14)}`;
+    imdbLink.innerHTML = `<span class="player-action-btn-inner"><span>IMDb</span>${icons.externalLink(
+      "",
+      14
+    )}</span>`;
     actionsRow.appendChild(imdbLink);
 
     info.appendChild(actionsRow);
@@ -1207,7 +1211,9 @@ export function mount(
       retryBtn.type = "button";
       retryBtn.className = "server-pill";
       retryBtn.tabIndex = 0;
-      retryBtn.textContent = t("player.retry");
+      retryBtn.innerHTML = `<span class="server-pill-inner"><span class="server-pill-name">${escapeHtml(
+        t("player.retry")
+      )}</span></span>`;
       retryBtn.addEventListener("click", () => loadVodStreams(true));
 
       row.append(msg, retryBtn);
@@ -1266,7 +1272,7 @@ export function mount(
 
       btn.innerHTML = `
         <span class="server-pill-inner">
-          <span>${escapeHtml(label)}</span>
+          <span class="server-pill-name">${escapeHtml(label)}</span>
           <span class="${qualityClass}">${escapeHtml(effectiveQuality)}</span>
           <span class="latency-label tabular-nums">${src.latencyMs}ms</span>
         </span>
@@ -1494,9 +1500,9 @@ export function mount(
           sortBtn.setAttribute("aria-label", sortLabel);
           sortBtn.setAttribute("aria-pressed", String(effectiveSortDesc));
           sortBtn.title = sortLabel;
-          sortBtn.innerHTML = `<span class="episodes-trigger-inner">${icons.arrowUpDown(
+          sortBtn.innerHTML = `<span class="popover-icon-inner">${icons.arrowUpDown(
             "",
-            14
+            15
           )}</span>`;
           sortBtn.addEventListener("click", () => {
             const wasFocused = document.activeElement === sortBtn;
@@ -1516,7 +1522,7 @@ export function mount(
         closeBtn.type = "button";
         closeBtn.className = "episodes-popover-close";
         closeBtn.setAttribute("aria-label", t("player.closeEpisodesAria"));
-        closeBtn.innerHTML = `<span class="episodes-trigger-inner">${icons.x(
+        closeBtn.innerHTML = `<span class="popover-icon-inner">${icons.x(
           "",
           16,
           2
@@ -1529,6 +1535,7 @@ export function mount(
         header.appendChild(headerActions);
         popover.appendChild(header);
 
+        let seasonBarRef: HTMLDivElement | null = null;
         if (derived.hasMultipleSeasons) {
           const seasonBar = document.createElement("div");
           seasonBar.className = "season-bar no-scrollbar";
@@ -1540,9 +1547,10 @@ export function mount(
                 ? "season-btn is-active"
                 : "season-btn";
             sBtn.tabIndex = 0;
-            sBtn.textContent = isZh()
+            const sLabel = isZh()
               ? t("player.seasonName", { season: season.seasonNumber })
               : season.name;
+            sBtn.innerHTML = `<span class="season-btn-inner">${escapeHtml(sLabel)}</span>`;
             sBtn.addEventListener("click", () => {
               activeSeasonIndex = sIdx;
               activeEpisodeIndex = 0;
@@ -1550,6 +1558,7 @@ export function mount(
             });
             seasonBar.appendChild(sBtn);
           });
+          seasonBarRef = seasonBar;
           popover.appendChild(seasonBar);
         }
 
@@ -1573,11 +1582,14 @@ export function mount(
           epBtn.tabIndex = 0;
           if (layoutMode === "list") {
             const labelSpan = document.createElement("span");
-            labelSpan.className = "episode-btn-label";
+            labelSpan.className = "episode-btn-inner episode-btn-label";
             labelSpan.textContent = epLabel;
             epBtn.appendChild(labelSpan);
           } else {
-            epBtn.textContent = epLabel;
+            const innerSpan = document.createElement("span");
+            innerSpan.className = "episode-btn-inner";
+            innerSpan.textContent = epLabel;
+            epBtn.appendChild(innerSpan);
           }
           epBtn.addEventListener("click", () => {
             const targetServerIdx =
@@ -1599,6 +1611,19 @@ export function mount(
           shouldScrollActiveEp = false;
           window.requestAnimationFrame(() => {
             if (signal.aborted) return;
+            if (seasonBarRef && seasonBarRef.scrollHeight > seasonBarRef.clientHeight) {
+              const activeSeasonBtn =
+                seasonBarRef.querySelector<HTMLElement>(".season-btn.is-active");
+              if (activeSeasonBtn) {
+                const sbRect = seasonBarRef.getBoundingClientRect();
+                const sBtnRect = activeSeasonBtn.getBoundingClientRect();
+                const targetSeasonTop =
+                  seasonBarRef.scrollTop +
+                  (sBtnRect.top - sbRect.top) -
+                  Math.max(0, (seasonBarRef.clientHeight - sBtnRect.height) / 2);
+                seasonBarRef.scrollTop = Math.max(0, targetSeasonTop);
+              }
+            }
             const activeBtn =
               epGrid.querySelector<HTMLElement>(".episode-btn.is-active");
             if (!activeBtn) return;
@@ -1644,7 +1669,13 @@ export function mount(
   window.addEventListener(
     "keydown",
     (e) => {
-      if (e.key === "Escape" || e.key === "BrowserBack" || e.key === "GoBack") {
+      if (
+        e.key === "Escape" ||
+        e.key === "BrowserBack" ||
+        e.key === "GoBack" ||
+        e.keyCode === 10009 ||
+        e.key === "XF86Back"
+      ) {
         if (
           document.fullscreenElement ||
           (document as any).webkitFullscreenElement

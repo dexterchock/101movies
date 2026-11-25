@@ -389,7 +389,9 @@ svg {
 
 .top-bar {
   flex-shrink: 0;
-  position: relative;
+  position: sticky;
+  top: 0;
+  background-color: #000000;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -664,7 +666,8 @@ svg {
   transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.pill-arrow-btn:not(:disabled):hover .pill-arrow-icon {
+.pill-arrow-btn:not(:disabled):hover .pill-arrow-icon,
+.pill-arrow-btn:not(:disabled):focus-visible .pill-arrow-icon {
   transform: scale(1.25);
 }
 
@@ -929,6 +932,7 @@ svg {
 
 .page-nav-btn:hover {
   background-color: rgba(38, 38, 38, 0.8);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .page-nav-btn:focus-visible {
@@ -1012,9 +1016,10 @@ svg {
     transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.clear-history-btn:hover .clear-history-btn-inner {
+.clear-history-btn:hover .clear-history-btn-inner,
+.clear-history-btn:focus-visible .clear-history-btn-inner {
   opacity: 1;
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 @media (min-width: 640px) {
@@ -1081,8 +1086,9 @@ svg {
   transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.sync-btn:hover .sync-btn-inner {
-  transform: scale(1.05);
+.sync-btn:hover .sync-btn-inner,
+.sync-btn:focus-visible .sync-btn-inner {
+  transform: scale(1.06);
 }
 
 .sync-btn-dot {
@@ -1193,7 +1199,8 @@ svg {
     transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.search-clear-btn:hover .search-clear-inner {
+.search-clear-btn:hover .search-clear-inner,
+.search-clear-btn:focus-visible .search-clear-inner {
   opacity: 1;
   transform: scale(1.25);
 }
@@ -1746,7 +1753,7 @@ svg {
   justify-content: center;
   cursor: pointer;
   outline: none;
-  transition: opacity 250ms ease, transform 250ms ease, background-color 250ms ease,
+  transition: opacity 250ms ease, background-color 250ms ease,
     border-color 250ms ease;
 }
 
@@ -1755,6 +1762,7 @@ svg {
   height: 12px;
   display: block;
   flex-shrink: 0;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 @media (hover: none) {
@@ -1770,16 +1778,17 @@ svg {
 
 .media-card-remove:focus-visible {
   opacity: 1;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
 .media-card-remove:hover {
   background-color: rgba(38, 38, 38, 0.95);
   border-color: rgba(255, 255, 255, 0.6);
-  transform: scale(1.08);
 }
 
-.media-card-remove:active {
-  transform: scale(0.95);
+.media-card-remove:hover .media-card-remove-icon,
+.media-card-remove:focus-visible .media-card-remove-icon {
+  transform: scale(1.2);
 }
 
 .media-card-meta {
@@ -2365,8 +2374,22 @@ svg {
   white-space: nowrap;
   cursor: pointer;
   outline: none;
-  transition: transform 250ms ease, background-color 250ms ease,
-    border-color 250ms ease, color 250ms ease, filter 250ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease,
+    color 250ms ease, filter 250ms ease;
+}
+
+.player-action-btn-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.watch-later-btn:hover .player-action-btn-inner,
+.watch-later-btn:focus-visible .player-action-btn-inner,
+.imdb-btn:hover .player-action-btn-inner,
+.imdb-btn:focus-visible .player-action-btn-inner {
+  transform: scale(1.07);
 }
 
 .watch-later-btn {
@@ -2380,7 +2403,6 @@ svg {
 .watch-later-btn:hover {
   background-color: rgba(38, 38, 38, 0.9);
   border-color: rgba(255, 255, 255, 0.4);
-  transform: scale(1.03);
 }
 
 .watch-later-btn.is-saved {
@@ -2402,12 +2424,15 @@ svg {
 
 .imdb-btn:hover {
   filter: brightness(1.08);
-  transform: scale(1.03);
 }
 
-.watch-later-btn:focus-visible,
+.watch-later-btn:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.watch-later-btn.is-saved:focus-visible,
 .imdb-btn:focus-visible {
-  box-shadow: 0 0 0 3px #ffffff;
+  box-shadow: 0 0 0 2px #000000, 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
 @media (min-width: 640px) {
@@ -2555,6 +2580,10 @@ svg {
   font-weight: 700;
 }
 
+.server-pill.is-selected:focus-visible {
+  box-shadow: 0 0 0 2px #000000, 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
 .server-pill.is-high-ping {
   color: #fca5a5;
   background-color: rgba(69, 10, 10, 0.6);
@@ -2581,12 +2610,9 @@ svg {
   transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.server-pill:hover .server-pill-inner {
-  transform: scale(1.05);
-}
-
+.server-pill:hover .server-pill-inner,
 .server-pill:focus-visible .server-pill-inner {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 .quality-badge {
@@ -2674,11 +2700,12 @@ svg {
   color: #ffffff;
   cursor: pointer;
   outline: none;
-  transition: background-color 300ms ease;
+  transition: background-color 300ms ease, border-color 300ms ease;
 }
 
-.server-nav-btn:hover {
+.server-nav-btn:not(:disabled):hover {
   background-color: rgba(38, 38, 38, 0.8);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .server-nav-btn:focus-visible {
@@ -2698,7 +2725,8 @@ svg {
   transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.server-nav-btn:not(:disabled):hover .server-nav-icon {
+.server-nav-btn:not(:disabled):hover .server-nav-icon,
+.server-nav-btn:not(:disabled):focus-visible .server-nav-icon {
   transform: scale(1.25);
 }
 
@@ -2785,12 +2813,11 @@ svg {
   transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.episodes-trigger-btn:hover .episodes-trigger-inner {
-  transform: scale(1.05);
-}
-
+.resume-pill:hover .episodes-trigger-inner,
+.resume-pill:focus-visible .episodes-trigger-inner,
+.episodes-trigger-btn:hover .episodes-trigger-inner,
 .episodes-trigger-btn:focus-visible .episodes-trigger-inner {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 .episodes-popover {
@@ -2798,10 +2825,10 @@ svg {
   bottom: 100%;
   right: 0;
   margin-bottom: 12px;
-  width: 380px;
+  width: 396px;
   max-width: calc(100vw - 32px);
-  width: min(380px, calc(100vw - 32px));
-  max-height: 60vh;
+  width: min(396px, calc(100vw - 32px));
+  max-height: 68vh;
   border-radius: 24px;
   background-color: rgba(18, 18, 18, 0.96);
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -2814,7 +2841,7 @@ svg {
 .episodes-popover--wide {
   width: 440px;
   width: min(440px, calc(100vw - 32px));
-  max-height: 65vh;
+  max-height: 68vh;
 }
 
 .episodes-popover-header {
@@ -2831,7 +2858,7 @@ svg {
 .episodes-popover-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -2840,23 +2867,36 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 9999px;
-  color: #ffffff;
+  background-color: rgba(23, 23, 23, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
   outline: none;
-  transition: background-color 200ms ease, color 200ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease, color 250ms ease;
 }
 
-.episodes-popover-action {
-  color: rgba(255, 255, 255, 0.72);
+.popover-icon-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .episodes-popover-action:hover,
 .episodes-popover-close:hover {
-  background-color: rgba(38, 38, 38, 0.8);
+  background-color: rgba(38, 38, 38, 0.85);
+  border-color: rgba(255, 255, 255, 0.3);
   color: #ffffff;
+}
+
+.episodes-popover-action:hover .popover-icon-inner,
+.episodes-popover-action:focus-visible .popover-icon-inner,
+.episodes-popover-close:hover .popover-icon-inner,
+.episodes-popover-close:focus-visible .popover-icon-inner {
+  transform: scale(1.2);
 }
 
 .episodes-popover-action:focus-visible,
@@ -2865,17 +2905,33 @@ svg {
 }
 
 .episodes-popover-action.is-active {
-  background-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background-color: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+}
+
+.episodes-popover-action.is-active:hover {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: #ffffff;
+  color: #000000;
+}
+
+.episodes-popover-action.is-active:focus-visible {
+  box-shadow: 0 0 0 2px #121212, 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
 .season-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  align-content: flex-start;
   gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
+  max-height: 114px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 2px 2px 12px 2px;
+  margin: -2px -2px 12px -2px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
 }
@@ -2884,8 +2940,8 @@ svg {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
-  padding: 0 14px;
+  height: 30px;
+  padding: 0 12px;
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 500;
@@ -2897,12 +2953,23 @@ svg {
   border: 1px solid rgba(255, 255, 255, 0.15);
   background-color: rgba(23, 23, 23, 0.7);
   color: rgba(255, 255, 255, 0.8);
-  transition: background-color 200ms ease, color 200ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease, color 250ms ease;
+}
+
+.season-btn-inner {
+  display: inline-block;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .season-btn:hover {
   background-color: rgba(38, 38, 38, 0.8);
+  border-color: rgba(255, 255, 255, 0.25);
   color: #ffffff;
+}
+
+.season-btn:hover .season-btn-inner,
+.season-btn:focus-visible .season-btn-inner {
+  transform: scale(1.08);
 }
 
 .season-btn:focus-visible {
@@ -2916,6 +2983,10 @@ svg {
   font-weight: 700;
 }
 
+.season-btn.is-active:focus-visible {
+  box-shadow: 0 0 0 2px #121212, 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
 .episodes-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2927,7 +2998,8 @@ svg {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-right: 2px;
+  padding: 2px;
+  margin: -2px;
 }
 
 .episodes-grid--medium {
@@ -2954,6 +3026,9 @@ svg {
 }
 
 .episode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 36px;
   padding: 8px 10px;
   border-radius: 12px;
@@ -2962,7 +3037,6 @@ svg {
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   cursor: pointer;
   outline: none;
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -2971,7 +3045,16 @@ svg {
   transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
 }
 
+.episode-btn-inner {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
 .episodes-grid--list .episode-btn {
+  justify-content: flex-start;
   text-align: left;
   white-space: normal;
   padding: 8px 12px;
@@ -2993,6 +3076,16 @@ svg {
   color: #ffffff;
 }
 
+.episode-btn:hover .episode-btn-inner,
+.episode-btn:focus-visible .episode-btn-inner {
+  transform: scale(1.08);
+}
+
+.episodes-grid--list .episode-btn:hover .episode-btn-inner,
+.episodes-grid--list .episode-btn:focus-visible .episode-btn-inner {
+  transform: scale(1.03);
+}
+
 .episode-btn:focus-visible {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
@@ -3002,6 +3095,10 @@ svg {
   color: #000000;
   border-color: #ffffff;
   font-weight: 700;
+}
+
+.episode-btn.is-active:focus-visible {
+  box-shadow: 0 0 0 2px #121212, 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
 @media (min-width: 640px) {
@@ -3119,8 +3216,8 @@ svg {
   max-width: 56rem;
   max-height: 85vh;
   border-radius: 24px;
-  background-color: #121212;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background-color: rgba(18, 18, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   overflow: hidden;
   color: #ffffff;
 }
@@ -3176,43 +3273,37 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 9999px;
   background-color: rgba(23, 23, 23, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
   flex-shrink: 0;
   outline: none;
-  transition: background-color 250ms ease, border-color 250ms ease,
-    transform 250ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease, color 250ms ease;
 }
 
 .sync-modal-close:hover {
-  background-color: rgba(38, 38, 38, 0.9);
+  background-color: rgba(38, 38, 38, 0.85);
   border-color: rgba(255, 255, 255, 0.3);
-  transform: scale(1.06);
+  color: #ffffff;
 }
 
 .sync-modal-close:focus-visible {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
-  transform: scale(1.06);
-}
-
-.sync-modal-close:active {
-  transform: scale(0.96);
 }
 
 .sync-modal-close-icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .sync-modal-close:hover .sync-modal-close-icon,
 .sync-modal-close:focus-visible .sync-modal-close-icon {
-  transform: scale(1.18);
+  transform: scale(1.2);
 }
 
 .sync-modal-body {
@@ -3391,24 +3482,17 @@ svg {
   line-height: 1;
   cursor: pointer;
   outline: none;
-  transition: background-color 250ms ease, border-color 250ms ease,
-    color 250ms ease, transform 250ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease, color 250ms ease;
 }
 
 .sync-stop-btn:hover {
   background-color: rgba(255, 255, 255, 0.13);
   border-color: rgba(255, 255, 255, 0.32);
   color: #ffffff;
-  transform: scale(1.02);
 }
 
 .sync-stop-btn:focus-visible {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
-  transform: scale(1.02);
-}
-
-.sync-stop-btn:active {
-  transform: scale(0.98);
 }
 
 .sync-stop-btn[hidden] {
@@ -3443,23 +3527,16 @@ svg {
   white-space: nowrap;
   cursor: pointer;
   outline: none;
-  transition: background-color 250ms ease, border-color 250ms ease,
-    color 250ms ease, transform 250ms ease;
+  transition: background-color 250ms ease, border-color 250ms ease, color 250ms ease;
 }
 
 .sync-choice-btn:hover {
   background-color: rgba(255, 255, 255, 0.16);
   border-color: rgba(255, 255, 255, 0.35);
-  transform: scale(1.02);
 }
 
 .sync-choice-btn:focus-visible {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
-  transform: scale(1.02);
-}
-
-.sync-choice-btn:active {
-  transform: scale(0.98);
 }
 
 .sync-choice-btn--danger {
@@ -3485,7 +3562,7 @@ svg {
 .sync-stop-btn:focus-visible .sync-action-btn-inner,
 .sync-choice-btn:hover .sync-action-btn-inner,
 .sync-choice-btn:focus-visible .sync-action-btn-inner {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 /* =========================================================
@@ -3601,7 +3678,9 @@ html.no-focus-visible .episode-btn:focus {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
-html.no-focus-visible .page-nav-btn:not(:disabled):focus .page-nav-icon {
+html.no-focus-visible .page-nav-btn:not(:disabled):focus .page-nav-icon,
+html.no-focus-visible .pill-arrow-btn:not(:disabled):focus .pill-arrow-icon,
+html.no-focus-visible .server-nav-btn:not(:disabled):focus .server-nav-icon {
   transform: scale(1.25);
 }
 
@@ -3616,22 +3695,17 @@ html.no-focus-visible .sync-choice-btn:focus {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
-html.no-focus-visible .sync-modal-close:focus {
-  transform: scale(1.06);
-}
-
-html.no-focus-visible .sync-modal-close:focus .sync-modal-close-icon {
-  transform: scale(1.18);
-}
-
-html.no-focus-visible .sync-stop-btn:focus,
-html.no-focus-visible .sync-choice-btn:focus {
-  transform: scale(1.02);
+html.no-focus-visible .sync-modal-close:focus .sync-modal-close-icon,
+html.no-focus-visible .episodes-popover-action:focus .popover-icon-inner,
+html.no-focus-visible .episodes-popover-close:focus .popover-icon-inner {
+  transform: scale(1.2);
 }
 
 html.no-focus-visible .sync-stop-btn:focus .sync-action-btn-inner,
-html.no-focus-visible .sync-choice-btn:focus .sync-action-btn-inner {
-  transform: scale(1.05);
+html.no-focus-visible .sync-choice-btn:focus .sync-action-btn-inner,
+html.no-focus-visible .sync-btn:focus .sync-btn-inner,
+html.no-focus-visible .clear-history-btn:focus .clear-history-btn-inner {
+  transform: scale(1.06);
 }
 
 html.no-focus-visible .media-card-remove:focus {
@@ -3640,34 +3714,80 @@ html.no-focus-visible .media-card-remove:focus {
 
 html.no-focus-visible .watch-later-btn:focus,
 html.no-focus-visible .imdb-btn:focus {
-  box-shadow: 0 0 0 3px #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
-html.no-focus-visible .server-pill:focus .server-pill-inner,
-html.no-focus-visible .episodes-trigger-btn:focus .episodes-trigger-inner {
-  transform: scale(1.05);
-}
-
-html.no-focus-visible .episodes-trigger-btn:focus {
+html.no-focus-visible .watch-later-btn.is-saved:focus,
+html.no-focus-visible .imdb-btn:focus {
   box-shadow: 0 0 0 2px #000000, 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
-/* NOTE: iOS standalone PWA fixes (viewport-fit=cover + black-translucent):
-   1. Recover WebKit's ~safe-area-inset-top bottom truncation bug via JS-measured --app-height.
-   2. Disable iOS 26/27 forced top progressive blur via `.ios-pwa-top-shield` (fixed solid strip moved from 5px -> 0px).
-   3. Blend portrait Player backdrop top edge softly into #000000 behind the status bar without pushing the layout low. */
-.ios-pwa-top-shield {
-  position: fixed;
-  top: 5px;
-  left: 0;
-  right: 0;
-  width: 100%;
-  height: 12px;
-  background-color: #000000;
-  pointer-events: none;
-  z-index: 2;
+html.no-focus-visible .watch-later-btn:focus .player-action-btn-inner,
+html.no-focus-visible .imdb-btn:focus .player-action-btn-inner {
+  transform: scale(1.07);
 }
 
+html.no-focus-visible .server-pill:focus .server-pill-inner,
+html.no-focus-visible .resume-pill:focus .episodes-trigger-inner,
+html.no-focus-visible .episodes-trigger-btn:focus .episodes-trigger-inner {
+  transform: scale(1.06);
+}
+
+html.no-focus-visible .season-btn:focus .season-btn-inner,
+html.no-focus-visible .episode-btn:focus .episode-btn-inner {
+  transform: scale(1.08);
+}
+
+html.no-focus-visible .episodes-trigger-btn:focus,
+html.no-focus-visible .server-pill.is-selected:focus {
+  box-shadow: 0 0 0 2px #000000, 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
+html.no-focus-visible .episodes-popover-action.is-active:focus,
+html.no-focus-visible .season-btn.is-active:focus,
+html.no-focus-visible .episode-btn.is-active:focus {
+  box-shadow: 0 0 0 2px #121212, 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
+/* Top fixed solid shield for WebKit fixedContainerEdges / TopScrollPocket suppression on iOS 26/27 (Safari & PWA) */
+.top-edge-shield {
+  display: none;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .top-edge-shield {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 12px;
+    height: max(12px, env(safe-area-inset-top, 0px));
+    background-color: #000000;
+    pointer-events: none;
+    z-index: 95;
+  }
+
+  .player-hero::before {
+    content: "";
+    position: absolute;
+    top: 12px;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    left: 0;
+    right: 0;
+    height: 18px;
+    z-index: 3;
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.78) 0%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+}
+
+/* NOTE: iOS standalone PWA fixes (viewport-fit=cover): recover WebKit's bottom truncation bug via JS-measured --app-height. */
 html.ios-standalone,
 html.ios-standalone body {
   height: var(--app-height, 100vh);
@@ -3693,65 +3813,23 @@ html.ios-standalone .modal-backdrop {
   min-height: var(--app-height, 100dvh);
 }
 
-@media (orientation: portrait) {
-  html.ios-standalone .player-hero::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: calc(env(safe-area-inset-top, 0px) + 12px);
-    z-index: 3;
-    background: linear-gradient(
-      to bottom,
-      #000000 0%,
-      rgba(0, 0, 0, 0.72) 55%,
-      transparent 100%
-    );
-    pointer-events: none;
-  }
-}
-
-@media (max-width: 639px) {
-  html.ios-standalone .top-bar {
-    padding-top: calc(6px + env(safe-area-inset-top, 0px));
-  }
-
-  html.ios-standalone .back-btn-wrap {
-    top: 6px;
-  }
-
-  html.ios-standalone .player-video-wrap {
-    margin-top: calc(env(safe-area-inset-top, 0px) + 50px);
-  }
-
-  html.ios-standalone .player-video-wrap:fullscreen,
-  html.ios-standalone .player-video-wrap:-webkit-full-screen {
-    margin-top: 0;
-  }
-
-  html.ios-standalone .player-backdrop--poster {
-    padding-top: calc(16px + env(safe-area-inset-top, 0px));
-  }
-}
-
 /* Optical vertical centering for Latin cap-height labels inside pill buttons */
 @supports (text-box-trim: trim-both) {
   .back-btn-inner > span,
+  .player-action-btn-inner > span,
   .watch-later-btn > span,
   .imdb-btn > span,
   .server-pill-name,
   .resume-pill > span,
   .episodes-trigger-inner > span,
-  .season-btn,
-  .capsule-btn,
-  .pill-btn,
+  .season-btn-inner,
+  .capsule-btn-label,
+  .pill-btn-label,
   .clear-history-btn-inner > span,
   .sync-btn > span,
-  .sync-stop-btn,
-  .sync-choice-btn,
+  .sync-action-btn-inner,
   .bottom-nav-link-inner > span,
-  .lang-toggle-btn {
+  .lang-toggle-btn-label {
     text-box-trim: trim-both;
     text-box-edge: cap alphabetic;
   }
@@ -3856,8 +3934,7 @@ html.ios-standalone .modal-backdrop {
     margin-left: 10px;
   }
 
-  .watch-later-btn > * + *,
-  .imdb-btn > * + * {
+  .player-action-btn-inner > * + * {
     margin-left: 6px;
   }
 
@@ -3893,12 +3970,16 @@ html.ios-standalone .modal-backdrop {
     margin-left: 6px;
   }
 
-  .season-bar > * + * {
-    margin-left: 6px;
+  .season-bar {
+    margin: -3px -3px 9px -3px;
+  }
+
+  .season-bar > .season-btn {
+    margin: 3px;
   }
 
   .episodes-popover-actions > * + * {
-    margin-left: 4px;
+    margin-left: 6px;
   }
 
   .episodes-grid {

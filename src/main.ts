@@ -188,13 +188,16 @@ function findBestSpatialCandidate(
 }
 
 function scrollFocusTargetWithinTrack(el: HTMLElement) {
-  const scroller = el.closest(".pill-scroll, .season-bar, .episodes-grid") as
+  const scroller = el.closest(".pill-track, .season-bar, .episodes-grid") as
     | HTMLElement
     | null;
   if (!scroller) return;
   const scrollerRect = scroller.getBoundingClientRect();
   const elRect = el.getBoundingClientRect();
-  if (scroller.classList.contains("episodes-grid")) {
+  if (
+    scroller.classList.contains("episodes-grid") ||
+    scroller.classList.contains("season-bar")
+  ) {
     const offsetTop = elRect.top - scrollerRect.top + scroller.scrollTop;
     const targetTop = offsetTop - scrollerRect.height / 2 + elRect.height / 2;
     scroller.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
@@ -287,8 +290,8 @@ function attachSpatialNavigation() {
   });
 }
 
-const BUNDLE_CHECK_INTERVAL_MS = 60_000;
-let lastBundleCheckAt = Date.now();
+const BUNDLE_CHECK_INTERVAL_MS = 15_000;
+let lastBundleCheckAt = 0;
 
 function getCurrentBundlePath(): string | null {
   const scripts = document.querySelectorAll<HTMLScriptElement>("script[src]");

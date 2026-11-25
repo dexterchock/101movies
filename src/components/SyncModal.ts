@@ -71,7 +71,7 @@ export function openSyncModal(onClose: () => void): SyncModalController {
   closeBtn.className = "sync-modal-close";
   closeBtn.setAttribute("aria-label", t("sync.closeAria"));
   closeBtn.tabIndex = 0;
-  closeBtn.innerHTML = icons.x("sync-modal-close-icon", 18);
+  closeBtn.innerHTML = icons.x("sync-modal-close-icon", 16, 2);
 
   header.append(titleWrap, closeBtn);
 

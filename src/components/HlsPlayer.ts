@@ -1,6 +1,7 @@
 import type HlsType from "hls.js";
 import {
   buildVodProxyUrl,
+  deactivateBackupApi,
   getBackupVodProxyUrl,
   isBackupApiActive,
 } from "../api";
@@ -389,6 +390,9 @@ export function createHlsPlayer(
     checkResolution(video.videoWidth, video.videoHeight);
   };
 
+  const isUsingBackupProxy = (u: string) =>
+    /^https?:\/\//i.test(u) && u.includes("/api/vod/proxy");
+
   video.addEventListener("loadedmetadata", handleVideoDims, { signal });
   video.addEventListener("resize", handleVideoDims, { signal });
   video.addEventListener(
@@ -404,7 +408,14 @@ export function createHlsPlayer(
     "error",
     () => {
       if (destroyed || hls !== null) return;
-      if (!useProxy && allowProxyFallback && !isBackupApiActive()) {
+      const curVideoSrc = video.currentSrc || video.src || getEffectiveSrc();
+      if (useBackupManifest || isUsingBackupProxy(curVideoSrc)) {
+        pendingSeek = video.currentTime || pendingSeek;
+        deactivateBackupApi(true);
+        useBackupManifest = false;
+        useProxy = true;
+        void startPlayback();
+      } else if (!useProxy && allowProxyFallback && !isBackupApiActive()) {
         pendingSeek = video.currentTime || pendingSeek;
         useProxy = true;
         void startPlayback();
@@ -534,6 +545,15 @@ export function createHlsPlayer(
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (destroyed || gen !== playbackGen || !data.fatal) return;
         if (
+          data.type === Hls.ErrorTypes.NETWORK_ERROR &&
+          isUsingBackupProxy(effectiveSrc)
+        ) {
+          pendingSeek = video.currentTime || pendingSeek;
+          deactivateBackupApi(true);
+          destroyHlsInstance();
+          useProxy = true;
+          void startPlayback();
+        } else if (
           data.type === Hls.ErrorTypes.NETWORK_ERROR &&
           !useProxy &&
           allowProxyFallback &&

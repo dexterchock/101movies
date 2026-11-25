@@ -10,7 +10,23 @@ const REMOTE_API_ORIGIN = "https://101movies.pages.dev";
 const BACKUP_UNTIL_KEY = "api_backup_until";
 const BACKUP_ORIGIN_OVERRIDE_KEY = "backup_api_origin";
 const BACKUP_FAILOVER_TTL_MS = 30 * 60 * 1000;
+const BACKUP_UNREACHABLE_COOLDOWN_MS = 10 * 60 * 1000;
 const PRIMARY_FAILOVER_TIMEOUT_MS = 18_000;
+
+let unreachableBackupOrigin = "";
+let backupUnreachableUntil = 0;
+
+function createAbortError(): Error {
+  try {
+    const domErr = new DOMException("Aborted", "AbortError");
+    if (domErr && domErr.name === "AbortError") {
+      return domErr;
+    }
+  } catch {}
+  const err = new Error("Aborted");
+  err.name = "AbortError";
+  return err;
+}
 
 const API_LS_PREFIX = "api_cache_v6:";
 const API_SS_PREFIX = "api_search_v6:";
@@ -67,9 +83,21 @@ function getBackupApiOrigin(): string {
   return ENV_BACKUP_API_ORIGIN;
 }
 
+function isBackupUsable(backupOrigin = getBackupApiOrigin()): boolean {
+  return Boolean(
+    backupOrigin &&
+      !(
+        backupOrigin === unreachableBackupOrigin &&
+        Date.now() < backupUnreachableUntil
+      )
+  );
+}
+
 export function isBackupApiActive(): boolean {
   const backupOrigin = getBackupApiOrigin();
-  if (!backupOrigin || typeof window === "undefined") return false;
+  if (!isBackupUsable(backupOrigin) || typeof window === "undefined") {
+    return false;
+  }
   try {
     const until = Number(window.sessionStorage?.getItem(BACKUP_UNTIL_KEY) || 0);
     return Number.isFinite(until) && until > Date.now();
@@ -81,6 +109,8 @@ export function isBackupApiActive(): boolean {
 export function activateBackupApi(ttlMs = BACKUP_FAILOVER_TTL_MS): boolean {
   const backupOrigin = getBackupApiOrigin();
   if (!backupOrigin || typeof window === "undefined") return false;
+  unreachableBackupOrigin = "";
+  backupUnreachableUntil = 0;
   try {
     window.sessionStorage?.setItem(
       BACKUP_UNTIL_KEY,
@@ -92,10 +122,25 @@ export function activateBackupApi(ttlMs = BACKUP_FAILOVER_TTL_MS): boolean {
   }
 }
 
+export function deactivateBackupApi(markUnreachable = false): void {
+  const backupOrigin = getBackupApiOrigin();
+  if (markUnreachable && backupOrigin) {
+    unreachableBackupOrigin = backupOrigin;
+    backupUnreachableUntil = Date.now() + BACKUP_UNREACHABLE_COOLDOWN_MS;
+  } else if (!markUnreachable) {
+    unreachableBackupOrigin = "";
+    backupUnreachableUntil = 0;
+  }
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage?.removeItem(BACKUP_UNTIL_KEY);
+  } catch {}
+}
+
 export function getBackupVodProxyUrl(targetUrl: string): string | null {
   if (isLocalhost()) return null;
   const backupOrigin = getBackupApiOrigin();
-  if (!backupOrigin) return null;
+  if (!isBackupUsable(backupOrigin)) return null;
   return `${backupOrigin}/api/vod/proxy?mode=manifest&url=${encodeURIComponent(
     targetUrl
   )}`;
@@ -278,14 +323,13 @@ async function consumeEarlyFetch(
   delete store[path];
 
   if (signal?.aborted) {
-    throw new DOMException("Aborted", "AbortError");
+    throw createAbortError();
   }
 
   try {
     const res = signal
       ? await new Promise<Response>((resolve, reject) => {
-          const onAbort = () =>
-            reject(new DOMException("Aborted", "AbortError"));
+          const onAbort = () => reject(createAbortError());
           signal.addEventListener("abort", onAbort, { once: true });
           earlyPromise.then(
             (r) => {
@@ -313,7 +357,7 @@ async function fetchPrimaryWithTimeout(
   externalSignal?: AbortSignal
 ): Promise<Response> {
   if (externalSignal?.aborted) {
-    throw new DOMException("Aborted", "AbortError");
+    throw createAbortError();
   }
 
   const controller = new AbortController();
@@ -336,9 +380,7 @@ async function fetchPrimaryWithTimeout(
     return earlyRes || (await fetch(path, { signal: controller.signal }));
   } catch (err: any) {
     if (abortedByCaller || externalSignal?.aborted) {
-      throw err?.name === "AbortError"
-        ? err
-        : new DOMException("Aborted", "AbortError");
+      throw err?.name === "AbortError" ? err : createAbortError();
     }
     if (timedOut) {
       throw new Error("Primary API timeout");
@@ -347,6 +389,23 @@ async function fetchPrimaryWithTimeout(
   } finally {
     clearTimeout(timeoutId);
     externalSignal?.removeEventListener("abort", onExternalAbort);
+  }
+}
+
+async function tryFetchBackupJson<T>(
+  backupOrigin: string,
+  path: string,
+  signal?: AbortSignal
+): Promise<T> {
+  try {
+    const data = await fetchJsonFromOrigin<T>(`${backupOrigin}${path}`, signal);
+    activateBackupApi();
+    return data;
+  } catch (backupErr: any) {
+    if (backupErr?.name !== "AbortError" && !signal?.aborted) {
+      deactivateBackupApi(true);
+    }
+    throw backupErr;
   }
 }
 
@@ -369,35 +428,46 @@ async function fetchJsonWithLocalFallback<T>(
     }
   }
 
-  if (!isLocalhost() && backupOrigin && isBackupApiActive()) {
-    return fetchJsonFromOrigin<T>(`${backupOrigin}${path}`, signal);
+  if (!isLocalhost() && isBackupUsable(backupOrigin) && isBackupApiActive()) {
+    try {
+      return await fetchJsonFromOrigin<T>(`${backupOrigin}${path}`, signal);
+    } catch (backupErr: any) {
+      if (backupErr?.name === "AbortError" || signal?.aborted) {
+        throw backupErr;
+      }
+      deactivateBackupApi(true);
+    }
   }
 
+  const canFailover = !isLocalhost() && isBackupUsable(backupOrigin);
   let res: Response;
   try {
-    if (!isLocalhost() && backupOrigin) {
+    if (canFailover) {
       res = await fetchPrimaryWithTimeout(path, signal);
     } else {
       const earlyRes = !isLocalhost() ? await consumeEarlyFetch(path, signal) : null;
       res = earlyRes || (await fetch(path, { signal }));
     }
   } catch (err: any) {
-    if (
-      err?.name !== "AbortError" &&
-      !signal?.aborted &&
-      !isLocalhost() &&
-      backupOrigin
-    ) {
-      activateBackupApi();
-      return fetchJsonFromOrigin<T>(`${backupOrigin}${path}`, signal);
+    if (err?.name !== "AbortError" && !signal?.aborted && canFailover) {
+      try {
+        return await tryFetchBackupJson<T>(backupOrigin, path, signal);
+      } catch (backupErr: any) {
+        if (backupErr?.name === "AbortError" || signal?.aborted) {
+          throw backupErr;
+        }
+        if (err?.message === "Primary API timeout") {
+          return fetchJsonFromOrigin<T>(path, signal);
+        }
+        throw err;
+      }
     }
     throw err;
   }
 
   if (!isLocalhost() && isQuotaOrFailOpenResponse(res)) {
-    if (backupOrigin) {
-      activateBackupApi();
-      return fetchJsonFromOrigin<T>(`${backupOrigin}${path}`, signal);
+    if (isBackupUsable(backupOrigin)) {
+      return tryFetchBackupJson<T>(backupOrigin, path, signal);
     }
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`);
@@ -424,9 +494,8 @@ async function fetchJsonWithLocalFallback<T>(
   try {
     data = await res.json();
   } catch (err) {
-    if (!signal?.aborted && !isLocalhost() && backupOrigin) {
-      activateBackupApi();
-      return fetchJsonFromOrigin<T>(`${backupOrigin}${path}`, signal);
+    if (!signal?.aborted && !isLocalhost() && isBackupUsable(backupOrigin)) {
+      return tryFetchBackupJson<T>(backupOrigin, path, signal);
     }
     throw err;
   }
@@ -499,7 +568,7 @@ function combineAbortSignals(
       entry.controller.abort();
       onRelease();
     }
-    return Promise.reject(new DOMException("Aborted", "AbortError"));
+    return Promise.reject(createAbortError());
   }
   return null;
 }
@@ -526,7 +595,7 @@ function awaitEntryWithSignal<T>(
         entry.controller.abort();
         onEmptyAbort();
       }
-      reject(new DOMException("Aborted", "AbortError"));
+      reject(createAbortError());
     };
 
     externalSignal.addEventListener("abort", onAbort, { once: true });

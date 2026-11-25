@@ -51,7 +51,42 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
   }
 }
 
-// 2. Element.prototype.append / Element.prototype.replaceChildren (Chrome 54 / Chrome 86)
+// 2. Element.prototype.append / Element.prototype.replaceChildren / NodeList.prototype.forEach / focus options
+if (
+  typeof NodeList !== "undefined" &&
+  NodeList.prototype &&
+  !(NodeList.prototype as any).forEach
+) {
+  (NodeList.prototype as any).forEach = Array.prototype.forEach;
+}
+
+if (
+  typeof HTMLElement !== "undefined" &&
+  HTMLElement.prototype &&
+  typeof HTMLElement.prototype.focus === "function"
+) {
+  let supportsFocusOptions = false;
+  try {
+    const probeEl = document.createElement("button");
+    probeEl.focus({
+      get preventScroll() {
+        supportsFocusOptions = true;
+        return true;
+      },
+    });
+  } catch {
+    supportsFocusOptions = false;
+  }
+  if (!supportsFocusOptions) {
+    const origFocus = HTMLElement.prototype.focus;
+    HTMLElement.prototype.focus = function (this: HTMLElement) {
+      try {
+        origFocus.call(this);
+      } catch {}
+    };
+  }
+}
+
 if (typeof Element !== "undefined") {
   if (!Element.prototype.append) {
     Element.prototype.append = function (...nodes: (Node | string)[]) {
@@ -150,9 +185,24 @@ if (typeof Promise !== "undefined") {
   }
 }
 
-// 5. AbortController / AbortSignal (Chrome 66) & addEventListener({ signal }) (Chrome 90)
+// 5. AbortController / AbortSignal (Chrome 66), fetch init sanitization, & addEventListener({ signal }) (Chrome 90)
 if (typeof window !== "undefined") {
-  if (typeof (window as any).AbortController === "undefined") {
+  const createPolyfillAbortError = (): Error => {
+    try {
+      const domErr = new DOMException("Aborted", "AbortError");
+      if (domErr && domErr.name === "AbortError") {
+        return domErr;
+      }
+    } catch {}
+    const err = new Error("Aborted");
+    err.name = "AbortError";
+    return err;
+  };
+
+  const hasNativeAbortController =
+    typeof (window as any).AbortController === "function";
+
+  if (!hasNativeAbortController) {
     type AbortListener = (ev: Event) => void;
 
     class PolyfillAbortSignal {
@@ -212,17 +262,8 @@ if (typeof window !== "undefined") {
       abort(reason?: unknown) {
         if (this.signal.aborted) return;
         this.signal.aborted = true;
-        if (reason !== undefined) {
-          this.signal.reason = reason;
-        } else {
-          try {
-            this.signal.reason = new DOMException("Aborted", "AbortError");
-          } catch {
-            const err = new Error("Aborted");
-            err.name = "AbortError";
-            this.signal.reason = err;
-          }
-        }
+        this.signal.reason =
+          reason !== undefined ? reason : createPolyfillAbortError();
         let evt: Event;
         try {
           evt = new Event("abort");
@@ -236,6 +277,111 @@ if (typeof window !== "undefined") {
 
     (window as any).AbortSignal = PolyfillAbortSignal;
     (window as any).AbortController = PolyfillAbortController;
+  }
+
+  // Wrap window.fetch only when native fetch rejects polyfilled signal or unsupported init options (e.g. older Tizen/WebKit)
+  if (typeof window.fetch === "function") {
+    let nativeFetchSupportsSignal = false;
+    if (hasNativeAbortController) {
+      try {
+        if (typeof Request === "function") {
+          new Request("https://example.com/", {
+            signal: new AbortController().signal,
+          });
+          nativeFetchSupportsSignal = true;
+        } else {
+          nativeFetchSupportsSignal = true;
+        }
+      } catch {
+        nativeFetchSupportsSignal = false;
+      }
+    }
+
+    let nativeFetchSupportsCache = false;
+    try {
+      if (typeof Request === "function") {
+        new Request("https://example.com/", { cache: "no-store" });
+        nativeFetchSupportsCache = true;
+      }
+    } catch {
+      nativeFetchSupportsCache = false;
+    }
+
+    let nativeFetchSupportsKeepalive = false;
+    try {
+      if (typeof Request === "function") {
+        new Request("https://example.com/", { keepalive: false } as RequestInit);
+        nativeFetchSupportsKeepalive = true;
+      }
+    } catch {
+      nativeFetchSupportsKeepalive = false;
+    }
+
+    if (
+      !nativeFetchSupportsSignal ||
+      !nativeFetchSupportsCache ||
+      !nativeFetchSupportsKeepalive
+    ) {
+      const origFetch = window.fetch.bind(window);
+      window.fetch = function (
+        input: RequestInfo | URL,
+        init?: RequestInit
+      ): Promise<Response> {
+        if (!init || typeof init !== "object") {
+          return origFetch(input);
+        }
+
+        const sig = !nativeFetchSupportsSignal
+          ? (init.signal as AbortSignal | undefined)
+          : undefined;
+        if (sig && sig.aborted) {
+          return Promise.reject(createPolyfillAbortError());
+        }
+
+        const cleanInit: Record<string, unknown> = {};
+        const keys = Object.keys(init);
+        for (let i = 0; i < keys.length; i++) {
+          const k = keys[i];
+          if (k === "signal" && !nativeFetchSupportsSignal) continue;
+          if (k === "cache" && !nativeFetchSupportsCache) continue;
+          if (k === "keepalive" && !nativeFetchSupportsKeepalive) continue;
+          cleanInit[k] = (init as Record<string, unknown>)[k];
+        }
+
+        const fetchPromise =
+          Object.keys(cleanInit).length > 0
+            ? origFetch(input, cleanInit as RequestInit)
+            : origFetch(input);
+
+        if (!sig) {
+          return fetchPromise;
+        }
+
+        return new Promise<Response>((resolve, reject) => {
+          let settled = false;
+          const onAbort = () => {
+            if (settled) return;
+            settled = true;
+            reject(createPolyfillAbortError());
+          };
+          sig.addEventListener("abort", onAbort, { once: true });
+          fetchPromise.then(
+            (res) => {
+              if (settled) return;
+              settled = true;
+              sig.removeEventListener("abort", onAbort);
+              resolve(res);
+            },
+            (err) => {
+              if (settled) return;
+              settled = true;
+              sig.removeEventListener("abort", onAbort);
+              reject(err);
+            }
+          );
+        });
+      };
+    }
   }
 
   // Test if EventTarget.addEventListener honors { signal }; wrap if unsupported (Chrome < 90)

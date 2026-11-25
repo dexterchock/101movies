@@ -124,7 +124,7 @@
           var pm = p.match(/^\/player\/(movie|tv)\/(\d+)$/);
           if (pm) {
             kick("/api/tmdb/" + pm[1] + "/" + pm[2] + "?v=6");
-            kick("/api/vod/resolve?type=" + encodeURIComponent(pm[1]) + "&id=" + encodeURIComponent(pm[2]) + "&v=7");
+            kick("/api/vod/resolve?type=" + encodeURIComponent(pm[1]) + "&id=" + encodeURIComponent(pm[2]) + "&v=8");
           }
         }
       })();

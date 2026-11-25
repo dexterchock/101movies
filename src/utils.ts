@@ -220,10 +220,47 @@ export interface ResponsiveGridState {
 }
 
 let safeAreaProbeEl: HTMLDivElement | null = null;
+let iosTopShieldEl: HTMLDivElement | null = null;
+let iosTopShieldRaf = 0;
 
 export function isIosStandalone(): boolean {
   if (typeof window === "undefined") return false;
   return (window.navigator as { standalone?: boolean }).standalone === true;
+}
+
+/**
+ * Remove iOS 26/27 standalone PWA's forced top progressive blur by dynamically moving
+ * a painted full-width fixed black strip from `top: 5px` into `top <= 4px` (`0px`).
+ */
+export function kickIosStandaloneBlurFix(): void {
+  if (typeof document === "undefined" || !isIosStandalone() || !document.body) {
+    return;
+  }
+  if (!iosTopShieldEl || !document.body.contains(iosTopShieldEl)) {
+    iosTopShieldEl = document.createElement("div");
+    iosTopShieldEl.className = "ios-pwa-top-shield";
+    iosTopShieldEl.setAttribute("aria-hidden", "true");
+    document.body.appendChild(iosTopShieldEl);
+  }
+  const el = iosTopShieldEl;
+  if (iosTopShieldRaf && typeof cancelAnimationFrame === "function") {
+    cancelAnimationFrame(iosTopShieldRaf);
+    iosTopShieldRaf = 0;
+  }
+  el.style.top = "5px";
+  const settle = () => {
+    el.style.top = "0px";
+  };
+  if (typeof requestAnimationFrame === "function") {
+    iosTopShieldRaf = requestAnimationFrame(() => {
+      iosTopShieldRaf = requestAnimationFrame(() => {
+        iosTopShieldRaf = 0;
+        settle();
+      });
+    });
+  } else {
+    settle();
+  }
 }
 
 /** Sync `--app-height` and `html.ios-standalone` to bypass WebKit's standalone `viewport-fit=cover` bottom truncation bug. */
@@ -237,6 +274,7 @@ export function syncIosStandaloneViewport(): number | null {
   }
 
   docEl.classList.add("ios-standalone");
+  kickIosStandaloneBlurFix();
   const sw = window.screen?.width ?? 0;
   const sh = window.screen?.height ?? 0;
   const iw = window.innerWidth;
@@ -271,7 +309,7 @@ function getSafeAreaVerticalInset(viewportWidth: number): number {
     const cs = window.getComputedStyle(safeAreaProbeEl);
     const top = parseFloat(cs.paddingTop) || 0;
     const bottom = parseFloat(cs.paddingBottom) || 0;
-    const extraTop = top + (isIosStandalone() && viewportWidth < 640 ? 18 : 0);
+    const extraTop = top;
     const bottomThreshold =
       viewportWidth >= 768 ? 30 : viewportWidth >= 640 ? 26 : 22;
     const extraBottom = Math.max(0, bottom - bottomThreshold);

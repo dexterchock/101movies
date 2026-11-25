@@ -4,7 +4,7 @@ import { getLang, setLang, t, type I18nKey, type UiLang } from "./i18n";
 import { icons } from "./icons";
 import { initRouter, remountCurrentRoute } from "./router";
 import { pullSyncState } from "./sync";
-import { syncIosStandaloneViewport } from "./utils";
+import { kickIosStandaloneBlurFix, syncIosStandaloneViewport } from "./utils";
 
 // Polyfill smooth-scroll options API on older Smart TV Chromium engines (WebOS / Tizen)
 if (typeof window !== "undefined") {
@@ -510,6 +510,7 @@ function bootstrap() {
   window.addEventListener("pageshow", handleViewportSync);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
+      kickIosStandaloneBlurFix();
       void checkForNewBundle(currentPath);
       void pullSyncState();
     }
@@ -520,6 +521,7 @@ function bootstrap() {
   initRouter(mainStage, (pathname) => {
     currentPath = pathname;
     updateBottomNav();
+    kickIosStandaloneBlurFix();
     void checkForNewBundle(currentPath);
     if (pathname === "/history" || pathname === "/saved" || pathname === "/watch-later") {
       void pullSyncState();

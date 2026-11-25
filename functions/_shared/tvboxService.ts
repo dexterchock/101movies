@@ -2,6 +2,7 @@ import {
   computeTitleMatchScore,
   evaluateYearMatch,
   generateZhTitleVariants,
+  isIncompatibleTvSpinOffOrAdaptation,
   isIncompatibleVodCategory,
   parseSeasonInfo,
   prepareTargetTitles,
@@ -74,7 +75,8 @@ async function probeVodSiteForMedia(
   targetYear?: string,
   mediaType: "movie" | "tv" = "movie",
   useVideoList = true,
-  timeoutMs = 3200
+  timeoutMs = 3200,
+  isAnimation?: boolean
 ): Promise<ProbeResult> {
   const sep = siteUrl.includes("?") ? "&" : "?";
   const ac = useVideoList ? "videolist" : "list";
@@ -106,6 +108,12 @@ async function probeVodSiteForMedia(
       if (
         !vodPlayFrom ||
         isIncompatibleVodCategory(item.type_name, mediaType) ||
+        isIncompatibleTvSpinOffOrAdaptation(
+          vodName,
+          item.type_name,
+          mediaType,
+          isAnimation
+        ) ||
         vodName.includes("解说") ||
         vodName.includes("预告") ||
         vodName.includes("短剧") ||
@@ -164,6 +172,7 @@ interface ProbeContext {
   primaryQuery: string;
   preparedTargets: PreparedTargetTitle[];
   releaseYear: string;
+  isAnimation?: boolean;
 }
 
 function applyAvailabilityTitle(item: any, primaryZhTitle?: string): any {
@@ -222,6 +231,11 @@ async function prepareProbeContext(
   };
 
   let probeQuery = "";
+  let isAnimation: boolean | undefined =
+    Array.isArray(item.genre_ids) &&
+    item.genre_ids.some((id: any) => Number(id) === 16)
+      ? true
+      : undefined;
 
   // Only look up TMDB detail translations for the rare item lacking any CJK list title
   if (!primaryZhTitle && tmdbApiKey && tracker.used < tracker.max - 2 && consumeBudget(tracker)) {
@@ -232,6 +246,12 @@ async function prepareProbeContext(
       );
       if (metaRes.ok) {
         const metaData: any = await metaRes.json();
+        if (
+          Array.isArray(metaData?.genres) &&
+          metaData.genres.some((g: any) => Number(g?.id) === 16)
+        ) {
+          isAnimation = true;
+        }
         const allZhTitles = new Set<string>();
 
         const zh = metaData.title || metaData.name;
@@ -299,6 +319,7 @@ async function prepareProbeContext(
     primaryQuery,
     preparedTargets: prepareTargetTitles(candidateTitles, type),
     releaseYear,
+    isAnimation,
   };
 }
 
@@ -338,7 +359,9 @@ export async function checkMediaHasPlayableStreams(
       ctx.preparedTargets,
       ctx.releaseYear,
       ctx.type,
-      true
+      true,
+      3200,
+      ctx.isAnimation
     );
     if (outcome === "hit") {
       available = true;
@@ -457,7 +480,9 @@ export async function filterItemsByServerAvailability(
             ctx.preparedTargets,
             ctx.releaseYear,
             ctx.type,
-            true
+            true,
+            3200,
+            ctx.isAnimation
           );
           if (outcome === "hit") {
             pass1VerifiedCount++;
@@ -516,7 +541,9 @@ export async function filterItemsByServerAvailability(
             ctx.preparedTargets,
             ctx.releaseYear,
             ctx.type,
-            true
+            true,
+            3200,
+            ctx.isAnimation
           );
           if (outcome === "hit") {
             pass2VerifiedCount++;

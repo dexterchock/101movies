@@ -576,6 +576,43 @@ export function isIncompatibleVodCategory(
   return false;
 }
 
+export function isIncompatibleTvSpinOffOrAdaptation(
+  vodName?: string,
+  typeName?: string,
+  mediaType?: "movie" | "tv",
+  isAnimation?: boolean
+): boolean {
+  if (mediaType !== "tv") return false;
+  const name = toSimplifiedChinese(String(vodName || "")).trim();
+  const cat = toSimplifiedChinese(String(typeName || "")).trim();
+
+  if (
+    /(剧场版|总集篇|特别编辑版|特别篇|番外篇|特典|精华版|剪辑版|精选集|OVA|OAD)/i.test(
+      name
+    ) ||
+    /(?:^|[\s:：·\-—_(（\[【])SP(?:$|[\s:：·\-—_)）\]】\d])/i.test(name)
+  ) {
+    return true;
+  }
+
+  if (isAnimation) {
+    if (/(真人版|真人剧|真人电影)/.test(name)) {
+      return true;
+    }
+    if (
+      cat &&
+      /(欧美剧|美国剧|美剧|日剧|日本剧|韩剧|韩国剧|国产剧|内地剧|大陆剧|港剧|香港剧|台剧|台湾剧|泰剧|泰国剧|海外剧|英剧|英国剧)/.test(
+        cat
+      ) &&
+      !/(动漫|动画|番剧)/.test(cat)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function stripLanguageAndStatusTags(input: string): string {
   let clean = input.trim();
   // Strip bracketed tags like [美剧], (粤语), (国语版), 【更新至16集】
@@ -636,7 +673,11 @@ export function parseSeasonInfo(rawTitle: string): {
   if (digitSubtitledSeasonMatch) {
     const base = stripLanguageAndStatusTags(digitSubtitledSeasonMatch[1]);
     const num = parseInt(digitSubtitledSeasonMatch[2], 10);
-    if (base.length >= 2 && !Number.isNaN(num)) {
+    if (
+      base.length >= 2 &&
+      !Number.isNaN(num) &&
+      !/(剧场版|特别篇|总集篇|特别编辑版|番外篇|OVA|OAD|SP)$/i.test(base)
+    ) {
       return { baseTitle: base, seasonNumber: num, audioLang };
     }
   }
@@ -672,7 +713,11 @@ export function parseSeasonInfo(rawTitle: string): {
   if (trailingDigitSeasonMatch) {
     const base = stripLanguageAndStatusTags(trailingDigitSeasonMatch[1]);
     const num = parseInt(trailingDigitSeasonMatch[2], 10);
-    if (base.length >= 2 && !Number.isNaN(num)) {
+    if (
+      base.length >= 2 &&
+      !Number.isNaN(num) &&
+      !/(剧场版|特别篇|总集篇|特别编辑版|番外篇|OVA|OAD|SP)$/i.test(base)
+    ) {
       return { baseTitle: base, seasonNumber: num, audioLang };
     }
   }
@@ -1113,7 +1158,8 @@ async function searchSingleVodSite(
   mediaType?: "movie" | "tv",
   timeoutMs = 2400,
   externalSignal?: AbortSignal,
-  onOutcome?: (outcome: "ok" | "error" | "timeout") => void
+  onOutcome?: (outcome: "ok" | "error" | "timeout") => void,
+  isAnimation?: boolean
 ): Promise<ResolvedStreamSource[]> {
   if (externalSignal?.aborted) return [];
   const start = Date.now();
@@ -1175,9 +1221,15 @@ async function searchSingleVodSite(
       const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
       const vodYear = vodYearMatch ? vodYearMatch[0] : "";
 
-      // Reject recaps ("解说"), trailers ("预告"/"花絮"/"先导"), micro-dramas ("短剧"), and wrong movie/tv categories
+      // Reject recaps ("解说"), trailers ("预告"/"花絮"/"先导"), micro-dramas ("短剧"), spin-offs/live-action adaptations, and wrong movie/tv categories
       if (
         isIncompatibleVodCategory(item.type_name, mediaType) ||
+        isIncompatibleTvSpinOffOrAdaptation(
+          vodName,
+          item.type_name,
+          mediaType,
+          isAnimation
+        ) ||
         vodName.includes("解说") ||
         vodName.includes("预告") ||
         vodName.includes("短剧") ||
@@ -1283,9 +1335,16 @@ async function searchSingleVodSite(
           }
         }
 
-        const sortedSeasons = Array.from(seasonMap.values()).sort(
+        let sortedSeasons = Array.from(seasonMap.values()).sort(
           (a, b) => a.seasonNumber - b.seasonNumber
         );
+        // Prune stray 1-2 episode OVA/special entries accidentally bucketed as Season 2+ alongside a long-running continuous series
+        const season1 = sortedSeasons.find((sc) => sc.seasonNumber === 1);
+        if (season1 && season1.episodes.length >= 60 && sortedSeasons.length > 1) {
+          sortedSeasons = sortedSeasons.filter(
+            (sc) => sc.seasonNumber === 1 || sc.episodes.length > 2
+          );
+        }
         const primaryCand = sortedSeasons[0];
         const seasons: VodSeasonGroup[] = sortedSeasons.map((sc) => ({
           seasonNumber: sc.seasonNumber,
@@ -1447,6 +1506,7 @@ interface TmdbCandidateMetadata {
   releaseYear?: string;
   isUnreleased: boolean;
   primaryZhTitle?: string;
+  isAnimation?: boolean;
   expiresAt: number;
 }
 
@@ -1532,7 +1592,7 @@ async function getTmdbCandidateMetadata(
     typeof caches !== "undefined" ? (caches as any).default : null;
   const edgeCacheReq =
     tmdbId && edgeCache
-      ? new Request(`https://tmdb-meta.101movies.internal/v3/${type}/${tmdbId}`, {
+      ? new Request(`https://tmdb-meta.101movies.internal/v4/${type}/${tmdbId}`, {
           method: "GET",
         })
       : null;
@@ -1560,6 +1620,7 @@ async function getTmdbCandidateMetadata(
   let releaseYear: string | undefined;
   let isUnreleased = false;
   let primaryZhTitle: string | undefined;
+  let isAnimation: boolean | undefined;
 
   const addCandidateTitle = (raw?: string) => {
     if (!raw || typeof raw !== "string") return;
@@ -1595,6 +1656,12 @@ async function getTmdbCandidateMetadata(
     if (Number(hintItem.vote_count || 0) === 0) {
       isUnreleased = true;
     }
+    if (
+      Array.isArray(hintItem.genre_ids) &&
+      hintItem.genre_ids.some((id: any) => Number(id) === 16)
+    ) {
+      isAnimation = true;
+    }
   }
 
   if (tmdbId && tmdbApiKey) {
@@ -1612,6 +1679,14 @@ async function getTmdbCandidateMetadata(
           releaseYear = dateStr.slice(0, 4);
         }
         isUnreleased = isMediaUnreleased(type, d);
+        if (
+          Array.isArray(d.genres) &&
+          d.genres.some((g: any) => Number(g?.id) === 16)
+        ) {
+          isAnimation = true;
+        } else if (Array.isArray(d.genres)) {
+          isAnimation = false;
+        }
 
         const officialZhTitles = new Set<string>();
         if (zhTitle && /[\u4e00-\u9fff]/.test(zhTitle)) {
@@ -1721,6 +1796,7 @@ async function getTmdbCandidateMetadata(
     releaseYear,
     isUnreleased,
     primaryZhTitle,
+    isAnimation,
     expiresAt: Date.now() + 60 * 60 * 1000,
   };
   setBoundedCache(tmdbMetadataCache, cacheKey, meta, 500);
@@ -1846,21 +1922,35 @@ export async function resolveStreamsForMedia(params: {
   let vodSubrequestsUsed = 0;
   let hadUpstreamErrors = false;
 
+  const primaryNorm = normalizeTitleForComparison(searchKeywords[0] || "");
   for (let kIdx = 0; kIdx < maxKeywordsToTry; kIdx++) {
     if (vodSubrequestsUsed >= MAX_VOD_SUBREQUESTS) break;
-    if (kIdx > 0 && matchedBaseSiteIds.size >= 2) break;
-    if (kIdx > 1 && matchedBaseSiteIds.size > 0) break;
+    const kw = searchKeywords[kIdx];
+    const kwNorm = normalizeTitleForComparison(kw || "");
+    const isDistinctCjkAlias =
+      kIdx > 0 &&
+      /[\u4e00-\u9fff]/.test(kw || "") &&
+      Boolean(primaryNorm) &&
+      Boolean(kwNorm) &&
+      !primaryNorm.includes(kwNorm) &&
+      !kwNorm.includes(primaryNorm);
+    if (kIdx > 0 && matchedBaseSiteIds.size >= (isDistinctCjkAlias ? 6 : 2)) {
+      break;
+    }
+    if (kIdx > 1 && matchedBaseSiteIds.size > 0 && !isDistinctCjkAlias) {
+      break;
+    }
 
     const overallBudgetMs =
       matchedBaseSiteIds.size > 0
-        ? OVERALL_WITH_SOURCES_DEADLINE_MS
+        ? isDistinctCjkAlias
+          ? 4600
+          : OVERALL_WITH_SOURCES_DEADLINE_MS
         : OVERALL_EMPTY_DEADLINE_MS;
     const remainingWallMs = overallBudgetMs - (Date.now() - resolveStart);
     if (kIdx > 0 && remainingWallMs < 800) break;
     const maxRoundCapMs = matchedBaseSiteIds.size > 0 ? 2600 : 6000;
     const roundTimeoutMs = Math.max(800, Math.min(maxRoundCapMs, remainingWallMs));
-
-    const kw = searchKeywords[kIdx];
     const remainingBudget = MAX_VOD_SUBREQUESTS - vodSubrequestsUsed;
     const remainingSites = activeSites
       .filter((s) => !matchedBaseSiteIds.has(s.id))
@@ -1905,7 +1995,8 @@ export async function resolveStreamsForMedia(params: {
               if (outcome === "error" || outcome === "timeout") {
                 hadUpstreamErrors = true;
               }
-            }
+            },
+            meta.isAnimation
           );
           if (siteSources.length > 0 && !matchedBaseSiteIds.has(site.id)) {
             matchedBaseSiteIds.add(site.id);
@@ -1972,7 +2063,8 @@ export async function resolveStreamsForMedia(params: {
                 if (outcome === "error" || outcome === "timeout") {
                   hadUpstreamErrors = true;
                 }
-              }
+              },
+              meta.isAnimation
             );
             if (siteSources.length > 0 && !matchedBaseSiteIds.has(site.id)) {
               matchedBaseSiteIds.add(site.id);

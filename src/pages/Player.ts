@@ -1103,7 +1103,7 @@ export function mount(
     const renderWatchLaterBtn = (saved: boolean) => {
       watchLaterBtn.classList.toggle("is-saved", saved);
       watchLaterBtn.setAttribute("aria-pressed", String(saved));
-      watchLaterBtn.innerHTML = `${icons.bookmark("", 14)}<span>${escapeHtml(
+      watchLaterBtn.innerHTML = `${icons.bookmark("", 15)}<span>${escapeHtml(
         saved ? t("player.saved") : t("player.save")
       )}</span>`;
     };
@@ -1428,7 +1428,7 @@ export function mount(
         <span class="episodes-trigger-inner">
           ${icons.layers("", 14)}
           <span>${escapeHtml(triggerTitle)}</span>
-          <span class="tabular-nums" style="font-family:ui-monospace,monospace;font-size:12px;color:rgba(0,0,0,0.65)">${
+          <span class="tabular-nums" style="font-family:ui-monospace,monospace;font-size:12px;line-height:1;color:rgba(0,0,0,0.65)">${
             derived.safeEpisodeIndex + 1
           }/${derived.episodes.length}</span>
           ${icons.chevronUp("", 14)}

@@ -288,7 +288,7 @@ export async function checkPendingGroupPaired(
   if (!pendingGroupId || isDeviceSynced()) return isDeviceSynced();
   try {
     const res = await fetch(
-      `/api/sync/state?groupId=${encodeURIComponent(pendingGroupId)}&_t=${Date.now()}`,
+      `/api/sync/state?groupId=${encodeURIComponent(pendingGroupId)}`,
       { cache: "no-store", signal }
     );
     if (!res.ok) return false;
@@ -379,7 +379,7 @@ export async function pullSyncState(force = false): Promise<boolean> {
       const since = getLocalUpdatedAt();
       const qs = since > 0 ? `&since=${since}` : "";
       const res = await fetch(
-        `/api/sync/state?groupId=${encodeURIComponent(groupId)}${qs}&_t=${Date.now()}`,
+        `/api/sync/state?groupId=${encodeURIComponent(groupId)}${qs}`,
         { cache: "no-store" }
       );
       lastPullAt = Date.now();

@@ -1,4 +1,6 @@
 import path from "path";
+import * as esbuild from "esbuild";
+import ts from "typescript";
 import { defineConfig, Plugin } from "vite";
 
 // NOTE: DO NOT remove or switch to native <script type="module">. Samsung Tizen 4.0
@@ -22,9 +24,37 @@ function tizenClassicBundlePlugin(): Plugin {
   };
 }
 
+// Downlevel the bundled IIFE to pure ES5 so Tizen 3.0 (Chromium 47) parses without ES2015 syntax errors.
+const ES5_TOP_SHIM =
+  'try{if(typeof Object.getOwnPropertyDescriptors!=="function"){Object.getOwnPropertyDescriptors=function(o){if(o==null)throw new TypeError("Cannot convert undefined or null to object");var t=Object(o),r={},k=Object.getOwnPropertyNames(t);if(typeof Object.getOwnPropertySymbols==="function")k=k.concat(Object.getOwnPropertySymbols(t));for(var i=0;i<k.length;i++){var p=k[i],d=Object.getOwnPropertyDescriptor(t,p);if(d!==void 0)r[p]=d}return r}}}catch(e){};';
+
+function tizenEs5DownlevelPlugin(): Plugin {
+  return {
+    name: "tizen-es5-downlevel",
+    apply: "build",
+    renderChunk(code, chunk) {
+      if (!chunk.fileName.endsWith(".js")) return null;
+      const transpiled = ts.transpileModule(code, {
+        compilerOptions: {
+          target: ts.ScriptTarget.ES5,
+          module: ts.ModuleKind.None,
+          allowJs: true,
+          downlevelIteration: true,
+          removeComments: true,
+        },
+      });
+      const minified = esbuild.transformSync(ES5_TOP_SHIM + transpiled.outputText, {
+        minify: true,
+        target: "es5",
+      });
+      return { code: minified.code, map: null };
+    },
+  };
+}
+
 export default defineConfig(() => {
   return {
-    plugins: [tizenClassicBundlePlugin()],
+    plugins: [tizenEs5DownlevelPlugin(), tizenClassicBundlePlugin()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "."),

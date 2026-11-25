@@ -9,6 +9,13 @@ import { searchTmdbWithVodAvailability } from "../functions/_shared/tmdbSearch.j
 import { resolveStreamsForMedia } from "../functions/_shared/tvboxService.js";
 import { handleVodProxyRequest } from "../functions/_shared/vodProxy.js";
 
+const PRIMARY_SYNC_ORIGIN = "https://101movies.pages.dev";
+const SYNC_PATHS = new Set([
+  "/api/sync/code",
+  "/api/sync/pair",
+  "/api/sync/state",
+]);
+const MAX_SYNC_BODY_BYTES = 512_000;
 const PAGES_PREVIEW_ORIGIN_RE = /^https:\/\/[a-z0-9-]+\.101movies\.pages\.dev$/i;
 const ALLOWED_PROXY_ORIGINS = new Set([
   "https://101movies.pages.dev",
@@ -202,6 +209,69 @@ async function handleDetailsRequest(
   }
 }
 
+async function handleSyncProxyRequest(
+  request: Request,
+  url: URL,
+  path: string
+): Promise<Response> {
+  if (!SYNC_PATHS.has(path)) {
+    return jsonWithCors({ ok: false, error: "Not found" }, { status: 404, cacheControl: "no-store" });
+  }
+
+  const method = request.method.toUpperCase();
+  const isStatePath = path === "/api/sync/state";
+  if (method !== "POST" && !(isStatePath && method === "GET")) {
+    return jsonWithCors(
+      { ok: false, error: "Method not allowed" },
+      { status: 405, cacheControl: "no-store" }
+    );
+  }
+
+  const upstreamUrl = new URL(PRIMARY_SYNC_ORIGIN + path);
+  for (const key of ["groupId", "since", "_t"]) {
+    const val = url.searchParams.get(key);
+    if (val !== null) {
+      upstreamUrl.searchParams.set(key, val);
+    }
+  }
+
+  let body: string | undefined;
+  if (method === "POST") {
+    body = await request.text();
+    if (body.length > MAX_SYNC_BODY_BYTES) {
+      return jsonWithCors(
+        { ok: false, error: "Payload too large" },
+        { status: 413, cacheControl: "no-store" }
+      );
+    }
+  }
+
+  try {
+    const upstreamRes = await fetch(upstreamUrl.toString(), {
+      method,
+      headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
+      body,
+    });
+    const respText = await upstreamRes.text();
+    return new Response(respText, {
+      status: upstreamRes.status,
+      headers: {
+        "Content-Type":
+          upstreamRes.headers.get("Content-Type") ||
+          "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (err) {
+    console.error("Failed to proxy sync request:", err);
+    return jsonWithCors(
+      { ok: false, error: "Sync service unavailable" },
+      { status: 502, cacheControl: "no-store" }
+    );
+  }
+}
+
 export async function OPTIONS(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = resolveRequestPath(url);
@@ -210,7 +280,7 @@ export async function OPTIONS(request: Request): Promise<Response> {
     "Access-Control-Allow-Origin": isVodProxy
       ? resolveProxyCorsOrigin(request, url)
       : "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Range",
     "Access-Control-Max-Age": "86400",
   };
@@ -220,9 +290,23 @@ export async function OPTIONS(request: Request): Promise<Response> {
   return new Response(null, { status: 204, headers });
 }
 
+export async function POST(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const path = resolveRequestPath(url);
+  if (SYNC_PATHS.has(path)) {
+    return handleSyncProxyRequest(request, url, path);
+  }
+  return jsonWithCors({ error: "Not found" }, { status: 404, cacheControl: "no-store" });
+}
+
 export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = resolveRequestPath(url);
+
+  if (SYNC_PATHS.has(path)) {
+    return handleSyncProxyRequest(request, url, path);
+  }
+
   const apiKey = getTmdbKey();
 
   if (path === "/api/health") {

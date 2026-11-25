@@ -9,6 +9,10 @@
     {
       "source": "/api/(.*)",
       "destination": "/api/index?__path=$1"
+    },
+    {
+      "source": "/((?!api/|assets/|vendor/|fonts/|upscaler/|\\.well-known/).*)",
+      "destination": "/index.html"
     }
   ]
 }

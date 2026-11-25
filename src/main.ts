@@ -290,8 +290,8 @@ function attachSpatialNavigation() {
   });
 }
 
-const BUNDLE_CHECK_INTERVAL_MS = 60_000;
-let lastBundleCheckAt = Date.now();
+const BUNDLE_CHECK_INTERVAL_MS = 15_000;
+let lastBundleCheckAt = 0;
 
 function getCurrentBundlePath(): string | null {
   const scripts = document.querySelectorAll<HTMLScriptElement>("script[src]");
@@ -312,17 +312,11 @@ async function checkForNewBundle(currentPath: string): Promise<void> {
   lastBundleCheckAt = now;
 
   try {
-    const res = await fetch(`/?_bc=${now}`, { cache: "no-store" });
+    const res = await fetch("/", { cache: "no-store" });
     if (!res.ok) return;
     const html = await res.text();
     const m = html.match(/\/assets\/index-[^"'?#]+\.js/);
     if (m && m[0] !== current) {
-      try {
-        if (window.sessionStorage?.getItem("last_bundle_reload") === m[0]) {
-          return;
-        }
-        window.sessionStorage?.setItem("last_bundle_reload", m[0]);
-      } catch {}
       window.location.reload();
     }
   } catch {}

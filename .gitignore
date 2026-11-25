@@ -11,5 +11,6 @@ coverage/
 .agent/
 .agents/
 .aistudio/
+.tv-sim/
 
 

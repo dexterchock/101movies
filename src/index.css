@@ -2359,7 +2359,8 @@ svg {
 }
 
 .watch-later-btn,
-.imdb-btn {
+.imdb-btn,
+.douban-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2386,7 +2387,9 @@ svg {
 .watch-later-btn:hover .player-action-btn-inner,
 .watch-later-btn:focus-visible .player-action-btn-inner,
 .imdb-btn:hover .player-action-btn-inner,
-.imdb-btn:focus-visible .player-action-btn-inner {
+.imdb-btn:focus-visible .player-action-btn-inner,
+.douban-btn:hover .player-action-btn-inner,
+.douban-btn:focus-visible .player-action-btn-inner {
   transform: scale(1.07);
 }
 
@@ -2420,7 +2423,15 @@ svg {
   font-weight: 700;
 }
 
-.imdb-btn:hover {
+.douban-btn {
+  background-color: #00b51d;
+  color: #ffffff;
+  border: 1px solid #00b51d;
+  font-weight: 700;
+}
+
+.imdb-btn:hover,
+.douban-btn:hover {
   filter: brightness(1.08);
 }
 
@@ -2429,7 +2440,8 @@ svg {
 }
 
 .watch-later-btn.is-saved:focus-visible,
-.imdb-btn:focus-visible {
+.imdb-btn:focus-visible,
+.douban-btn:focus-visible {
   box-shadow: 0 0 0 2px #000000, 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
@@ -2467,7 +2479,8 @@ svg {
   }
 
   .watch-later-btn,
-  .imdb-btn {
+  .imdb-btn,
+  .douban-btn {
     height: 42px;
     font-size: 14px;
     padding: 0 16px;
@@ -3058,6 +3071,18 @@ svg {
   transition: opacity 200ms ease;
 }
 
+.manual-search-submit-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.manual-search-submit:hover .manual-search-submit-inner,
+.manual-search-submit:focus-visible .manual-search-submit-inner {
+  transform: scale(1.06);
+}
+
 .manual-search-submit:hover {
   opacity: 0.9;
 }
@@ -3082,7 +3107,6 @@ svg {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 3px;
   width: 100%;
   padding: 9px 12px;
   border-radius: 12px;
@@ -3090,9 +3114,26 @@ svg {
   background-color: rgba(23, 23, 23, 0.72);
   color: #ffffff;
   text-align: left;
+  overflow: hidden;
   cursor: pointer;
   outline: none;
   transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+.manual-match-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  transform-origin: left center;
+  transition: transform 700ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.manual-match-item:hover .manual-match-inner,
+.manual-match-item:focus-visible .manual-match-inner {
+  transform: scale(1.03);
 }
 
 .manual-match-item:hover {
@@ -3736,6 +3777,8 @@ svg {
   .popover-icon-inner,
   .season-btn-inner,
   .episode-btn-inner,
+  .manual-search-submit-inner,
+  .manual-match-inner,
   .sync-modal-close-icon,
   .sync-action-btn-inner {
     transform: translate3d(0, 0, 0) scale(1);
@@ -3787,14 +3830,18 @@ svg {
   }
 
   .episodes-grid--list .episode-btn:hover .episode-btn-inner,
-  .episodes-grid--list .episode-btn:focus-visible .episode-btn-inner {
+  .episodes-grid--list .episode-btn:focus-visible .episode-btn-inner,
+  .manual-match-item:hover .manual-match-inner,
+  .manual-match-item:focus-visible .manual-match-inner {
     transform: translate3d(0, 0, 0) scale(1.03);
   }
 
   .watch-later-btn:hover .player-action-btn-inner,
   .watch-later-btn:focus-visible .player-action-btn-inner,
   .imdb-btn:hover .player-action-btn-inner,
-  .imdb-btn:focus-visible .player-action-btn-inner {
+  .imdb-btn:focus-visible .player-action-btn-inner,
+  .douban-btn:hover .player-action-btn-inner,
+  .douban-btn:focus-visible .player-action-btn-inner {
     transform: translate3d(0, 0, 0) scale(1.07);
   }
 
@@ -3808,6 +3855,8 @@ svg {
   .resume-pill:focus-visible .episodes-trigger-inner,
   .episodes-trigger-btn:hover .episodes-trigger-inner,
   .episodes-trigger-btn:focus-visible .episodes-trigger-inner,
+  .manual-search-submit:hover .manual-search-submit-inner,
+  .manual-search-submit:focus-visible .manual-search-submit-inner,
   .sync-stop-btn:hover .sync-action-btn-inner,
   .sync-stop-btn:focus-visible .sync-action-btn-inner,
   .sync-choice-btn:hover .sync-action-btn-inner,
@@ -3926,6 +3975,8 @@ html.no-focus-visible .episodes-trigger-inner,
 html.no-focus-visible .popover-icon-inner,
 html.no-focus-visible .season-btn-inner,
 html.no-focus-visible .episode-btn-inner,
+html.no-focus-visible .manual-search-submit-inner,
+html.no-focus-visible .manual-match-inner,
 html.no-focus-visible .sync-modal-close-icon,
 html.no-focus-visible .sync-action-btn-inner {
   will-change: auto !important;
@@ -3986,18 +4037,37 @@ html.no-focus-visible .media-card-remove:focus {
 }
 
 html.no-focus-visible .watch-later-btn:focus,
-html.no-focus-visible .imdb-btn:focus {
+html.no-focus-visible .imdb-btn:focus,
+html.no-focus-visible .douban-btn:focus {
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
 html.no-focus-visible .watch-later-btn.is-saved:focus,
-html.no-focus-visible .imdb-btn:focus {
+html.no-focus-visible .imdb-btn:focus,
+html.no-focus-visible .douban-btn:focus {
   box-shadow: 0 0 0 2px #000000, 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
 html.no-focus-visible .watch-later-btn:focus .player-action-btn-inner,
-html.no-focus-visible .imdb-btn:focus .player-action-btn-inner {
+html.no-focus-visible .imdb-btn:focus .player-action-btn-inner,
+html.no-focus-visible .douban-btn:focus .player-action-btn-inner {
   transform: scale(1.07);
+}
+
+html.no-focus-visible .manual-search-submit:focus {
+  box-shadow: 0 0 0 2px #121212, 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
+html.no-focus-visible .manual-search-submit:focus .manual-search-submit-inner {
+  transform: scale(1.06);
+}
+
+html.no-focus-visible .manual-match-item:focus {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+html.no-focus-visible .manual-match-item:focus .manual-match-inner {
+  transform: scale(1.03);
 }
 
 html.no-focus-visible .server-pill:focus .server-pill-inner,
@@ -4088,6 +4158,8 @@ html.ios-standalone .modal-backdrop {
   .player-action-btn-inner > span,
   .watch-later-btn > span,
   .imdb-btn > span,
+  .douban-btn > span,
+  .manual-search-submit-inner,
   .server-pill-name,
   .resume-pill > span,
   .episodes-trigger-inner > span,

@@ -330,6 +330,10 @@ const MESSAGES = {
     "player.loadingSeason": "Loading Season {season}...",
     "player.seasonNotFound": "No streams found for Season {season}. Try Switch Match.",
     "player.searchFallback": "Search",
+    "player.douban": "Douban",
+    "player.doubanAria": "View on Douban",
+    "player.customSourceTag": "Custom",
+    "player.resetManualAria": "Back to default match",
   },
   zh: {
     "nav.aria": "主导航",
@@ -448,6 +452,10 @@ const MESSAGES = {
     "player.loadingSeason": "正在加载第{season}季...",
     "player.seasonNotFound": "未找到第{season}季资源，可点击右上角搜索手动切换。",
     "player.searchFallback": "手动搜索",
+    "player.douban": "豆瓣",
+    "player.doubanAria": "在豆瓣查看",
+    "player.customSourceTag": "手动",
+    "player.resetManualAria": "恢复默认匹配",
   },
 } as const;
 

@@ -88,11 +88,18 @@ function cleanDisplayZhTitle(rawVodName?: string): string | undefined {
     .trim();
 }
 
+function formatServerLabel(src: ResolvedStreamSource): string {
+  const parts = [src.sourceName];
+  if (src.isManual) parts.push(t("player.customSourceTag"));
+  if (src.audioLang) parts.push(src.audioLang);
+  return parts.join(" · ");
+}
+
 function estimatePillSlotWidth(
   src: ResolvedStreamSource,
   overrideQuality?: string
 ): number {
-  const label = `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""}`;
+  const label = formatServerLabel(src);
   let textWidth = 0;
   for (const ch of label) {
     textWidth += /[\u4e00-\u9fff]/.test(ch) ? 14.5 : 8;
@@ -262,6 +269,17 @@ function buildImdbHref(imdbId: string, fallbackTitle: string): string {
     : `https://www.imdb.com/find/?s=tt&q=${encodeURIComponent(fallbackTitle)}`;
 }
 
+function buildDoubanHref(
+  doubanId: string | undefined,
+  fallbackTitle: string
+): string {
+  return doubanId
+    ? `https://movie.douban.com/subject/${encodeURIComponent(doubanId)}/`
+    : `https://search.douban.com/movie/subject_search?search_text=${encodeURIComponent(
+        fallbackTitle
+      )}`;
+}
+
 export function mount(
   container: HTMLElement,
   params: { type: "movie" | "tv"; id: string },
@@ -296,10 +314,22 @@ export function mount(
     fullDetails || (previewItem ? { ...previewItem, genres: [], tagline: "" } : null);
 
   const cachedVod = api.getCachedVodStreams(type, id);
-  let sources: ResolvedStreamSource[] = cachedVod?.sources || [];
+  let defaultSources: ResolvedStreamSource[] = cachedVod?.sources
+    ? [...cachedVod.sources]
+    : [];
+  let manualOverrideSource: ResolvedStreamSource | null = null;
+  let sources: ResolvedStreamSource[] = [...defaultSources];
+  let manualRestoreAttempted = false;
+  let manualRestoreCanceled = false;
   let tmdbSeasonsMeta: TmdbSeasonSummary[] = cachedVod?.tmdbSeasons || [];
   let lastSearchQuery = cachedVod?.searchQuery || "";
   let resolving = !cachedVod;
+
+  function rebuildSourcesList() {
+    sources = manualOverrideSource
+      ? [manualOverrideSource, ...defaultSources]
+      : [...defaultSources];
+  }
 
   const detectedQualities: Record<string, string> = {};
   sources.forEach((src) => {
@@ -579,7 +609,7 @@ export function mount(
             episodes: retSrc.episodes,
           };
 
-          const existingIdx = sources.findIndex(
+          const existingIdx = defaultSources.findIndex(
             (s) =>
               s.sourceId === retSrc.sourceId ||
               (!s.audioLang &&
@@ -588,7 +618,7 @@ export function mount(
           );
 
           if (existingIdx >= 0) {
-            const target = sources[existingIdx];
+            const target = defaultSources[existingIdx];
             const prevSeasons = target.seasons
               ? [...target.seasons]
               : [
@@ -603,18 +633,19 @@ export function mount(
             if (!prevSeasons.some((s) => s.seasonNumber === targetSeasonNum)) {
               prevSeasons.push(seasonGroup);
               prevSeasons.sort((a, b) => a.seasonNumber - b.seasonNumber);
-              sources[existingIdx] = {
+              defaultSources[existingIdx] = {
                 ...target,
                 seasons: prevSeasons,
               };
             }
           } else {
-            sources.push({
+            defaultSources.push({
               ...retSrc,
               seasons: [seasonGroup],
             });
           }
         }
+        rebuildSourcesList();
 
         const derived = getDerivedState();
         let serverSeasons = derived.episodeSourceServer?.seasons || [];
@@ -687,27 +718,139 @@ export function mount(
   }
 
   function applyManualSource(picked: ResolvedStreamSource) {
-    const nextIdx = sources.findIndex((s) => s.sourceId === picked.sourceId);
-    if (nextIdx >= 0) {
-      sources[nextIdx] = picked;
-    } else {
-      sources = [picked, ...sources];
-    }
-    const targetServerIdx = nextIdx >= 0 ? nextIdx : 0;
+    manualRestoreCanceled = true;
+    const keyword =
+      (manualQuery || lastSearchQuery || "").trim() || picked.vodName;
+    manualOverrideSource = {
+      ...picked,
+      isManual: true,
+    };
+    rebuildSourcesList();
+    const q = api.getCachedManifestQuality(picked.episodes?.[0]?.url);
+    if (q) detectedQualities[picked.sourceId] = q;
+
     const pages = buildServerPages(sources, serverBarWidth, detectedQualities);
-    serverPage = findPageForSourceIndex(pages, targetServerIdx);
+    serverPage = findPageForSourceIndex(pages, 0);
     isManualPickerOpen = false;
     selectedUnloadedSeasonNum = null;
 
     if (picked.episodes.length <= 1) {
       isEpisodePopoverOpen = false;
-      startPlaybackWithProgress(targetServerIdx, 0, 0, 0);
+      startPlaybackWithProgress(0, 0, 0, 0);
     } else {
-      activeServerIndex = targetServerIdx;
+      activeServerIndex = 0;
       activeSeasonIndex = 0;
       activeEpisodeIndex = 0;
+      syncStage();
       renderBottomBar();
     }
+    prewarmStreamManifests([manualOverrideSource], signal, (sourceId, qVal) => {
+      if (signal.aborted) return;
+      applyDetectedQuality(sourceId, qVal);
+    });
+    if (!manualQuery.trim()) {
+      manualQuery = keyword;
+    }
+  }
+
+  function resetManualSource() {
+    manualRestoreCanceled = true;
+    manualOverrideSource = null;
+    rebuildSourcesList();
+    isManualPickerOpen = false;
+    selectedUnloadedSeasonNum = null;
+    activeSeasonIndex = 0;
+    activeEpisodeIndex = 0;
+    serverPage = 0;
+
+    if (savedProgress?.manualPick) {
+      const clearedProgress: WatchProgress = {
+        ...savedProgress,
+        sourceId: defaultSources[0]?.sourceId,
+        manualPick: undefined,
+      };
+      savedProgress = clearedProgress;
+      persistWatchHistory(details, clearedProgress, true);
+    }
+
+    if (isPlaying) {
+      if (defaultSources.length > 0) {
+        startPlaybackWithProgress(0, 0, 0, 0);
+      } else {
+        isPlaying = false;
+        activeServerIndex = null;
+        isEpisodePopoverOpen = false;
+        syncStage();
+        renderBottomBar();
+      }
+    } else {
+      activeServerIndex = null;
+      if (defaultSources.length === 0) {
+        isEpisodePopoverOpen = false;
+      }
+      syncStage();
+      renderBottomBar();
+    }
+  }
+
+  function restoreManualPickFromProgress() {
+    if (
+      signal.aborted ||
+      manualRestoreAttempted ||
+      manualRestoreCanceled ||
+      manualOverrideSource ||
+      !savedProgress?.manualPick
+    ) {
+      return;
+    }
+    const pick = savedProgress.manualPick;
+    const kw = (pick.keyword || pick.vodName || "").trim();
+    if (!kw) return;
+    manualRestoreAttempted = true;
+
+    api
+      .searchRawVodSources(type, id, kw, signal)
+      .then((res) => {
+        if (signal.aborted || manualRestoreCanceled || manualOverrideSource) {
+          return;
+        }
+        const list = res?.sources || [];
+        const restored =
+          list.find((s) => s.sourceId === pick.sourceId) ||
+          list.find((s) => s.vodName === pick.vodName);
+        if (!restored) return;
+
+        manualOverrideSource = {
+          ...restored,
+          isManual: true,
+        };
+        if (!manualQuery.trim()) {
+          manualQuery = kw;
+        }
+        const q = api.getCachedManifestQuality(restored.episodes?.[0]?.url);
+        if (q) detectedQualities[restored.sourceId] = q;
+
+        if (isPlaying && activeServerIndex !== null) {
+          const playingSrc = sources[activeServerIndex];
+          rebuildSourcesList();
+          const newIdx = playingSrc
+            ? sources.findIndex((s) => s.sourceId === playingSrc.sourceId)
+            : -1;
+          activeServerIndex = newIdx >= 0 ? newIdx : 1;
+        } else {
+          rebuildSourcesList();
+          const pages = buildServerPages(sources, serverBarWidth, detectedQualities);
+          serverPage = findPageForSourceIndex(pages, 0);
+        }
+
+        syncStage();
+        renderBottomBar();
+        prewarmStreamManifests([manualOverrideSource], signal, (sourceId, qVal) => {
+          if (signal.aborted) return;
+          applyDetectedQuality(sourceId, qVal);
+        });
+      })
+      .catch(() => {});
   }
 
   function getDerivedState() {
@@ -818,6 +961,9 @@ export function mount(
         ...progressUpdate,
         updatedAt: Date.now(),
       };
+      if ("manualPick" in progressUpdate && !progressUpdate.manualPick) {
+        delete mergedProgress.manualPick;
+      }
       const filtered = history.filter(
         (item) =>
           !(item.id.toString() === id && (item.media_type || "movie") === type)
@@ -902,6 +1048,16 @@ export function mount(
     currentVideoTime = seekTime;
     isPlaying = true;
 
+    const manualPickMeta = targetServer.isManual
+      ? {
+          sourceId: targetServer.sourceId,
+          vodName: targetServer.vodName,
+          keyword:
+            (manualQuery || lastSearchQuery || "").trim() ||
+            targetServer.vodName,
+        }
+      : undefined;
+
     persistWatchHistory(
       details,
       {
@@ -911,6 +1067,7 @@ export function mount(
         episodeIndex: clampedEpIdx,
         episodeLabel: epLabel,
         currentTime: seekTime,
+        manualPick: manualPickMeta,
       },
       true
     );
@@ -1016,6 +1173,15 @@ export function mount(
       derived.activeEpisodeObj?.name || "",
       derived.activeEpisodeIndexClamped
     );
+    const manualPickMeta = derived.activeServer.isManual
+      ? {
+          sourceId: derived.activeServer.sourceId,
+          vodName: derived.activeServer.vodName,
+          keyword:
+            (manualQuery || lastSearchQuery || "").trim() ||
+            derived.activeServer.vodName,
+        }
+      : undefined;
     persistWatchHistory(
       details,
       {
@@ -1026,6 +1192,7 @@ export function mount(
         episodeLabel: epLabel,
         currentTime,
         duration,
+        manualPick: manualPickMeta,
       },
       syncImmediately
     );
@@ -1218,10 +1385,19 @@ export function mount(
     const overviewText = zhMode
       ? details.zh_overview || details.overview || ""
       : details.overview || "";
+    const preferredDoubanSource =
+      (activeServerIndex !== null ? sources[activeServerIndex] : undefined) ||
+      sources.find((s) => Boolean(s.doubanId));
+    const doubanId =
+      preferredDoubanSource?.doubanId ||
+      sources.find((s) => Boolean(s.doubanId))?.doubanId;
+    const doubanFallback =
+      chineseTitle || details.zh_title || primaryTitle || englishTitle;
     const imdbHref = buildImdbHref(imdbId, englishTitle || primaryTitle);
+    const doubanHref = buildDoubanHref(doubanId, doubanFallback);
 
     const heroAssetKey = `${details.id}|${backdropUrl}|${hasWideBackdrop ? 1 : 0}`;
-    const nextHeroKey = `${heroAssetKey}|${primaryTitle}|${secondaryTitle || ""}|${imdbHref}|${metaHtml}|${overviewText}`;
+    const nextHeroKey = `${heroAssetKey}|${primaryTitle}|${secondaryTitle || ""}|${imdbHref}|${doubanHref}|${metaHtml}|${overviewText}`;
     if (renderedHeroKey === nextHeroKey) return;
 
     // Hydrate metadata/title in-place when hero backdrop element is unchanged to avoid reloading the 4K backdrop
@@ -1254,6 +1430,15 @@ export function mount(
       const existingImdb = existingInfo.querySelector<HTMLAnchorElement>(".imdb-btn");
       if (existingImdb) {
         existingImdb.href = imdbHref;
+      }
+      const existingDouban = existingInfo.querySelector<HTMLAnchorElement>(".douban-btn");
+      if (existingDouban) {
+        existingDouban.href = doubanHref;
+        existingDouban.setAttribute("aria-label", t("player.doubanAria"));
+        const labelSpan = existingDouban.querySelector(
+          ".player-action-btn-inner > span"
+        );
+        if (labelSpan) labelSpan.textContent = t("player.douban");
       }
       return;
     }
@@ -1385,6 +1570,18 @@ export function mount(
       14
     )}</span>`;
     actionsRow.appendChild(imdbLink);
+
+    const doubanLink = document.createElement("a");
+    doubanLink.className = "douban-btn";
+    doubanLink.target = "_blank";
+    doubanLink.rel = "noopener noreferrer";
+    doubanLink.setAttribute("aria-label", t("player.doubanAria"));
+    doubanLink.tabIndex = 0;
+    doubanLink.href = doubanHref;
+    doubanLink.innerHTML = `<span class="player-action-btn-inner"><span>${escapeHtml(
+      t("player.douban")
+    )}</span>${icons.externalLink("", 14)}</span>`;
+    actionsRow.appendChild(doubanLink);
 
     info.appendChild(actionsRow);
 
@@ -1519,7 +1716,7 @@ export function mount(
       const isHighPing = src.latencyMs >= HIGH_PING_THRESHOLD_MS;
       const effectiveQuality =
         detectedQualities[src.sourceId] || src.quality || "1080P";
-      const label = `${src.sourceName}${src.audioLang ? ` · ${src.audioLang}` : ""}`;
+      const label = formatServerLabel(src);
 
       const btn = document.createElement("button");
       btn.type = "button";
@@ -1761,6 +1958,9 @@ export function mount(
         header.className = "episodes-popover-header";
         const headerTitleText = isManualPickerOpen
           ? t("player.manualSearchTitle")
+          : derived.episodeSourceServer?.isManual &&
+            derived.episodeSourceServer.vodName
+          ? derived.episodeSourceServer.vodName
           : derived.hasMultipleSeasons
           ? t("player.selectSeasonEpisode")
           : t("player.selectEpisode");
@@ -1810,6 +2010,21 @@ export function mount(
             }
           });
           headerActions.appendChild(sortBtn);
+        }
+
+        if (manualOverrideSource) {
+          const resetBtn = document.createElement("button");
+          resetBtn.type = "button";
+          resetBtn.dataset.manualResetBtn = "true";
+          resetBtn.className = "episodes-popover-action";
+          resetBtn.setAttribute("aria-label", t("player.resetManualAria"));
+          resetBtn.title = t("player.resetManualAria");
+          resetBtn.innerHTML = `<span class="popover-icon-inner">${icons.refreshCw(
+            "",
+            14
+          )}</span>`;
+          resetBtn.addEventListener("click", () => resetManualSource());
+          headerActions.appendChild(resetBtn);
         }
 
         const manualBtn = document.createElement("button");
@@ -1875,6 +2090,8 @@ export function mount(
           searchForm.className = "manual-search-form";
           const inputEl = document.createElement("input");
           inputEl.type = "text";
+          inputEl.id = "manual-search-input";
+          inputEl.name = "manualSearch";
           inputEl.className = "manual-search-input";
           inputEl.placeholder = t("player.manualSearchPlaceholder");
           inputEl.value = manualQuery;
@@ -1884,7 +2101,9 @@ export function mount(
           const submitBtn = document.createElement("button");
           submitBtn.type = "submit";
           submitBtn.className = "manual-search-submit";
-          submitBtn.textContent = t("player.manualSearchBtn");
+          submitBtn.innerHTML = `<span class="manual-search-submit-inner">${escapeHtml(
+            t("player.manualSearchBtn")
+          )}</span>`;
           searchForm.addEventListener("submit", (e) => {
             e.preventDefault();
             runManualSearch(inputEl.value);
@@ -1918,8 +2137,10 @@ export function mount(
                 .filter(Boolean)
                 .join(" · ");
               rowBtn.innerHTML = `
-                <span class="manual-match-title">${escapeHtml(item.vodName)}</span>
-                <span class="manual-match-meta tabular-nums">${escapeHtml(metaBits)}</span>
+                <span class="manual-match-inner">
+                  <span class="manual-match-title">${escapeHtml(item.vodName)}</span>
+                  <span class="manual-match-meta tabular-nums">${escapeHtml(metaBits)}</span>
+                </span>
               `;
               rowBtn.addEventListener("click", () => applyManualSource(item));
               matchList.appendChild(rowBtn);
@@ -2250,24 +2471,26 @@ export function mount(
       .resolveVodStreams(type, id, undefined, [], signal, bypassCache)
       .then((res) => {
         if (signal.aborted) return;
-        sources = res.sources || [];
+        defaultSources = res.sources || [];
+        rebuildSourcesList();
         tmdbSeasonsMeta = res.tmdbSeasons || [];
         lastSearchQuery = res.searchQuery || lastSearchQuery;
-        sources.forEach((src) => {
+        defaultSources.forEach((src) => {
           const q = api.getCachedManifestQuality(src.episodes?.[0]?.url);
           if (q) detectedQualities[src.sourceId] = q;
         });
         resolving = false;
         syncStage();
         renderBottomBar();
-        prewarmStreamManifests(sources, signal, (sourceId, q) => {
+        prewarmStreamManifests(defaultSources, signal, (sourceId, q) => {
           if (signal.aborted) return;
           applyDetectedQuality(sourceId, q);
         });
       })
       .catch(() => {
         if (signal.aborted) return;
-        sources = [];
+        defaultSources = [];
+        rebuildSourcesList();
         resolving = false;
         renderBottomBar();
       });
@@ -2277,6 +2500,7 @@ export function mount(
   if (!cachedVod) {
     loadVodStreams(false);
   }
+  restoreManualPickFromProgress();
 
   return {
     destroy() {

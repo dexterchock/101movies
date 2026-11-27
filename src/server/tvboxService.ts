@@ -3032,6 +3032,7 @@ function assembleSourcesFromRawBatch(params: {
           primaryEntry.episodes[0]?.name,
           primaryCand.playGroups[0]?.groupName
         );
+        const doubanId = extractDoubanId(primaryCand.item.vod_douban_id) || undefined;
 
         return {
           sourceId,
@@ -3051,6 +3052,7 @@ function assembleSourcesFromRawBatch(params: {
           vodPic: primaryCand.item.vod_pic
             ? String(primaryCand.item.vod_pic)
             : undefined,
+          ...(doubanId ? { doubanId } : {}),
           latencyMs,
           quality: tvQuality,
           playGroups: primaryCand.playGroups,
@@ -3068,6 +3070,7 @@ function assembleSourcesFromRawBatch(params: {
         bestCandidate.episodes[0]?.name,
         bestCandidate.playGroups[0]?.groupName
       );
+      const movieDoubanId = extractDoubanId(bestCandidate.item.vod_douban_id) || undefined;
 
       return {
         sourceId,
@@ -3087,6 +3090,7 @@ function assembleSourcesFromRawBatch(params: {
         vodPic: bestCandidate.item.vod_pic
           ? String(bestCandidate.item.vod_pic)
           : undefined,
+        ...(movieDoubanId ? { doubanId: movieDoubanId } : {}),
         latencyMs,
         quality: movieQuality,
         playGroups: bestCandidate.playGroups,
@@ -3893,6 +3897,7 @@ function assembleSeasonSourcesFromBatches(params: {
       const primary = cours[0];
       const mergedEps = sequentializeCourEpisodes(cours);
       const cleanName = toSimplifiedChinese(String(primary.item.vod_name || primaryQuery).trim());
+      const doubanId = extractDoubanId(primary.item.vod_douban_id) || undefined;
       return {
         sourceId: `${batch.site.id}${suffix}`,
         sourceName: batch.site.name,
@@ -3903,6 +3908,7 @@ function assembleSeasonSourcesFromBatches(params: {
         vodYear: primary.item.vod_year ? String(primary.item.vod_year) : undefined,
         vodRemarks: primary.item.vod_remarks ? String(primary.item.vod_remarks) : undefined,
         vodPic: primary.item.vod_pic ? String(primary.item.vod_pic) : undefined,
+        ...(doubanId ? { doubanId } : {}),
         latencyMs: batch.latencyMs,
         quality: detectSourceQuality(
           primary.item.vod_remarks,
@@ -3997,6 +4003,7 @@ function assembleRawPickerSources(params: {
       const audioLang =
         parseSeasonInfo(vodName).audioLang ||
         extractAudioLangFromText(vodName, String(item.vod_lang || ""), vodRemarks);
+      const doubanId = extractDoubanId(item.vod_douban_id) || undefined;
 
       const src: ResolvedStreamSource = {
         sourceId: `${batch.site.id}_raw_${item.vod_id}`,
@@ -4008,6 +4015,7 @@ function assembleRawPickerSources(params: {
         vodYear: item.vod_year ? String(item.vod_year) : undefined,
         vodRemarks: vodRemarks || undefined,
         vodPic: item.vod_pic ? String(item.vod_pic) : undefined,
+        ...(doubanId ? { doubanId } : {}),
         latencyMs: batch.latencyMs,
         quality: detectSourceQuality(
           vodRemarks,

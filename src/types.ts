@@ -90,6 +90,11 @@ export interface WatchProgress {
   currentTime?: number;
   duration?: number;
   updatedAt?: number;
+  manualPick?: {
+    sourceId: string;
+    vodName: string;
+    keyword: string;
+  };
 }
 
 export interface MediaItem {
@@ -185,6 +190,8 @@ export interface ResolvedStreamSource {
   vodYear?: string;
   vodRemarks?: string;
   vodPic?: string;
+  doubanId?: string;
+  isManual?: boolean;
   latencyMs: number;
   quality?: '4K' | '2K' | '1080P' | 'HD' | 'CAM' | string;
   playGroups: VodPlayGroup[];

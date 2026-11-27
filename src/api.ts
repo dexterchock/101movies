@@ -769,7 +769,7 @@ export const api = {
     const ram = vodResolveCache.get(key);
     if (ram) return ram;
     if (!customKeyword?.trim() && disabledIds.length === 0) {
-      const apiPath = `/api/vod/resolve?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&v=11`;
+      const apiPath = `/api/vod/resolve?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&v=12`;
       const disk = readPersistentCache<VodResolveResponse>("local", apiPath);
       if (disk && Array.isArray(disk.sources) && disk.sources.length > 0) {
         setBoundedCache(vodResolveCache, key, disk, 80);
@@ -949,7 +949,7 @@ export const api = {
     const queryParts = [
       `type=${encodeURIComponent(type)}`,
       `id=${encodeURIComponent(id)}`,
-      "v=11",
+      "v=12",
     ];
     if (customKeyword && customKeyword.trim()) {
       queryParts.push(`wd=${encodeURIComponent(customKeyword.trim())}`);
@@ -1008,7 +1008,7 @@ export const api = {
 
     const apiPath = `/api/vod/resolve?type=tv&id=${encodeURIComponent(
       id
-    )}&season=${encodeURIComponent(String(seasonNumber))}&v=11`;
+    )}&season=${encodeURIComponent(String(seasonNumber))}&v=12`;
     const data = await fetchJsonWithLocalFallback<VodResolveResponse>(
       apiPath,
       (d) => Array.isArray(d?.sources) && d.sources.length > 0,
@@ -1030,7 +1030,7 @@ export const api = {
     const trimmed = keyword.trim();
     const apiPath = `/api/vod/resolve?type=${encodeURIComponent(
       type
-    )}&id=${encodeURIComponent(id)}&wd=${encodeURIComponent(trimmed)}&raw=1&v=11`;
+    )}&id=${encodeURIComponent(id)}&wd=${encodeURIComponent(trimmed)}&raw=1&v=12`;
     return fetchJsonWithLocalFallback<VodResolveResponse>(
       apiPath,
       (d) => Array.isArray(d?.sources) && d.sources.length > 0,

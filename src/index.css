@@ -3575,6 +3575,112 @@ svg {
 }
 
 /* =========================================================
+   Desktop Pointer Hover Compositing Guard (All Enlarge Targets)
+   NOTE: Keep translate3d(0, 0, 0) + will-change: transform + backface-visibility: hidden
+   scoped to @media (hover: hover) and (pointer: fine) so Chromium does not demote
+   compositor layers on mouse-leave (preventing snap-back) while phones/TVs allocate zero idle layers.
+   ========================================================= */
+
+@media (hover: hover) and (pointer: fine) {
+  .bottom-nav-link-inner,
+  .lang-toggle-btn-label,
+  .capsule-btn-label,
+  .pill-arrow-icon,
+  .pill-btn-label,
+  .page-nav-icon,
+  .clear-history-btn-inner,
+  .sync-btn-inner,
+  .search-clear-inner,
+  .media-card-remove-icon,
+  .back-btn-inner,
+  .player-action-btn-inner,
+  .server-pill-inner,
+  .server-nav-icon,
+  .episodes-trigger-inner,
+  .popover-icon-inner,
+  .season-btn-inner,
+  .episode-btn-inner,
+  .sync-modal-close-icon,
+  .sync-action-btn-inner {
+    transform: translate3d(0, 0, 0) scale(1);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .bottom-nav-link:hover .bottom-nav-link-inner,
+  .bottom-nav-link:focus-visible .bottom-nav-link-inner,
+  .lang-toggle-btn:hover .lang-toggle-btn-label,
+  .lang-toggle-btn:focus-visible .lang-toggle-btn-label,
+  .capsule-btn:hover .capsule-btn-label,
+  .capsule-btn:focus-visible .capsule-btn-label,
+  .pill-btn:hover .pill-btn-label,
+  .pill-btn:focus-visible .pill-btn-label,
+  .back-btn:hover .back-btn-inner,
+  .back-btn:focus-visible .back-btn-inner {
+    transform: translate3d(0, 0, 0) scale(1.1);
+  }
+
+  .pill-arrow-btn:not(:disabled):hover .pill-arrow-icon,
+  .pill-arrow-btn:not(:disabled):focus-visible .pill-arrow-icon,
+  .page-nav-btn:not(:disabled):hover .page-nav-icon,
+  .page-nav-btn:not(:disabled):focus-visible .page-nav-icon,
+  .search-clear-btn:hover .search-clear-inner,
+  .search-clear-btn:focus-visible .search-clear-inner,
+  .server-nav-btn:not(:disabled):hover .server-nav-icon,
+  .server-nav-btn:not(:disabled):focus-visible .server-nav-icon {
+    transform: translate3d(0, 0, 0) scale(1.25);
+  }
+
+  .media-card-remove:hover .media-card-remove-icon,
+  .media-card-remove:focus-visible .media-card-remove-icon,
+  .episodes-popover-action:hover .popover-icon-inner,
+  .episodes-popover-action:focus-visible .popover-icon-inner,
+  .episodes-popover-close:hover .popover-icon-inner,
+  .episodes-popover-close:focus-visible .popover-icon-inner,
+  .sync-modal-close:hover .sync-modal-close-icon,
+  .sync-modal-close:focus-visible .sync-modal-close-icon {
+    transform: translate3d(0, 0, 0) scale(1.2);
+  }
+
+  .season-btn:hover .season-btn-inner,
+  .season-btn:focus-visible .season-btn-inner,
+  .episode-btn:hover .episode-btn-inner,
+  .episode-btn:focus-visible .episode-btn-inner {
+    transform: translate3d(0, 0, 0) scale(1.08);
+  }
+
+  .episodes-grid--list .episode-btn:hover .episode-btn-inner,
+  .episodes-grid--list .episode-btn:focus-visible .episode-btn-inner {
+    transform: translate3d(0, 0, 0) scale(1.03);
+  }
+
+  .watch-later-btn:hover .player-action-btn-inner,
+  .watch-later-btn:focus-visible .player-action-btn-inner,
+  .imdb-btn:hover .player-action-btn-inner,
+  .imdb-btn:focus-visible .player-action-btn-inner {
+    transform: translate3d(0, 0, 0) scale(1.07);
+  }
+
+  .clear-history-btn:hover .clear-history-btn-inner,
+  .clear-history-btn:focus-visible .clear-history-btn-inner,
+  .sync-btn:hover .sync-btn-inner,
+  .sync-btn:focus-visible .sync-btn-inner,
+  .server-pill:hover .server-pill-inner,
+  .server-pill:focus-visible .server-pill-inner,
+  .resume-pill:hover .episodes-trigger-inner,
+  .resume-pill:focus-visible .episodes-trigger-inner,
+  .episodes-trigger-btn:hover .episodes-trigger-inner,
+  .episodes-trigger-btn:focus-visible .episodes-trigger-inner,
+  .sync-stop-btn:hover .sync-action-btn-inner,
+  .sync-stop-btn:focus-visible .sync-action-btn-inner,
+  .sync-choice-btn:hover .sync-action-btn-inner,
+  .sync-choice-btn:focus-visible .sync-action-btn-inner {
+    transform: translate3d(0, 0, 0) scale(1.06);
+  }
+}
+
+/* =========================================================
    Legacy Smart TV (:focus & Compositor Fallbacks when :focus-visible is unsupported)
    ========================================================= */
 
@@ -3667,6 +3773,28 @@ html.no-focus-visible .media-card-remove {
   transform: none !important;
   transition: none !important;
   will-change: auto !important;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+}
+
+html.no-focus-visible .pill-arrow-icon,
+html.no-focus-visible .page-nav-icon,
+html.no-focus-visible .clear-history-btn-inner,
+html.no-focus-visible .sync-btn-inner,
+html.no-focus-visible .search-clear-inner,
+html.no-focus-visible .media-card-remove-icon,
+html.no-focus-visible .player-action-btn-inner,
+html.no-focus-visible .server-pill-inner,
+html.no-focus-visible .server-nav-icon,
+html.no-focus-visible .episodes-trigger-inner,
+html.no-focus-visible .popover-icon-inner,
+html.no-focus-visible .season-btn-inner,
+html.no-focus-visible .episode-btn-inner,
+html.no-focus-visible .sync-modal-close-icon,
+html.no-focus-visible .sync-action-btn-inner {
+  will-change: auto !important;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
 }
 
 html.no-focus-visible .media-card:hover .media-card-poster {

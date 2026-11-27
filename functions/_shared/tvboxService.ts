@@ -112,7 +112,8 @@ async function probeVodSiteForMedia(
           vodName,
           item.type_name,
           mediaType,
-          isAnimation
+          isAnimation,
+          vodSub
         ) ||
         vodName.includes("解说") ||
         vodName.includes("预告") ||

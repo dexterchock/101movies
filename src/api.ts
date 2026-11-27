@@ -769,7 +769,7 @@ export const api = {
     const ram = vodResolveCache.get(key);
     if (ram) return ram;
     if (!customKeyword?.trim() && disabledIds.length === 0) {
-      const apiPath = `/api/vod/resolve?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&v=9`;
+      const apiPath = `/api/vod/resolve?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&v=10`;
       const disk = readPersistentCache<VodResolveResponse>("local", apiPath);
       if (disk && Array.isArray(disk.sources) && disk.sources.length > 0) {
         setBoundedCache(vodResolveCache, key, disk, 80);
@@ -949,7 +949,7 @@ export const api = {
     const queryParts = [
       `type=${encodeURIComponent(type)}`,
       `id=${encodeURIComponent(id)}`,
-      "v=9",
+      "v=10",
     ];
     if (customKeyword && customKeyword.trim()) {
       queryParts.push(`wd=${encodeURIComponent(customKeyword.trim())}`);

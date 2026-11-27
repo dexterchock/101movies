@@ -1290,6 +1290,23 @@ const GENERIC_SEASON_STOP_WORDS = new Set([
   "完结篇",
   "tv版",
   "动画版",
+  "完结",
+  "特别",
+  "番外",
+  "总集",
+  "最终",
+  "剧场",
+  "前",
+  "后",
+  "上",
+  "下",
+  "中",
+  "序",
+  "终",
+  "新",
+  "真",
+  "外",
+  "续",
 ]);
 
 function countCjkChars(str: string): number {
@@ -1345,6 +1362,13 @@ export function extractTmdbSeasonArcTokens(
     if (!norm || seen.has(norm) || !isValidArcToken(norm)) return;
     seen.add(norm);
     tokens.push(norm);
+    if (/[篇章]$/.test(norm)) {
+      const stem = norm.slice(0, -1);
+      if (stem && !seen.has(stem) && countCjkChars(stem) >= 2 && isValidArcToken(stem)) {
+        seen.add(stem);
+        tokens.push(stem);
+      }
+    }
   };
 
   for (const piece of pieces) {
@@ -1587,6 +1611,50 @@ export interface TvCandidateResolution {
   isFinalSeason: boolean;
   arcKey: string;
   tmdbMatchedSeason: number | null;
+  hasExplicitTitleSeason: boolean;
+}
+
+function reconcileAliasSeasonWithTmdb(
+  aliasSeasonNum: number | null,
+  vodYear: string,
+  tmdbSeasons?: TmdbSeasonMeta[]
+): { seasonNumber: number | null; tmdbYearMatched: number | null } {
+  if (aliasSeasonNum === null || !tmdbSeasons || tmdbSeasons.length <= 1) {
+    return { seasonNumber: aliasSeasonNum, tmdbYearMatched: null };
+  }
+  const vodY = vodYear ? Number(vodYear) : NaN;
+  if (!Number.isFinite(vodY) || vodY <= 0) {
+    return { seasonNumber: aliasSeasonNum, tmdbYearMatched: null };
+  }
+  const aliasTmdb = tmdbSeasons.find((s) => s.seasonNumber === aliasSeasonNum);
+  const contradictsTmdb =
+    !aliasTmdb ||
+    (aliasTmdb.airYear !== undefined && Math.abs(vodY - aliasTmdb.airYear) >= 2);
+  if (!contradictsTmdb) {
+    return { seasonNumber: aliasSeasonNum, tmdbYearMatched: null };
+  }
+  const exactHits = tmdbSeasons.filter(
+    (s) => s.seasonNumber >= 2 && s.airYear === vodY
+  );
+  if (exactHits.length === 1) {
+    return {
+      seasonNumber: exactHits[0].seasonNumber,
+      tmdbYearMatched: exactHits[0].seasonNumber,
+    };
+  }
+  const nearHits = tmdbSeasons.filter(
+    (s) =>
+      s.seasonNumber >= 2 &&
+      s.airYear !== undefined &&
+      Math.abs(s.airYear - vodY) <= 1
+  );
+  if (nearHits.length === 1) {
+    return {
+      seasonNumber: nearHits[0].seasonNumber,
+      tmdbYearMatched: nearHits[0].seasonNumber,
+    };
+  }
+  return { seasonNumber: null, tmdbYearMatched: null };
 }
 
 export function resolveTvCandidateMatch(params: {
@@ -1620,6 +1688,7 @@ export function resolveTvCandidateMatch(params: {
     isFinalSeason: false,
     arcKey: "",
     tmdbMatchedSeason: null,
+    hasExplicitTitleSeason: false,
   };
 
   if (preparedTargets.length === 0) return noMatch;
@@ -1664,6 +1733,8 @@ export function resolveTvCandidateMatch(params: {
     const isFinalSeason = Boolean(parsed.isFinalSeason || aliasSeason?.isFinalSeason);
     let tmdbMatchedSeason: number | null = null;
     let resolvedScore = baseTitleScore;
+    let hasExplicitTitleSeason = parsed.seasonNumber !== null && parsedBaseIsTarget;
+    let fallthroughFromPath1 = false;
 
     if (seasonNumber !== null) {
       if (!parsedBaseIsTarget && tmdbArcMatch) {
@@ -1671,6 +1742,7 @@ export function resolveTvCandidateMatch(params: {
         seasonNumber = tmdbArcMatch.seasonNumber;
         tmdbMatchedSeason = tmdbArcMatch.seasonNumber;
         resolvedScore = Math.max(resolvedScore, 235);
+        hasExplicitTitleSeason = false;
       }
     } else if (isFinalSeason) {
       if (tmdbArcMatch) {
@@ -1678,7 +1750,15 @@ export function resolveTvCandidateMatch(params: {
         tmdbMatchedSeason = tmdbArcMatch.seasonNumber;
         resolvedScore = Math.max(resolvedScore, 235);
       } else if (aliasSeason?.seasonNumber) {
-        seasonNumber = aliasSeason.seasonNumber;
+        const rec = reconcileAliasSeasonWithTmdb(
+          aliasSeason.seasonNumber,
+          vodYear,
+          tmdbSeasons
+        );
+        seasonNumber = rec.seasonNumber;
+        if (rec.tmdbYearMatched !== null) {
+          tmdbMatchedSeason = rec.tmdbYearMatched;
+        }
         resolvedScore = Math.max(resolvedScore, 225);
       } else {
         seasonNumber = null;
@@ -1688,25 +1768,38 @@ export function resolveTvCandidateMatch(params: {
       tmdbMatchedSeason = tmdbArcMatch.seasonNumber;
       resolvedScore = Math.max(resolvedScore, 235);
     } else if (aliasSeason?.seasonNumber) {
-      seasonNumber = aliasSeason.seasonNumber;
+      const rec = reconcileAliasSeasonWithTmdb(
+        aliasSeason.seasonNumber,
+        vodYear,
+        tmdbSeasons
+      );
+      seasonNumber = rec.seasonNumber;
+      if (rec.tmdbYearMatched !== null) {
+        tmdbMatchedSeason = rec.tmdbYearMatched;
+      }
       resolvedScore = Math.max(resolvedScore, 225);
+    } else if (baseTitleScore < 240 && anchored && normRest.length >= 2) {
+      fallthroughFromPath1 = true;
     } else {
       seasonNumber = 1;
     }
 
-    const arcKey = parsed.subtitle
-      ? normalizeTitleForComparison(parsed.subtitle)
-      : normRest;
+    if (!fallthroughFromPath1) {
+      const arcKey = parsed.subtitle
+        ? normalizeTitleForComparison(parsed.subtitle)
+        : normRest;
 
-    return {
-      matched: true,
-      titleScore: resolvedScore,
-      seasonNumber,
-      partNumber,
-      isFinalSeason,
-      arcKey,
-      tmdbMatchedSeason,
-    };
+      return {
+        matched: true,
+        titleScore: resolvedScore,
+        seasonNumber,
+        partNumber,
+        isFinalSeason,
+        arcKey,
+        tmdbMatchedSeason,
+        hasExplicitTitleSeason,
+      };
+    }
   }
 
   if (!anchored) {
@@ -1728,19 +1821,26 @@ export function resolveTvCandidateMatch(params: {
       isFinalSeason: Boolean(parsed.isFinalSeason || aliasSeason?.isFinalSeason),
       arcKey: normRest,
       tmdbMatchedSeason: tmdbArcMatch.seasonNumber,
+      hasExplicitTitleSeason: false,
     };
   }
 
   // Path 3: Anchored prefix + alias season metadata in vod_sub (e.g. "JOJO的奇妙冒险 TV版 第四季" or "鬼灭之刃 第三季")
   if (aliasSeason) {
+    const rec = reconcileAliasSeasonWithTmdb(
+      aliasSeason.seasonNumber,
+      vodYear,
+      tmdbSeasons
+    );
     return {
       matched: true,
       titleScore: 225,
-      seasonNumber: aliasSeason.seasonNumber,
+      seasonNumber: rec.seasonNumber,
       partNumber,
       isFinalSeason: Boolean(parsed.isFinalSeason || aliasSeason.isFinalSeason),
       arcKey: normRest,
-      tmdbMatchedSeason: null,
+      tmdbMatchedSeason: rec.tmdbYearMatched,
+      hasExplicitTitleSeason: false,
     };
   }
 
@@ -1765,6 +1865,7 @@ export function resolveTvCandidateMatch(params: {
   }
 
   const targetCjk = countCjkChars(anchored.matchedTarget.rawClean);
+  const targetSigLen = anchored.matchedTarget.target.length;
   const restEndsArc = /(?:篇|章)$/.test(normRest);
   const qualifiesStructuralArc =
     isAnimation === true &&
@@ -1772,7 +1873,7 @@ export function resolveTvCandidateMatch(params: {
       normRest.length >= 3 &&
       normRest.length <= 16 &&
       (targetCjk >= 3 || (normRest.length >= 4 && normRest.endsWith("篇")))) ||
-      (targetCjk >= 6 &&
+      ((targetCjk >= 6 || (targetCjk >= 4 && targetSigLen >= 8)) &&
         anchored.hasCleanDelimiter &&
         normRest.length >= 2 &&
         normRest.length <= 10 &&
@@ -1805,6 +1906,7 @@ export function resolveTvCandidateMatch(params: {
     isFinalSeason: false,
     arcKey: normRest,
     tmdbMatchedSeason: yearMatchedSeason,
+    hasExplicitTitleSeason: false,
   };
 }
 
@@ -1921,6 +2023,8 @@ async function searchSingleVodSite(
       partNumber: number | null;
       isFinalSeason: boolean;
       arcKey: string;
+      tmdbMatchedSeason: number | null;
+      hasExplicitTitleSeason: boolean;
       vodYearNum: number;
       audioLang?: "粤语" | "国语";
       explicitTitleLang?: "粤语" | "国语";
@@ -1993,6 +2097,8 @@ async function searchSingleVodSite(
       let partNumber: number | null = null;
       let isFinalSeason = false;
       let arcKey = "";
+      let tmdbMatchedSeason: number | null = null;
+      let hasExplicitTitleSeason = false;
 
       if (mediaType === "tv") {
         const tvRes = resolveTvCandidateMatch({
@@ -2014,6 +2120,8 @@ async function searchSingleVodSite(
         partNumber = tvRes.partNumber;
         isFinalSeason = tvRes.isFinalSeason;
         arcKey = tvRes.arcKey;
+        tmdbMatchedSeason = tvRes.tmdbMatchedSeason;
+        hasExplicitTitleSeason = tvRes.hasExplicitTitleSeason;
       } else {
         titleScore = computeTitleMatchScore(
           vodName,
@@ -2060,6 +2168,8 @@ async function searchSingleVodSite(
           partNumber,
           isFinalSeason,
           arcKey,
+          tmdbMatchedSeason,
+          hasExplicitTitleSeason,
           vodYearNum,
           audioLang: detectedLang,
           explicitTitleLang: titleAudioLang,
@@ -2121,6 +2231,33 @@ async function searchSingleVodSite(
             } else {
               c.seasonNumber = Math.max(1, maxExplicitSeason) + 1;
             }
+          }
+        }
+
+        // Step A2: Attach split-cour sub-arcs whose arcKey extends an existing S2+ parent arc
+        // (e.g. "星尘斗士埃及篇" -> "星尘斗士", "爱丽丝篇异界战争" -> "爱丽丝篇")
+        for (const c of working) {
+          if (c.arcKey.length < 4) continue;
+          if (c.hasExplicitTitleSeason || c.tmdbMatchedSeason !== null) continue;
+          let bestParent: (typeof working)[0] | null = null;
+          for (const p of working) {
+            if (p === c) continue;
+            if (p.seasonNumber === null || p.seasonNumber < 2) continue;
+            if (p.arcKey.length < 3 || c.arcKey.length <= p.arcKey.length) continue;
+            if (!c.arcKey.startsWith(p.arcKey)) continue;
+            if (
+              c.vodYearNum > 0 &&
+              p.vodYearNum > 0 &&
+              (c.vodYearNum < p.vodYearNum || c.vodYearNum > p.vodYearNum + 2)
+            ) {
+              continue;
+            }
+            if (!bestParent || p.arcKey.length > bestParent.arcKey.length) {
+              bestParent = p;
+            }
+          }
+          if (bestParent && bestParent.seasonNumber !== null) {
+            c.seasonNumber = bestParent.seasonNumber;
           }
         }
 
@@ -2235,7 +2372,49 @@ async function searchSingleVodSite(
             }
           }
 
-          const distinctCours = Array.from(courMap.values()).sort((a, b) => {
+          const expectedYear = tmdbSeasonByNum.get(sNum)?.airYear;
+          const anchor = [...courMap.values()].sort((a, b) => {
+            const aTmdb = a.tmdbMatchedSeason === sNum ? 1 : 0;
+            const bTmdb = b.tmdbMatchedSeason === sNum ? 1 : 0;
+            if (aTmdb !== bTmdb) return bTmdb - aTmdb;
+
+            const aExplicit = a.hasExplicitTitleSeason ? 1 : 0;
+            const bExplicit = b.hasExplicitTitleSeason ? 1 : 0;
+            if (aExplicit !== bExplicit) return bExplicit - aExplicit;
+
+            if (expectedYear !== undefined && a.vodYearNum > 0 && b.vodYearNum > 0) {
+              const aDiff = Math.abs(a.vodYearNum - expectedYear);
+              const bDiff = Math.abs(b.vodYearNum - expectedYear);
+              if (aDiff !== bDiff) return aDiff - bDiff;
+            }
+
+            const aP1 = a.partNumber === null || a.partNumber === 1 ? 1 : 0;
+            const bP1 = b.partNumber === null || b.partNumber === 1 ? 1 : 0;
+            if (aP1 !== bP1) return bP1 - aP1;
+
+            if (a.score !== b.score) return b.score - a.score;
+            return a.arcKey.length - b.arcKey.length;
+          })[0];
+
+          const compatibleCours = Array.from(courMap.values()).filter((c) => {
+            if (c === anchor) return true;
+            const sameTmdbSeason =
+              anchor.tmdbMatchedSeason !== null &&
+              c.tmdbMatchedSeason === anchor.tmdbMatchedSeason;
+            const hasExplicitPart =
+              (c.partNumber !== null && c.partNumber >= 2) ||
+              (anchor.partNumber !== null && anchor.partNumber >= 2);
+            const bothFinal = anchor.isFinalSeason && c.isFinalSeason;
+            const shareArcPrefix =
+              !anchor.arcKey ||
+              !c.arcKey ||
+              anchor.arcKey === c.arcKey ||
+              c.arcKey.startsWith(anchor.arcKey) ||
+              anchor.arcKey.startsWith(c.arcKey);
+            return sameTmdbSeason || hasExplicitPart || bothFinal || shareArcPrefix;
+          });
+
+          const distinctCours = compatibleCours.sort((a, b) => {
             const ya = a.vodYearNum || 9999;
             const yb = b.vodYearNum || 9999;
             if (ya !== yb) return ya - yb;

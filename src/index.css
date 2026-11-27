@@ -2425,7 +2425,7 @@ svg {
 
 .douban-btn {
   background-color: #00b51d;
-  color: #ffffff;
+  color: #000000;
   border: 1px solid #00b51d;
   font-weight: 700;
 }
@@ -3094,6 +3094,8 @@ svg {
 .manual-match-list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 6px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -3107,6 +3109,7 @@ svg {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  flex-shrink: 0;
   width: 100%;
   padding: 9px 12px;
   border-radius: 12px;

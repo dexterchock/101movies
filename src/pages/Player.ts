@@ -2019,9 +2019,9 @@ export function mount(
           resetBtn.className = "episodes-popover-action";
           resetBtn.setAttribute("aria-label", t("player.resetManualAria"));
           resetBtn.title = t("player.resetManualAria");
-          resetBtn.innerHTML = `<span class="popover-icon-inner">${icons.refreshCw(
+          resetBtn.innerHTML = `<span class="popover-icon-inner">${icons.arrowLeft(
             "",
-            14
+            15
           )}</span>`;
           resetBtn.addEventListener("click", () => resetManualSource());
           headerActions.appendChild(resetBtn);

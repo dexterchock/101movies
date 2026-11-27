@@ -1,13 +1,6 @@
-interface BufferedResponse {
-  status: number;
-  statusText: string;
-  headers: [string, string][];
-  body: ArrayBuffer;
-}
-
 const EDGE_CACHE_VERSION = "v6";
-const inflightMisses = new Map<string, Promise<BufferedResponse>>();
-const inflightRevalidations = new Set<string>();
+const REVALIDATION_LOCK_TTL_MS = 20_000;
+const inflightRevalidations = new Map<string, number>();
 
 function normalizeCacheKeyUrl(url: URL): string {
   const normalized = new URL(url.origin + url.pathname);
@@ -149,8 +142,15 @@ export const onRequest: PagesFunction = async (context) => {
         outHeaders.set("X-Cache-Status", isStale ? "STALE" : "HIT");
         outHeaders.set("Access-Control-Allow-Origin", "*");
 
-        if (isStale && context.waitUntil && !inflightRevalidations.has(cacheUrl)) {
-          inflightRevalidations.add(cacheUrl);
+        const now = Date.now();
+        const lockUntil = inflightRevalidations.get(cacheUrl) || 0;
+        if (isStale && context.waitUntil && lockUntil <= now) {
+          if (inflightRevalidations.size > 200) {
+            for (const [k, exp] of inflightRevalidations) {
+              if (exp <= now) inflightRevalidations.delete(k);
+            }
+          }
+          inflightRevalidations.set(cacheUrl, now + REVALIDATION_LOCK_TTL_MS);
           const revalidatePromise = (async () => {
             try {
               const freshRes = await context.next();
@@ -202,58 +202,40 @@ export const onRequest: PagesFunction = async (context) => {
     });
   }
 
-  // Isolate-level singleflight coalesces simultaneous cold cache misses for the same URL
-  let inflight = inflightMisses.get(cacheUrl);
-  if (!inflight) {
-    inflight = (async () => {
-      const response = await context.next();
-      const headers = new Headers(response.headers);
-      headers.set("Access-Control-Allow-Origin", "*");
+  // Execute per-request without cross-request Promise sharing (workerd client aborts can strand shared Promises)
+  const response = await context.next();
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
 
-      if (response.status === 200) {
-        headers.set("X-Cache-Status", "MISS");
-        applyDefaultCacheControl(headers, url.pathname);
-      }
-
-      const body = await response.arrayBuffer();
-
-      if (response.status === 200 && cache && cacheKey) {
-        const toStore = buildEdgeCacheResponse(
-          new Response(body.slice(0), {
-            status: response.status,
-            statusText: response.statusText,
-          }),
-          headers
-        );
-        if (toStore) {
-          if (context.waitUntil) {
-            try {
-              context.waitUntil(cache.put(cacheKey, toStore));
-            } catch {}
-          } else {
-            cache.put(cacheKey, toStore).catch(() => {});
-          }
-        }
-      }
-
-      return {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Array.from(headers.entries()),
-        body,
-      };
-    })().finally(() => {
-      if (inflightMisses.get(cacheUrl) === inflight) {
-        inflightMisses.delete(cacheUrl);
-      }
-    });
-    inflightMisses.set(cacheUrl, inflight);
+  if (response.status === 200) {
+    headers.set("X-Cache-Status", "MISS");
+    applyDefaultCacheControl(headers, url.pathname);
   }
 
-  const result = await inflight;
-  return new Response(result.body.slice(0), {
-    status: result.status,
-    statusText: result.statusText,
-    headers: new Headers(result.headers),
+  const body = await response.arrayBuffer();
+
+  if (response.status === 200 && cache && cacheKey) {
+    const toStore = buildEdgeCacheResponse(
+      new Response(body.slice(0), {
+        status: response.status,
+        statusText: response.statusText,
+      }),
+      headers
+    );
+    if (toStore) {
+      if (context.waitUntil) {
+        try {
+          context.waitUntil(cache.put(cacheKey, toStore));
+        } catch {}
+      } else {
+        cache.put(cacheKey, toStore).catch(() => {});
+      }
+    }
+  }
+
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
   });
 };

@@ -333,6 +333,7 @@ const MESSAGES = {
     "player.douban": "Douban",
     "player.doubanAria": "View on Douban",
     "player.customSourceTag": "Custom",
+    "player.backToSearchAria": "Back to search",
     "player.resetManualAria": "Back to default match",
   },
   zh: {
@@ -455,6 +456,7 @@ const MESSAGES = {
     "player.douban": "豆瓣",
     "player.doubanAria": "在豆瓣查看",
     "player.customSourceTag": "手动",
+    "player.backToSearchAria": "返回搜索结果",
     "player.resetManualAria": "恢复默认匹配",
   },
 } as const;

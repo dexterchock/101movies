@@ -32,6 +32,7 @@ Notes for future coding sessions and automated agents working on this repository
 ### 1.5 Device Sync & Edge Proxy Security
 - **Cloudflare D1 Sync (`functions/_shared/syncService.ts`, `src/sync.ts`)**: Temporary 4-digit pairing code with 5-minute TTL (`PAIRING_CODE_TTL_MS`), auto-submit on 4th digit, first-pair merge of History & Saved (never overwrite), inline disconnect choices (`Keep local copy` / `Clear & disconnect`), `paired = 0` stale group cleanup, and `since` timestamp short-circuiting to minimize D1 reads/writes.
 - **Hardened `/api/vod/proxy` (`functions/_shared/vodProxy.ts`, `functions/api/_middleware.ts`)**: Keep private/loopback/link-local/metadata IPv4 & IPv6 blocklist, manual validated redirects, MIME & `#EXTM3U` checks, and same-origin CORS (`url.origin`).
+- **Workers Middleware (`functions/api/_middleware.ts`)**: NEVER share in-flight I/O `Promise`s across requests in module-global `Map`s (aborted requests in `workerd` can strand a shared Promise permanently); keep revalidation locks TTL-bounded (`Map<string, number>`).
 
 ---
 

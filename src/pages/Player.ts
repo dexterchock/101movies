@@ -717,6 +717,25 @@ export function mount(
       });
   }
 
+  function openManualSearch() {
+    isManualPickerOpen = true;
+    isEpisodePopoverOpen = true;
+    const defaultKw =
+      manualQuery ||
+      lastSearchQuery ||
+      details?.zh_title ||
+      details?.en_title ||
+      details?.title ||
+      details?.name ||
+      "";
+    if (defaultKw && !manualSearchedOnce) {
+      manualQuery = defaultKw;
+      runManualSearch(defaultKw);
+      return;
+    }
+    renderActionsRight();
+  }
+
   function applyManualSource(picked: ResolvedStreamSource) {
     manualRestoreCanceled = true;
     const keyword =
@@ -2012,18 +2031,42 @@ export function mount(
           headerActions.appendChild(sortBtn);
         }
 
-        if (manualOverrideSource) {
+        if (manualOverrideSource || isManualPickerOpen) {
           const resetBtn = document.createElement("button");
           resetBtn.type = "button";
           resetBtn.dataset.manualResetBtn = "true";
           resetBtn.className = "episodes-popover-action";
-          resetBtn.setAttribute("aria-label", t("player.resetManualAria"));
-          resetBtn.title = t("player.resetManualAria");
+          const isBackToSearch = Boolean(
+            manualOverrideSource && !isManualPickerOpen
+          );
+          const backLabel = isBackToSearch
+            ? t("player.backToSearchAria")
+            : t("player.resetManualAria");
+          resetBtn.setAttribute("aria-label", backLabel);
+          resetBtn.title = backLabel;
           resetBtn.innerHTML = `<span class="popover-icon-inner">${icons.arrowLeft(
             "",
             15
           )}</span>`;
-          resetBtn.addEventListener("click", () => resetManualSource());
+          resetBtn.addEventListener("click", () => {
+            const wasFocused = document.activeElement === resetBtn;
+            if (isBackToSearch) {
+              openManualSearch();
+            } else if (manualOverrideSource) {
+              resetManualSource();
+            } else {
+              isManualPickerOpen = false;
+              if (!hasPlayableList) {
+                isEpisodePopoverOpen = false;
+              }
+              renderActionsRight();
+            }
+            if (wasFocused) {
+              actionsRightEl
+                .querySelector<HTMLElement>("[data-manual-reset-btn]")
+                ?.focus({ preventScroll: true });
+            }
+          });
           headerActions.appendChild(resetBtn);
         }
 
@@ -2041,23 +2084,12 @@ export function mount(
           14
         )}</span>`;
         manualBtn.addEventListener("click", () => {
-          isManualPickerOpen = !isManualPickerOpen;
-          if (isManualPickerOpen) {
-            isEpisodePopoverOpen = true;
-            const defaultKw =
-              manualQuery ||
-              lastSearchQuery ||
-              details?.zh_title ||
-              details?.en_title ||
-              details?.title ||
-              details?.name ||
-              "";
-            if (defaultKw && !manualSearchedOnce) {
-              manualQuery = defaultKw;
-              runManualSearch(defaultKw);
-              return;
-            }
-          } else if (!hasPlayableList) {
+          if (!isManualPickerOpen) {
+            openManualSearch();
+            return;
+          }
+          isManualPickerOpen = false;
+          if (!hasPlayableList) {
             isEpisodePopoverOpen = false;
           }
           renderActionsRight();

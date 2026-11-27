@@ -1553,7 +1553,8 @@ export function mount(
       watchLaterBtn.setAttribute("aria-pressed", String(saved));
       watchLaterBtn.innerHTML = `<span class="player-action-btn-inner">${icons.bookmark(
         "",
-        15
+        15,
+        saved
       )}<span>${escapeHtml(saved ? t("player.saved") : t("player.save"))}</span></span>`;
     };
     renderWatchLaterBtn(isInWatchLater(type, details.id));

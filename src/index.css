@@ -2996,6 +2996,142 @@ svg {
   box-shadow: 0 0 0 2px #121212, 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 
+.season-btn.is-unloaded {
+  opacity: 0.68;
+}
+
+.season-btn.is-unloaded:hover {
+  opacity: 1;
+}
+
+.season-btn.is-loading-target {
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #ffffff;
+  opacity: 1;
+}
+
+.manual-search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.manual-search-input {
+  flex: 1 1 0%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 200ms ease, background-color 200ms ease;
+}
+
+@media (min-width: 640px) {
+  .manual-search-input {
+    font-size: 13px;
+  }
+}
+
+.manual-search-input:focus {
+  border-color: rgba(255, 255, 255, 0.45);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.manual-search-submit {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: #ffffff;
+  color: #000000;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  transition: opacity 200ms ease;
+}
+
+.manual-search-submit:hover {
+  opacity: 0.9;
+}
+
+.manual-search-submit:focus-visible {
+  box-shadow: 0 0 0 2px #121212, 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
+.manual-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 2px;
+  margin: -2px;
+  max-height: 300px;
+}
+
+.manual-match-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(23, 23, 23, 0.72);
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+
+.manual-match-item:hover {
+  background-color: rgba(42, 42, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.manual-match-item:focus-visible {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+
+.manual-match-title {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manual-match-meta {
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manual-empty-state {
+  padding: 18px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .episodes-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3882,8 +4018,13 @@ html.no-focus-visible .server-pill.is-selected:focus {
 
 html.no-focus-visible .episodes-popover-action.is-active:focus,
 html.no-focus-visible .season-btn.is-active:focus,
-html.no-focus-visible .episode-btn.is-active:focus {
+html.no-focus-visible .episode-btn.is-active:focus,
+html.no-focus-visible .manual-search-submit:focus {
   box-shadow: 0 0 0 2px #121212, 0 0 0 4px rgba(255, 255, 255, 0.85);
+}
+
+html.no-focus-visible .manual-match-item:focus {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
 }
 
 /* Top fixed #000000 color-extension candidate for iOS 26/27 standalone PWA ONLY (zero paint via background-clip: text; Safari untouched) */
@@ -4113,6 +4254,14 @@ html.ios-standalone .modal-backdrop {
 
   .episodes-popover-actions > * + * {
     margin-left: 6px;
+  }
+
+  .manual-search-form > * + * {
+    margin-left: 8px;
+  }
+
+  .manual-match-list > * + * {
+    margin-top: 6px;
   }
 
   .episodes-grid {

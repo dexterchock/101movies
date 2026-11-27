@@ -14,6 +14,8 @@ import {
   MediaDetails,
   MediaItem,
   ResolvedStreamSource,
+  TmdbSeasonSummary,
+  VodSeasonGroup,
   WatchProgress,
 } from "../types";
 import { escapeHtml, isInWatchLater, toggleWatchLater } from "../utils";
@@ -295,6 +297,8 @@ export function mount(
 
   const cachedVod = api.getCachedVodStreams(type, id);
   let sources: ResolvedStreamSource[] = cachedVod?.sources || [];
+  let tmdbSeasonsMeta: TmdbSeasonSummary[] = cachedVod?.tmdbSeasons || [];
+  let lastSearchQuery = cachedVod?.searchQuery || "";
   let resolving = !cachedVod;
 
   const detectedQualities: Record<string, string> = {};
@@ -310,6 +314,15 @@ export function mount(
   let isEpisodePopoverOpen = false;
   let episodeSortDesc = false;
   let shouldScrollActiveEp = false;
+  let loadingSeasonNum: number | null = null;
+  let selectedUnloadedSeasonNum: number | null = null;
+  const missingSeasonEmpty = new Set<number>();
+  let isManualPickerOpen = false;
+  let manualQuery = "";
+  let manualLoading = false;
+  let manualResults: ResolvedStreamSource[] = [];
+  let manualSearchedOnce = false;
+  let manualSearchController: AbortController | null = null;
   let initialSeekTime = 0;
   let lastSaveTime = 0;
   let currentVideoTime = 0;
@@ -468,12 +481,242 @@ export function mount(
     setHeadMeta('meta[name="twitter:image"]', "content", shareImage);
   }
 
+  type DisplaySeasonEntry =
+    | (VodSeasonGroup & { unloaded: false })
+    | {
+        seasonNumber: number;
+        name: string;
+        vodId: string | number;
+        vodName: string;
+        episodes: [];
+        unloaded: true;
+      };
+
+  function isDistinctTmdbSeasonName(name?: string): boolean {
+    const trimmed = String(name || "").trim();
+    if (!trimmed) return false;
+    if (/^第\s*[一二两三四五六七八九十\d]+\s*[季部期]$/i.test(trimmed)) return false;
+    if (/^(?:Season|Series)\s*\d+$/i.test(trimmed)) return false;
+    if (/^Specials?$/i.test(trimmed)) return false;
+    return true;
+  }
+
+  function getDisplaySeasons(serverSeasons: VodSeasonGroup[]): DisplaySeasonEntry[] {
+    const entries: DisplaySeasonEntry[] = serverSeasons.map((s) => ({
+      ...s,
+      unloaded: false as const,
+    }));
+    if (
+      type !== "tv" ||
+      tmdbSeasonsMeta.length <= 1 ||
+      tmdbSeasonsMeta.length > 15
+    ) {
+      return entries;
+    }
+
+    const s1Matched = serverSeasons.find((s) => s.seasonNumber === 1);
+    const tmdbS1 = tmdbSeasonsMeta.find((s) => s.seasonNumber === 1);
+    if (
+      s1Matched &&
+      (s1Matched.episodes.length >= 100 ||
+        (tmdbS1?.episodeCount &&
+          s1Matched.episodes.length >= tmdbS1.episodeCount * 1.5))
+    ) {
+      return entries;
+    }
+
+    const existingNums = new Set(serverSeasons.map((s) => s.seasonNumber));
+    const maxMatchedNum = serverSeasons.reduce(
+      (mx, s) => (s.seasonNumber > mx ? s.seasonNumber : mx),
+      0
+    );
+
+    for (const ts of tmdbSeasonsMeta) {
+      if (ts.seasonNumber <= 0 || existingNums.has(ts.seasonNumber)) continue;
+      if (isDistinctTmdbSeasonName(ts.name) || ts.seasonNumber < maxMatchedNum) {
+        entries.push({
+          seasonNumber: ts.seasonNumber,
+          name: `Season ${ts.seasonNumber}`,
+          vodId: 0,
+          vodName: ts.name,
+          episodes: [],
+          unloaded: true as const,
+        });
+      }
+    }
+
+    entries.sort((a, b) => a.seasonNumber - b.seasonNumber);
+    return entries;
+  }
+
+  function loadMissingSeason(targetSeasonNum: number) {
+    if (signal.aborted || loadingSeasonNum === targetSeasonNum) return;
+    selectedUnloadedSeasonNum = targetSeasonNum;
+    loadingSeasonNum = targetSeasonNum;
+    renderActionsRight();
+
+    api
+      .resolveVodSeason(id, targetSeasonNum, signal)
+      .then((res) => {
+        if (signal.aborted) return;
+        loadingSeasonNum = null;
+        const returned = res?.sources || [];
+        if (returned.length === 0) {
+          missingSeasonEmpty.add(targetSeasonNum);
+          renderActionsRight();
+          return;
+        }
+
+        const baseSiteId = (sid: string) => sid.replace(/_(?:guo|yue)$/i, "");
+        for (const retSrc of returned) {
+          const seasonGroup = retSrc.seasons?.find(
+            (s) => s.seasonNumber === targetSeasonNum
+          ) || {
+            seasonNumber: targetSeasonNum,
+            name: `Season ${targetSeasonNum}`,
+            vodId: retSrc.vodId,
+            vodName: retSrc.vodName,
+            episodes: retSrc.episodes,
+          };
+
+          const existingIdx = sources.findIndex(
+            (s) =>
+              s.sourceId === retSrc.sourceId ||
+              (!s.audioLang &&
+                !retSrc.audioLang &&
+                baseSiteId(s.sourceId) === baseSiteId(retSrc.sourceId))
+          );
+
+          if (existingIdx >= 0) {
+            const target = sources[existingIdx];
+            const prevSeasons = target.seasons
+              ? [...target.seasons]
+              : [
+                  {
+                    seasonNumber: 1,
+                    name: "Season 1",
+                    vodId: target.vodId,
+                    vodName: target.vodName,
+                    episodes: target.episodes,
+                  },
+                ];
+            if (!prevSeasons.some((s) => s.seasonNumber === targetSeasonNum)) {
+              prevSeasons.push(seasonGroup);
+              prevSeasons.sort((a, b) => a.seasonNumber - b.seasonNumber);
+              sources[existingIdx] = {
+                ...target,
+                seasons: prevSeasons,
+              };
+            }
+          } else {
+            sources.push({
+              ...retSrc,
+              seasons: [seasonGroup],
+            });
+          }
+        }
+
+        const derived = getDerivedState();
+        let serverSeasons = derived.episodeSourceServer?.seasons || [];
+        let loadedIdx = serverSeasons.findIndex(
+          (s) => s.seasonNumber === targetSeasonNum
+        );
+        if (loadedIdx < 0) {
+          const fallbackSrvIdx = sources.findIndex((src) =>
+            (src.seasons || []).some((s) => s.seasonNumber === targetSeasonNum)
+          );
+          if (fallbackSrvIdx >= 0) {
+            activeServerIndex = fallbackSrvIdx;
+            const pages = buildServerPages(sources, serverBarWidth, detectedQualities);
+            serverPage = findPageForSourceIndex(pages, fallbackSrvIdx);
+            serverSeasons = sources[fallbackSrvIdx].seasons || [];
+            loadedIdx = serverSeasons.findIndex(
+              (s) => s.seasonNumber === targetSeasonNum
+            );
+          }
+        }
+        if (loadedIdx >= 0) {
+          activeSeasonIndex = loadedIdx;
+          activeEpisodeIndex = 0;
+          selectedUnloadedSeasonNum = null;
+        } else {
+          missingSeasonEmpty.add(targetSeasonNum);
+        }
+        renderServerBar();
+        renderActionsRight();
+      })
+      .catch(() => {
+        if (signal.aborted) return;
+        loadingSeasonNum = null;
+        missingSeasonEmpty.add(targetSeasonNum);
+        renderActionsRight();
+      });
+  }
+
+  function runManualSearch(rawQuery: string) {
+    const q = rawQuery.trim();
+    if (!q || signal.aborted) return;
+    manualSearchController?.abort();
+    const ctrl = new AbortController();
+    manualSearchController = ctrl;
+    const onAbort = () => ctrl.abort();
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    manualQuery = q;
+    manualLoading = true;
+    manualSearchedOnce = true;
+    renderActionsRight();
+
+    api
+      .searchRawVodSources(type, id, q, ctrl.signal)
+      .then((res) => {
+        if (signal.aborted || ctrl.signal.aborted) return;
+        manualResults = res?.sources || [];
+        manualLoading = false;
+        renderActionsRight();
+      })
+      .catch(() => {
+        if (signal.aborted || ctrl.signal.aborted) return;
+        manualResults = [];
+        manualLoading = false;
+        renderActionsRight();
+      })
+      .finally(() => {
+        signal.removeEventListener("abort", onAbort);
+      });
+  }
+
+  function applyManualSource(picked: ResolvedStreamSource) {
+    const nextIdx = sources.findIndex((s) => s.sourceId === picked.sourceId);
+    if (nextIdx >= 0) {
+      sources[nextIdx] = picked;
+    } else {
+      sources = [picked, ...sources];
+    }
+    const targetServerIdx = nextIdx >= 0 ? nextIdx : 0;
+    const pages = buildServerPages(sources, serverBarWidth, detectedQualities);
+    serverPage = findPageForSourceIndex(pages, targetServerIdx);
+    isManualPickerOpen = false;
+    selectedUnloadedSeasonNum = null;
+
+    if (picked.episodes.length <= 1) {
+      isEpisodePopoverOpen = false;
+      startPlaybackWithProgress(targetServerIdx, 0, 0, 0);
+    } else {
+      activeServerIndex = targetServerIdx;
+      activeSeasonIndex = 0;
+      activeEpisodeIndex = 0;
+      renderBottomBar();
+    }
+  }
+
   function getDerivedState() {
     const activeServer =
       activeServerIndex !== null ? sources[activeServerIndex] || null : null;
     const episodeSourceServer = activeServer || sources[0] || null;
     const seasons = episodeSourceServer?.seasons || [];
-    const hasMultipleSeasons = seasons.length > 1;
+    const displaySeasons = getDisplaySeasons(seasons);
+    const hasMultipleSeasons = displaySeasons.length > 1;
     const safeSeasonIndex =
       seasons.length > 0 && activeSeasonIndex < seasons.length
         ? activeSeasonIndex
@@ -510,6 +753,7 @@ export function mount(
       activeServer,
       episodeSourceServer,
       seasons,
+      displaySeasons,
       hasMultipleSeasons,
       safeSeasonIndex,
       currentSeasonGroup,
@@ -1216,7 +1460,36 @@ export function mount(
       )}</span></span>`;
       retryBtn.addEventListener("click", () => loadVodStreams(true));
 
-      row.append(msg, retryBtn);
+      const searchFallbackBtn = document.createElement("button");
+      searchFallbackBtn.type = "button";
+      searchFallbackBtn.className = "server-pill";
+      searchFallbackBtn.tabIndex = 0;
+      searchFallbackBtn.innerHTML = `<span class="server-pill-inner">${icons.search(
+        "",
+        13
+      )}<span class="server-pill-name">${escapeHtml(
+        t("player.searchFallback")
+      )}</span></span>`;
+      searchFallbackBtn.addEventListener("click", () => {
+        isEpisodePopoverOpen = true;
+        isManualPickerOpen = true;
+        const defaultKw =
+          manualQuery ||
+          lastSearchQuery ||
+          details?.zh_title ||
+          details?.en_title ||
+          details?.title ||
+          details?.name ||
+          "";
+        if (defaultKw && !manualSearchedOnce) {
+          manualQuery = defaultKw;
+          runManualSearch(defaultKw);
+        } else {
+          renderActionsRight();
+        }
+      });
+
+      row.append(msg, retryBtn, searchFallbackBtn);
       serverBarEl.replaceChildren(row);
       return;
     }
@@ -1278,6 +1551,7 @@ export function mount(
         </span>
       `;
       btn.addEventListener("click", () => {
+        selectedUnloadedSeasonNum = null;
         const seekTime = isPlaying ? currentVideoTime : 0;
         const currentSeasonNum = getDerivedState().currentSeasonGroup?.seasonNumber;
         const nextSeasons = src.seasons || [];
@@ -1411,56 +1685,70 @@ export function mount(
       skelBtn.style.width = "128px";
       frag.appendChild(skelBtn);
     } else if (
-      !resolving &&
-      derived.episodeSourceServer &&
-      derived.episodes.length > 0
+      (!resolving &&
+        derived.episodeSourceServer &&
+        derived.episodes.length > 0) ||
+      isManualPickerOpen
     ) {
       const wrap = document.createElement("div");
       wrap.className = "episodes-popover-wrap";
       popoverWrapRef = wrap;
 
-      const triggerBtn = document.createElement("button");
-      triggerBtn.type = "button";
-      triggerBtn.className = "episodes-trigger-btn";
-      triggerBtn.tabIndex = 0;
-      const triggerTitle =
-        derived.hasMultipleSeasons && derived.currentSeasonGroup
-          ? t("player.seasonEpisodes", {
-              season: derived.currentSeasonGroup.seasonNumber,
-            })
-          : t("player.episodes");
+      const hasPlayableList = Boolean(
+        derived.episodeSourceServer && derived.episodes.length > 0
+      );
 
-      triggerBtn.innerHTML = `
-        <span class="episodes-trigger-inner">
-          ${icons.layers("", 14)}
-          <span>${escapeHtml(triggerTitle)}</span>
-          <span class="tabular-nums" style="font-family:ui-monospace,monospace;font-size:12px;line-height:1;color:rgba(0,0,0,0.65)">${
-            derived.safeEpisodeIndex + 1
-          }/${derived.episodes.length}</span>
-          ${icons.chevronUp("", 14)}
-        </span>
-      `;
-      const chevronEl = triggerBtn.querySelector("svg:last-of-type");
-      if (chevronEl instanceof SVGElement) {
-        chevronEl.style.transition = "transform 300ms ease";
-        chevronEl.style.transform = isEpisodePopoverOpen
-          ? "rotate(180deg)"
-          : "";
+      if (hasPlayableList) {
+        const triggerBtn = document.createElement("button");
+        triggerBtn.type = "button";
+        triggerBtn.className = "episodes-trigger-btn";
+        triggerBtn.tabIndex = 0;
+        const triggerTitle =
+          derived.hasMultipleSeasons && derived.currentSeasonGroup
+            ? t("player.seasonEpisodes", {
+                season: derived.currentSeasonGroup.seasonNumber,
+              })
+            : t("player.episodes");
+
+        triggerBtn.innerHTML = `
+          <span class="episodes-trigger-inner">
+            ${icons.layers("", 14)}
+            <span>${escapeHtml(triggerTitle)}</span>
+            <span class="tabular-nums" style="font-family:ui-monospace,monospace;font-size:12px;line-height:1;color:rgba(0,0,0,0.65)">${
+              derived.safeEpisodeIndex + 1
+            }/${derived.episodes.length}</span>
+            ${icons.chevronUp("", 14)}
+          </span>
+        `;
+        const chevronEl = triggerBtn.querySelector("svg:last-of-type");
+        if (chevronEl instanceof SVGElement) {
+          chevronEl.style.transition = "transform 300ms ease";
+          chevronEl.style.transform = isEpisodePopoverOpen
+            ? "rotate(180deg)"
+            : "";
+        }
+
+        triggerBtn.addEventListener("click", () => {
+          isEpisodePopoverOpen = !isEpisodePopoverOpen;
+          if (!isEpisodePopoverOpen) {
+            isManualPickerOpen = false;
+          } else {
+            shouldScrollActiveEp = true;
+          }
+          renderActionsRight();
+        });
+        wrap.appendChild(triggerBtn);
       }
 
-      triggerBtn.addEventListener("click", () => {
-        isEpisodePopoverOpen = !isEpisodePopoverOpen;
-        shouldScrollActiveEp = isEpisodePopoverOpen;
-        renderActionsRight();
-      });
-      wrap.appendChild(triggerBtn);
-
-      if (isEpisodePopoverOpen) {
+      if (isEpisodePopoverOpen || isManualPickerOpen) {
         const formattedLabels = derived.episodes.map((ep, idx) =>
           formatEpisodeLabel(ep.name, idx)
         );
-        const layoutMode = getEpisodeLayoutMode(formattedLabels);
-        const canReverseSort = derived.episodes.length >= 24;
+        const layoutMode = isManualPickerOpen
+          ? "wide"
+          : getEpisodeLayoutMode(formattedLabels);
+        const canReverseSort =
+          !isManualPickerOpen && derived.episodes.length >= 24;
         const effectiveSortDesc = canReverseSort && episodeSortDesc;
 
         const popover = document.createElement("div");
@@ -1471,16 +1759,22 @@ export function mount(
 
         const header = document.createElement("div");
         header.className = "episodes-popover-header";
+        const headerTitleText = isManualPickerOpen
+          ? t("player.manualSearchTitle")
+          : derived.hasMultipleSeasons
+          ? t("player.selectSeasonEpisode")
+          : t("player.selectEpisode");
+        const headerCountHtml = isManualPickerOpen
+          ? ""
+          : `<span class="tabular-nums" style="font-size:12px;font-family:ui-monospace,monospace;color:rgba(255,255,255,0.5);flex-shrink:0">&middot; ${escapeHtml(
+              t("player.epsCount", { count: derived.episodes.length })
+            )}</span>`;
         header.innerHTML = `
           <div style="display:flex;align-items:center;gap:8px;min-width:0">
             <span style="font-size:14px;font-weight:700;color:#ffffff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(
-              derived.hasMultipleSeasons
-                ? t("player.selectSeasonEpisode")
-                : t("player.selectEpisode")
+              headerTitleText
             )}</span>
-            <span class="tabular-nums" style="font-size:12px;font-family:ui-monospace,monospace;color:rgba(255,255,255,0.5);flex-shrink:0">&middot; ${escapeHtml(
-              t("player.epsCount", { count: derived.episodes.length })
-            )}</span>
+            ${headerCountHtml}
           </div>
         `;
 
@@ -1518,6 +1812,43 @@ export function mount(
           headerActions.appendChild(sortBtn);
         }
 
+        const manualBtn = document.createElement("button");
+        manualBtn.type = "button";
+        manualBtn.dataset.manualSearchBtn = "true";
+        manualBtn.className = isManualPickerOpen
+          ? "episodes-popover-action is-active"
+          : "episodes-popover-action";
+        manualBtn.setAttribute("aria-label", t("player.manualSearchAria"));
+        manualBtn.setAttribute("aria-pressed", String(isManualPickerOpen));
+        manualBtn.title = t("player.manualSearchAria");
+        manualBtn.innerHTML = `<span class="popover-icon-inner">${icons.search(
+          "",
+          14
+        )}</span>`;
+        manualBtn.addEventListener("click", () => {
+          isManualPickerOpen = !isManualPickerOpen;
+          if (isManualPickerOpen) {
+            isEpisodePopoverOpen = true;
+            const defaultKw =
+              manualQuery ||
+              lastSearchQuery ||
+              details?.zh_title ||
+              details?.en_title ||
+              details?.title ||
+              details?.name ||
+              "";
+            if (defaultKw && !manualSearchedOnce) {
+              manualQuery = defaultKw;
+              runManualSearch(defaultKw);
+              return;
+            }
+          } else if (!hasPlayableList) {
+            isEpisodePopoverOpen = false;
+          }
+          renderActionsRight();
+        });
+        headerActions.appendChild(manualBtn);
+
         const closeBtn = document.createElement("button");
         closeBtn.type = "button";
         closeBtn.className = "episodes-popover-close";
@@ -1529,6 +1860,7 @@ export function mount(
         )}</span>`;
         closeBtn.addEventListener("click", () => {
           isEpisodePopoverOpen = false;
+          isManualPickerOpen = false;
           renderActionsRight();
         });
         headerActions.appendChild(closeBtn);
@@ -1536,78 +1868,183 @@ export function mount(
         popover.appendChild(header);
 
         let seasonBarRef: HTMLDivElement | null = null;
-        if (derived.hasMultipleSeasons) {
-          const seasonBar = document.createElement("div");
-          seasonBar.className = "season-bar no-scrollbar";
-          derived.seasons.forEach((season, sIdx) => {
-            const sBtn = document.createElement("button");
-            sBtn.type = "button";
-            sBtn.className =
-              derived.safeSeasonIndex === sIdx
-                ? "season-btn is-active tabular-nums"
-                : "season-btn tabular-nums";
-            sBtn.tabIndex = 0;
-            const sLabel = isZh()
-              ? t("player.seasonName", { season: season.seasonNumber })
-              : season.name;
-            sBtn.innerHTML = `<span class="season-btn-inner">${escapeHtml(sLabel)}</span>`;
-            sBtn.addEventListener("click", () => {
-              activeSeasonIndex = sIdx;
-              activeEpisodeIndex = 0;
-              renderActionsRight();
-            });
-            seasonBar.appendChild(sBtn);
+        let epGridRef: HTMLDivElement | null = null;
+
+        if (isManualPickerOpen) {
+          const searchForm = document.createElement("form");
+          searchForm.className = "manual-search-form";
+          const inputEl = document.createElement("input");
+          inputEl.type = "text";
+          inputEl.className = "manual-search-input";
+          inputEl.placeholder = t("player.manualSearchPlaceholder");
+          inputEl.value = manualQuery;
+          inputEl.addEventListener("input", () => {
+            manualQuery = inputEl.value;
           });
-          seasonBarRef = seasonBar;
-          popover.appendChild(seasonBar);
-        }
+          const submitBtn = document.createElement("button");
+          submitBtn.type = "submit";
+          submitBtn.className = "manual-search-submit";
+          submitBtn.textContent = t("player.manualSearchBtn");
+          searchForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            runManualSearch(inputEl.value);
+          });
+          searchForm.append(inputEl, submitBtn);
+          popover.appendChild(searchForm);
 
-        const epGrid = document.createElement("div");
-        epGrid.className =
-          layoutMode === "compact"
-            ? "episodes-grid no-scrollbar"
-            : `episodes-grid episodes-grid--${layoutMode} no-scrollbar`;
-
-        const totalEps = derived.episodes.length;
-        for (let step = 0; step < totalEps; step++) {
-          const idx = effectiveSortDesc ? totalEps - 1 - step : step;
-          const isCurrentEp = isPlaying && derived.safeEpisodeIndex === idx;
-          const epLabel = formattedLabels[idx];
-          const epBtn = document.createElement("button");
-          epBtn.type = "button";
-          epBtn.className = isCurrentEp
-            ? "episode-btn is-active tabular-nums"
-            : "episode-btn tabular-nums";
-          epBtn.title = epLabel;
-          epBtn.tabIndex = 0;
-          if (layoutMode === "list") {
-            const labelSpan = document.createElement("span");
-            labelSpan.className = "episode-btn-inner episode-btn-label";
-            labelSpan.textContent = epLabel;
-            epBtn.appendChild(labelSpan);
+          const matchList = document.createElement("div");
+          matchList.className = "manual-match-list no-scrollbar";
+          if (manualLoading) {
+            const statusEl = document.createElement("div");
+            statusEl.className = "manual-empty-state";
+            statusEl.textContent = t("player.manualSearching");
+            matchList.appendChild(statusEl);
+          } else if (manualResults.length === 0) {
+            const emptyEl = document.createElement("div");
+            emptyEl.className = "manual-empty-state";
+            emptyEl.textContent = t("player.manualNoMatches");
+            matchList.appendChild(emptyEl);
           } else {
-            const innerSpan = document.createElement("span");
-            innerSpan.className = "episode-btn-inner";
-            innerSpan.textContent = epLabel;
-            epBtn.appendChild(innerSpan);
+            for (const item of manualResults) {
+              const rowBtn = document.createElement("button");
+              rowBtn.type = "button";
+              rowBtn.className = "manual-match-item";
+              const metaBits = [
+                item.sourceName,
+                item.vodYear,
+                item.vodRemarks,
+                t("player.epsCount", { count: item.episodes.length }),
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              rowBtn.innerHTML = `
+                <span class="manual-match-title">${escapeHtml(item.vodName)}</span>
+                <span class="manual-match-meta tabular-nums">${escapeHtml(metaBits)}</span>
+              `;
+              rowBtn.addEventListener("click", () => applyManualSource(item));
+              matchList.appendChild(rowBtn);
+            }
           }
-          epBtn.addEventListener("click", () => {
-            const targetServerIdx =
-              activeServerIndex !== null ? activeServerIndex : 0;
-            isEpisodePopoverOpen = false;
-            startPlaybackWithProgress(
-              targetServerIdx,
-              derived.safeSeasonIndex,
-              idx,
-              0
-            );
-          });
-          epGrid.appendChild(epBtn);
+          popover.appendChild(matchList);
+        } else {
+          if (derived.hasMultipleSeasons) {
+            const seasonBar = document.createElement("div");
+            seasonBar.className = "season-bar no-scrollbar";
+            derived.displaySeasons.forEach((season) => {
+              const sBtn = document.createElement("button");
+              sBtn.type = "button";
+              const isSelectedUnloaded =
+                season.unloaded &&
+                selectedUnloadedSeasonNum === season.seasonNumber;
+              const matchedIdx = derived.seasons.findIndex(
+                (ms) => ms.seasonNumber === season.seasonNumber
+              );
+              const isActive =
+                !season.unloaded &&
+                selectedUnloadedSeasonNum === null &&
+                derived.safeSeasonIndex === matchedIdx;
+              sBtn.className = [
+                "season-btn tabular-nums",
+                isActive ? "is-active" : "",
+                season.unloaded ? "is-unloaded" : "",
+                isSelectedUnloaded ? "is-loading-target" : "",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              sBtn.tabIndex = 0;
+              const sLabel = isZh()
+                ? t("player.seasonName", { season: season.seasonNumber })
+                : season.name;
+              sBtn.innerHTML = `<span class="season-btn-inner">${escapeHtml(
+                sLabel
+              )}</span>`;
+              sBtn.addEventListener("click", () => {
+                if (season.unloaded) {
+                  loadMissingSeason(season.seasonNumber);
+                  return;
+                }
+                selectedUnloadedSeasonNum = null;
+                activeSeasonIndex = matchedIdx >= 0 ? matchedIdx : 0;
+                activeEpisodeIndex = 0;
+                renderActionsRight();
+              });
+              seasonBar.appendChild(sBtn);
+            });
+            seasonBarRef = seasonBar;
+            popover.appendChild(seasonBar);
+          }
+
+          if (
+            selectedUnloadedSeasonNum !== null &&
+            loadingSeasonNum === selectedUnloadedSeasonNum
+          ) {
+            const loadingEl = document.createElement("div");
+            loadingEl.className = "manual-empty-state";
+            loadingEl.textContent = t("player.loadingSeason", {
+              season: selectedUnloadedSeasonNum,
+            });
+            popover.appendChild(loadingEl);
+          } else if (
+            selectedUnloadedSeasonNum !== null &&
+            missingSeasonEmpty.has(selectedUnloadedSeasonNum)
+          ) {
+            const emptySeasonEl = document.createElement("div");
+            emptySeasonEl.className = "manual-empty-state";
+            emptySeasonEl.textContent = t("player.seasonNotFound", {
+              season: selectedUnloadedSeasonNum,
+            });
+            popover.appendChild(emptySeasonEl);
+          } else {
+            const epGrid = document.createElement("div");
+            epGrid.className =
+              layoutMode === "compact"
+                ? "episodes-grid no-scrollbar"
+                : `episodes-grid episodes-grid--${layoutMode} no-scrollbar`;
+
+            const totalEps = derived.episodes.length;
+            for (let step = 0; step < totalEps; step++) {
+              const idx = effectiveSortDesc ? totalEps - 1 - step : step;
+              const isCurrentEp = isPlaying && derived.safeEpisodeIndex === idx;
+              const epLabel = formattedLabels[idx];
+              const epBtn = document.createElement("button");
+              epBtn.type = "button";
+              epBtn.className = isCurrentEp
+                ? "episode-btn is-active tabular-nums"
+                : "episode-btn tabular-nums";
+              epBtn.title = epLabel;
+              epBtn.tabIndex = 0;
+              if (layoutMode === "list") {
+                const labelSpan = document.createElement("span");
+                labelSpan.className = "episode-btn-inner episode-btn-label";
+                labelSpan.textContent = epLabel;
+                epBtn.appendChild(labelSpan);
+              } else {
+                const innerSpan = document.createElement("span");
+                innerSpan.className = "episode-btn-inner";
+                innerSpan.textContent = epLabel;
+                epBtn.appendChild(innerSpan);
+              }
+              epBtn.addEventListener("click", () => {
+                const targetServerIdx =
+                  activeServerIndex !== null ? activeServerIndex : 0;
+                isEpisodePopoverOpen = false;
+                startPlaybackWithProgress(
+                  targetServerIdx,
+                  derived.safeSeasonIndex,
+                  idx,
+                  0
+                );
+              });
+              epGrid.appendChild(epBtn);
+            }
+            epGridRef = epGrid;
+            popover.appendChild(epGrid);
+          }
         }
-        popover.appendChild(epGrid);
+
         wrap.appendChild(popover);
 
-        if (shouldScrollActiveEp) {
+        if (shouldScrollActiveEp && !isManualPickerOpen) {
           shouldScrollActiveEp = false;
           window.requestAnimationFrame(() => {
             if (signal.aborted) return;
@@ -1624,16 +2061,17 @@ export function mount(
                 seasonBarRef.scrollTop = Math.max(0, targetSeasonTop);
               }
             }
+            if (!epGridRef) return;
             const activeBtn =
-              epGrid.querySelector<HTMLElement>(".episode-btn.is-active");
+              epGridRef.querySelector<HTMLElement>(".episode-btn.is-active");
             if (!activeBtn) return;
-            const epRect = epGrid.getBoundingClientRect();
+            const epRect = epGridRef.getBoundingClientRect();
             const btnRect = activeBtn.getBoundingClientRect();
             const targetTop =
-              epGrid.scrollTop +
+              epGridRef.scrollTop +
               (btnRect.top - epRect.top) -
-              Math.max(0, (epGrid.clientHeight - btnRect.height) / 2);
-            epGrid.scrollTop = Math.max(0, targetTop);
+              Math.max(0, (epGridRef.clientHeight - btnRect.height) / 2);
+            epGridRef.scrollTop = Math.max(0, targetTop);
           });
         }
       }
@@ -1813,6 +2251,8 @@ export function mount(
       .then((res) => {
         if (signal.aborted) return;
         sources = res.sources || [];
+        tmdbSeasonsMeta = res.tmdbSeasons || [];
+        lastSearchQuery = res.searchQuery || lastSearchQuery;
         sources.forEach((src) => {
           const q = api.getCachedManifestQuality(src.episodes?.[0]?.url);
           if (q) detectedQualities[src.sourceId] = q;

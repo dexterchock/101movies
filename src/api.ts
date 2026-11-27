@@ -769,7 +769,7 @@ export const api = {
     const ram = vodResolveCache.get(key);
     if (ram) return ram;
     if (!customKeyword?.trim() && disabledIds.length === 0) {
-      const apiPath = `/api/vod/resolve?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&v=10`;
+      const apiPath = `/api/vod/resolve?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&v=11`;
       const disk = readPersistentCache<VodResolveResponse>("local", apiPath);
       if (disk && Array.isArray(disk.sources) && disk.sources.length > 0) {
         setBoundedCache(vodResolveCache, key, disk, 80);
@@ -949,7 +949,7 @@ export const api = {
     const queryParts = [
       `type=${encodeURIComponent(type)}`,
       `id=${encodeURIComponent(id)}`,
-      "v=10",
+      "v=11",
     ];
     if (customKeyword && customKeyword.trim()) {
       queryParts.push(`wd=${encodeURIComponent(customKeyword.trim())}`);
@@ -994,6 +994,48 @@ export const api = {
     vodResolveInflight.set(key, entry);
     return awaitEntryWithSignal(entry, signal, () =>
       vodResolveInflight.delete(key)
+    );
+  },
+
+  async resolveVodSeason(
+    id: string,
+    seasonNumber: number,
+    signal?: AbortSignal
+  ): Promise<VodResolveResponse> {
+    const key = `tv:${id}:season:${seasonNumber}`;
+    const ram = vodResolveCache.get(key);
+    if (ram) return ram;
+
+    const apiPath = `/api/vod/resolve?type=tv&id=${encodeURIComponent(
+      id
+    )}&season=${encodeURIComponent(String(seasonNumber))}&v=11`;
+    const data = await fetchJsonWithLocalFallback<VodResolveResponse>(
+      apiPath,
+      (d) => Array.isArray(d?.sources) && d.sources.length > 0,
+      signal,
+      true
+    );
+    if (data && Array.isArray(data.sources) && data.sources.length > 0) {
+      setBoundedCache(vodResolveCache, key, data, 80);
+    }
+    return data;
+  },
+
+  async searchRawVodSources(
+    type: "movie" | "tv",
+    id: string,
+    keyword: string,
+    signal?: AbortSignal
+  ): Promise<VodResolveResponse> {
+    const trimmed = keyword.trim();
+    const apiPath = `/api/vod/resolve?type=${encodeURIComponent(
+      type
+    )}&id=${encodeURIComponent(id)}&wd=${encodeURIComponent(trimmed)}&raw=1&v=11`;
+    return fetchJsonWithLocalFallback<VodResolveResponse>(
+      apiPath,
+      (d) => Array.isArray(d?.sources) && d.sources.length > 0,
+      signal,
+      false
     );
   },
 

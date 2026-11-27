@@ -168,6 +168,13 @@ export interface VodSeasonGroup {
   episodes: VodEpisode[];
 }
 
+export interface TmdbSeasonSummary {
+  seasonNumber: number;
+  name: string;
+  airDate?: string;
+  episodeCount?: number;
+}
+
 export interface ResolvedStreamSource {
   sourceId: string;
   sourceName: string;
@@ -192,5 +199,6 @@ export interface VodResolveResponse {
   candidateTitles: string[];
   releaseYear?: string;
   sources: ResolvedStreamSource[];
+  tmdbSeasons?: TmdbSeasonSummary[];
   hadTransientErrors?: boolean;
 }

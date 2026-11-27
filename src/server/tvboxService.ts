@@ -4,6 +4,7 @@ import type {
   VodEpisode,
   VodPlayGroup,
   VodSeasonGroup,
+  TmdbSeasonSummary,
   ResolvedStreamSource,
   VodResolveResponse,
 } from "../types.js";
@@ -1030,6 +1031,7 @@ export function buildSearchKeywords(
 export interface TmdbSeasonMeta {
   seasonNumber: number;
   name: string;
+  airDate?: string;
   airYear?: number;
   episodeCount?: number;
 }
@@ -1276,6 +1278,214 @@ export function evaluateYearMatch(
     return { matched: true, bonus: 0 };
   }
   return { matched: false, bonus: 0 };
+}
+
+export function parseAllIsoDateDays(raw: unknown): number[] {
+  const str = String(raw || "").trim();
+  if (!str) return [];
+  const days: number[] = [];
+  const seen = new Set<number>();
+  const re = /((?:19|20)\d{2})[-/.](1[0-2]|0?[1-9])[-/.](3[01]|[12]\d|0?[1-9])(?!\d)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(str)) !== null) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (
+      dt.getUTCFullYear() !== y ||
+      dt.getUTCMonth() !== mo - 1 ||
+      dt.getUTCDate() !== d
+    ) {
+      continue;
+    }
+    const dayNum = Math.floor(dt.getTime() / 86_400_000);
+    if (!seen.has(dayNum)) {
+      seen.add(dayNum);
+      days.push(dayNum);
+    }
+  }
+  return days;
+}
+
+export function parseSingleIsoDateDay(raw?: string): number | null {
+  const days = parseAllIsoDateDays(raw);
+  return days.length > 0 ? days[0] : null;
+}
+
+export function extractDoubanId(raw: unknown): string | null {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 100000) return null;
+  return String(Math.floor(n));
+}
+
+export function getMinDayDiff(days: number[], targetDay: number | null): number | null {
+  if (targetDay === null || days.length === 0) return null;
+  let best = Infinity;
+  for (const d of days) {
+    const diff = Math.abs(d - targetDay);
+    if (diff < best) best = diff;
+  }
+  return Number.isFinite(best) ? best : null;
+}
+
+interface RawSiteBatch {
+  site: VodSite;
+  keyword: string;
+  list: any[];
+  latencyMs: number;
+}
+
+interface CrossSiteDoubanConsensus {
+  doubanDates: Map<string, Set<number>>;
+  doubanSeason: Map<string, number>;
+  matchedMovieDoubanIds: Set<string>;
+}
+
+function buildDoubanDatesMap(batches: RawSiteBatch[]): Map<string, Set<number>> {
+  const doubanDates = new Map<string, Set<number>>();
+  for (const batch of batches) {
+    for (const item of batch.list) {
+      const dbId = extractDoubanId(item?.vod_douban_id);
+      if (!dbId) continue;
+      const days = parseAllIsoDateDays(item?.vod_pubdate);
+      if (days.length === 0) continue;
+      let set = doubanDates.get(dbId);
+      if (!set) {
+        set = new Set<number>();
+        doubanDates.set(dbId, set);
+      }
+      for (const d of days) set.add(d);
+    }
+  }
+  return doubanDates;
+}
+
+function getEffectivePubDays(
+  item: any,
+  doubanDates?: Map<string, Set<number>>
+): number[] {
+  const own = parseAllIsoDateDays(item?.vod_pubdate);
+  const dbId = extractDoubanId(item?.vod_douban_id);
+  const pooled = dbId ? doubanDates?.get(dbId) : undefined;
+  if (!pooled || pooled.size === 0) return own;
+  if (own.length === 0) return Array.from(pooled);
+  const merged = new Set<number>(own);
+  for (const d of pooled) merged.add(d);
+  return Array.from(merged);
+}
+
+export function matchTvSeasonByDateOrInterval(params: {
+  pubDays: number[];
+  tmdbSeasons: TmdbSeasonMeta[];
+  episodeCount: number;
+  partNumber: number | null;
+  isFinalSeason: boolean;
+  parsedSeasonNumber: number | null;
+  hasExplicitTitleSeason: boolean;
+  isAnimation?: boolean;
+  isOngoingNow: boolean;
+  isExactBaseTitle: boolean;
+}): { seasonNumber: number; matchKind: "exact_date" | "cour_interval" } | null {
+  const {
+    pubDays,
+    tmdbSeasons,
+    episodeCount,
+    partNumber,
+    isFinalSeason,
+    parsedSeasonNumber,
+    hasExplicitTitleSeason,
+    isAnimation,
+    isOngoingNow,
+    isExactBaseTitle,
+  } = params;
+
+  if (pubDays.length === 0 || tmdbSeasons.length === 0) return null;
+
+  const seasonsWithDays = tmdbSeasons
+    .filter((s) => s.seasonNumber > 0)
+    .map((s) => ({
+      ...s,
+      airDay: parseSingleIsoDateDay(s.airDate),
+    }))
+    .filter((s): s is TmdbSeasonMeta & { airDay: number } => s.airDay !== null)
+    .sort((a, b) => a.seasonNumber - b.seasonNumber);
+
+  if (seasonsWithDays.length === 0) return null;
+
+  // Tier 1: Exact premiere date match (within +-4 days for JST/UTC/broadcast offsets)
+  const exactHits: (TmdbSeasonMeta & { airDay: number; bestDiff: number })[] = [];
+  for (const s of seasonsWithDays) {
+    const diff = getMinDayDiff(pubDays, s.airDay);
+    if (diff === null || diff > 4) continue;
+    if (
+      episodeCount <= 2 &&
+      !isOngoingNow &&
+      !(s.episodeCount !== undefined && s.episodeCount <= 2) &&
+      !isExactBaseTitle
+    ) {
+      continue;
+    }
+    if (
+      hasExplicitTitleSeason &&
+      parsedSeasonNumber !== null &&
+      parsedSeasonNumber !== s.seasonNumber &&
+      diff > 2
+    ) {
+      continue;
+    }
+    exactHits.push({ ...s, bestDiff: diff });
+  }
+
+  if (exactHits.length === 1) {
+    return { seasonNumber: exactHits[0].seasonNumber, matchKind: "exact_date" };
+  }
+  if (exactHits.length > 1) {
+    exactHits.sort((a, b) => a.bestDiff - b.bestDiff);
+    if (exactHits[0].bestDiff < exactHits[1].bestDiff) {
+      return { seasonNumber: exactHits[0].seasonNumber, matchKind: "exact_date" };
+    }
+  }
+
+  // Tier 2: Split-cour timeline interval match (e.g. Egypt Arc 2015-01-09 inside JoJo S2 2014..2016)
+  if (episodeCount <= 2 && !isOngoingNow) return null;
+  if (hasExplicitTitleSeason && parsedSeasonNumber !== null) return null;
+  if (partNumber === null && !isFinalSeason && isAnimation !== true) return null;
+
+  const intervalHits: TmdbSeasonMeta[] = [];
+  for (let i = 0; i < seasonsWithDays.length; i++) {
+    const s = seasonsWithDays[i];
+    if (
+      s.seasonNumber === 1 &&
+      tmdbSeasons.length === 1 &&
+      partNumber === null &&
+      !isFinalSeason
+    ) {
+      continue;
+    }
+    if (
+      s.episodeCount !== undefined &&
+      s.episodeCount < 18 &&
+      partNumber === null &&
+      !isFinalSeason
+    ) {
+      continue;
+    }
+    const nextSeason = seasonsWithDays[i + 1];
+    const upperBound = nextSeason
+      ? nextSeason.airDay - 4
+      : s.airDay + (partNumber !== null || isFinalSeason ? 730 : 540);
+    const inInterval = pubDays.some((d) => d > s.airDay + 4 && d < upperBound);
+    if (inInterval) {
+      intervalHits.push(s);
+    }
+  }
+
+  if (intervalHits.length === 1) {
+    return { seasonNumber: intervalHits[0].seasonNumber, matchKind: "cour_interval" };
+  }
+
+  return null;
 }
 
 const GENERIC_SEASON_STOP_WORDS = new Set([
@@ -1667,6 +1877,8 @@ export function resolveTvCandidateMatch(params: {
   tmdbSeasons?: TmdbSeasonMeta[];
   isAnimation?: boolean;
   targetYear?: string;
+  pubDays?: number[];
+  doubanMatchedSeason?: number | null;
 }): TvCandidateResolution {
   const {
     vodName,
@@ -1678,6 +1890,8 @@ export function resolveTvCandidateMatch(params: {
     tmdbSeasons,
     isAnimation,
     targetYear,
+    pubDays,
+    doubanMatchedSeason,
   } = params;
 
   const noMatch: TvCandidateResolution = {
@@ -1726,6 +1940,72 @@ export function resolveTvCandidateMatch(params: {
   const partNumber =
     parsed.partNumber ?? parsedPart ?? subArcPartNumber ?? aliasSeason?.partNumber ?? null;
   const isOngoingNow = isOngoingCurrentYear(vodYear, vodRemarks);
+  const hasExplicitTitleSeason = parsed.seasonNumber !== null && parsedBaseIsTarget;
+  const hasSeriesIdentity =
+    baseTitleScore >= 140 ||
+    anchored !== null ||
+    (doubanMatchedSeason !== null && doubanMatchedSeason !== undefined);
+
+  if (!hasSeriesIdentity) {
+    return noMatch;
+  }
+
+  const resolvedArcKey = parsed.subtitle
+    ? normalizeTitleForComparison(parsed.subtitle)
+    : normRest;
+  const resolvedFinalSeason = Boolean(
+    parsed.isFinalSeason || aliasSeason?.isFinalSeason
+  );
+
+  // Deterministic tier 1: Exact air date / split-cour timeline interval match against TMDB seasons
+  if (pubDays && pubDays.length > 0 && tmdbSeasons && tmdbSeasons.length > 0) {
+    const dateMatch = matchTvSeasonByDateOrInterval({
+      pubDays,
+      tmdbSeasons,
+      episodeCount,
+      partNumber,
+      isFinalSeason: resolvedFinalSeason,
+      parsedSeasonNumber: parsed.seasonNumber,
+      hasExplicitTitleSeason,
+      isAnimation,
+      isOngoingNow,
+      isExactBaseTitle: baseTitleScore >= 240,
+    });
+    if (dateMatch) {
+      return {
+        matched: true,
+        titleScore: Math.max(
+          baseTitleScore,
+          dateMatch.matchKind === "exact_date" ? 260 : 240
+        ),
+        seasonNumber: dateMatch.seasonNumber,
+        partNumber,
+        isFinalSeason: resolvedFinalSeason,
+        arcKey: resolvedArcKey,
+        tmdbMatchedSeason: dateMatch.seasonNumber,
+        hasExplicitTitleSeason,
+      };
+    }
+  }
+
+  // Deterministic tier 2: Cross-site Douban ID consensus match
+  if (
+    doubanMatchedSeason !== null &&
+    doubanMatchedSeason !== undefined &&
+    doubanMatchedSeason > 0 &&
+    (episodeCount > 2 || isOngoingNow || baseTitleScore >= 240)
+  ) {
+    return {
+      matched: true,
+      titleScore: Math.max(baseTitleScore, 250),
+      seasonNumber: doubanMatchedSeason,
+      partNumber,
+      isFinalSeason: resolvedFinalSeason,
+      arcKey: resolvedArcKey,
+      tmdbMatchedSeason: doubanMatchedSeason,
+      hasExplicitTitleSeason,
+    };
+  }
 
   // Path 1: Direct base title match (exact title or explicit Season X / 第X季 / 最终季 / digit sequel)
   if (baseTitleScore >= 140) {
@@ -1966,19 +2246,106 @@ function sequentializeCourEpisodes(cours: { episodes: VodEpisode[] }[]): VodEpis
   });
 }
 
-async function searchSingleVodSite(
+function isExcludedVodItem(
+  item: any,
+  mediaType?: "movie" | "tv",
+  isAnimation?: boolean
+): boolean {
+  const vodName = String(item?.vod_name || "").trim();
+  const vodSub = String(item?.vod_sub || "").trim();
+  const vodRemarks = String(item?.vod_remarks || "").trim();
+  return (
+    isIncompatibleVodCategory(item?.type_name, mediaType) ||
+    isIncompatibleTvSpinOffOrAdaptation(
+      vodName,
+      item?.type_name,
+      mediaType,
+      isAnimation,
+      vodSub
+    ) ||
+    vodName.includes("解说") ||
+    vodName.includes("预告") ||
+    vodName.includes("短剧") ||
+    vodRemarks.includes("预告") ||
+    vodRemarks.includes("花絮") ||
+    vodRemarks.includes("先导") ||
+    vodRemarks.includes("电影解说")
+  );
+}
+
+function evaluateMovieCandidate(params: {
+  item: any;
+  preparedTargets: PreparedTargetTitle[];
+  targetYear?: string;
+  targetDateDay: number | null;
+  doubanDates?: Map<string, Set<number>>;
+  matchedMovieDoubanIds?: Set<string>;
+}): { matched: boolean; score: number; matchedByExactDate: boolean } {
+  const {
+    item,
+    preparedTargets,
+    targetYear,
+    targetDateDay,
+    doubanDates,
+    matchedMovieDoubanIds,
+  } = params;
+  const vodName = String(item?.vod_name || "").trim();
+  const vodSub = String(item?.vod_sub || "").trim();
+  const vodYearMatch = String(item?.vod_year || "").match(/(19|20)\d{2}/);
+  const vodYear = vodYearMatch ? vodYearMatch[0] : "";
+
+  let titleScore = computeTitleMatchScore(
+    vodName,
+    vodSub,
+    preparedTargets,
+    "movie",
+    targetYear
+  );
+  const dbId = extractDoubanId(item?.vod_douban_id);
+  const isConsensusDouban = Boolean(dbId && matchedMovieDoubanIds?.has(dbId));
+  if (isConsensusDouban) {
+    titleScore = Math.max(titleScore, 240);
+  }
+
+  const pubDays = getEffectivePubDays(item, doubanDates);
+  const dayDiff = getMinDayDiff(pubDays, targetDateDay);
+
+  if (dayDiff !== null && dayDiff <= 4 && titleScore >= 110) {
+    return {
+      matched: true,
+      score: titleScore + 160,
+      matchedByExactDate: true,
+    };
+  }
+  if (dayDiff !== null && dayDiff <= 45 && titleScore >= 140) {
+    return {
+      matched: true,
+      score: titleScore + 110,
+      matchedByExactDate: false,
+    };
+  }
+  if (titleScore < 140) {
+    return { matched: false, score: 0, matchedByExactDate: false };
+  }
+  const yearCheck = evaluateYearMatch("movie", targetYear, vodYear, titleScore);
+  if (!yearCheck.matched) {
+    return { matched: false, score: 0, matchedByExactDate: false };
+  }
+  return {
+    matched: true,
+    score: titleScore + yearCheck.bonus,
+    matchedByExactDate: false,
+  };
+}
+
+async function fetchRawVodSiteBatch(
   site: VodSite,
   keyword: string,
-  targetTitles: string[] | PreparedTargetTitle[],
-  targetYear?: string,
-  mediaType?: "movie" | "tv",
   timeoutMs = 2400,
   externalSignal?: AbortSignal,
-  onOutcome?: (outcome: "ok" | "error" | "timeout") => void,
-  isAnimation?: boolean,
-  tmdbSeasons?: TmdbSeasonMeta[]
-): Promise<ResolvedStreamSource[]> {
-  if (externalSignal?.aborted) return [];
+  onOutcome?: (outcome: "ok" | "error" | "timeout") => void
+): Promise<RawSiteBatch | null> {
+  if (externalSignal?.aborted) return null;
   const start = Date.now();
   const sep = site.api.includes("?") ? "&" : "?";
   const searchUrl = `${site.api}${sep}ac=videolist&wd=${encodeURIComponent(keyword)}`;
@@ -2006,101 +2373,93 @@ async function searchSingleVodSite(
     if (!res.ok) {
       recordSiteFailure(site.id);
       onOutcome?.("error");
-      return [];
+      return null;
     }
     const data: any = await res.json();
     recordSiteSuccess(site.id);
     onOutcome?.("ok");
     const list = Array.isArray(data?.list) ? data.list : [];
-    if (list.length === 0) return [];
+    if (list.length === 0) return null;
 
-    const latencyMs = Date.now() - start;
-
-    type ScoredCandidate = {
-      item: any;
-      score: number;
-      seasonNumber: number | null;
-      partNumber: number | null;
-      isFinalSeason: boolean;
-      arcKey: string;
-      tmdbMatchedSeason: number | null;
-      hasExplicitTitleSeason: boolean;
-      vodYearNum: number;
-      audioLang?: "粤语" | "国语";
-      explicitTitleLang?: "粤语" | "国语";
-      playGroups: VodPlayGroup[];
-      episodes: VodEpisode[];
+    return {
+      site,
+      keyword,
+      list,
+      latencyMs: Date.now() - start,
     };
-
-    const preparedTargets: PreparedTargetTitle[] =
-      targetTitles.length > 0 && typeof targetTitles[0] === "string"
-        ? prepareTargetTitles(targetTitles as string[], mediaType)
-        : (targetTitles as PreparedTargetTitle[]);
-    const tmdbSeasonAirYears =
-      tmdbSeasons
-        ?.map((s) => s.airYear)
-        .filter((y): y is number => typeof y === "number" && y > 0) || undefined;
-
-    const validCandidates: ScoredCandidate[] = [];
-
-    for (const item of list) {
-      if (!item.vod_play_url) continue;
-
-      const vodName = String(item.vod_name || "").trim();
-      const vodSub = String(item.vod_sub || "").trim();
-      const vodRemarks = String(item.vod_remarks || "").trim();
-      const vodLang = String(item.vod_lang || "").trim();
-      const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
-      const vodYear = vodYearMatch ? vodYearMatch[0] : "";
-      const vodYearNum = vodYear ? Number(vodYear) : 0;
-
-      // Reject recaps ("解说"), trailers ("预告"/"花絮"/"先导"), micro-dramas ("短剧"), spin-offs/live-action adaptations, and wrong movie/tv categories
-      if (
-        isIncompatibleVodCategory(item.type_name, mediaType) ||
-        isIncompatibleTvSpinOffOrAdaptation(
-          vodName,
-          item.type_name,
-          mediaType,
-          isAnimation,
-          vodSub
-        ) ||
-        vodName.includes("解说") ||
-        vodName.includes("预告") ||
-        vodName.includes("短剧") ||
-        vodRemarks.includes("预告") ||
-        vodRemarks.includes("花絮") ||
-        vodRemarks.includes("先导") ||
-        vodRemarks.includes("电影解说")
-      ) {
-        continue;
+  } catch {
+    if (!externalSignal?.aborted) {
+      if (timedOut) {
+        onOutcome?.("timeout");
+        // Skip tripping circuit cooldown on short timeouts (slow PHP search != broken video CDN)
+        if (timeoutMs >= 5000) {
+          recordSiteFailure(site.id);
+        }
+      } else {
+        onOutcome?.("error");
+        recordSiteFailure(site.id);
       }
+    }
+    return null;
+  } finally {
+    clearTimeout(timer);
+    if (externalSignal) {
+      externalSignal.removeEventListener("abort", onExternalAbort);
+    }
+  }
+}
 
-      const { playGroups, bestEpisodes } = parseVodPlayGroups(
+function buildCrossSiteDoubanConsensus(params: {
+  batches: RawSiteBatch[];
+  preparedTargets: PreparedTargetTitle[];
+  mediaType?: "movie" | "tv";
+  targetYear?: string;
+  targetDateDay: number | null;
+  isAnimation?: boolean;
+  tmdbSeasons?: TmdbSeasonMeta[];
+}): CrossSiteDoubanConsensus {
+  const {
+    batches,
+    preparedTargets,
+    mediaType,
+    targetYear,
+    targetDateDay,
+    isAnimation,
+    tmdbSeasons,
+  } = params;
+
+  const doubanDates = buildDoubanDatesMap(batches);
+  const doubanSeason = new Map<string, number>();
+  const matchedMovieDoubanIds = new Set<string>();
+
+  for (const batch of batches) {
+    for (const item of batch.list) {
+      if (!item?.vod_play_url) continue;
+      if (isExcludedVodItem(item, mediaType, isAnimation)) continue;
+      const dbId = extractDoubanId(item.vod_douban_id);
+      if (!dbId) continue;
+
+      const { bestEpisodes } = parseVodPlayGroups(
         item.vod_play_from,
         item.vod_play_url
       );
       if (bestEpisodes.length === 0) continue;
-
       const hasNonTrailerEpisode = bestEpisodes.some(
         (ep) => !ep.name.includes("预告") && !ep.name.includes("花絮")
       );
-      if (!hasNonTrailerEpisode) {
-        continue;
-      }
+      if (!hasNonTrailerEpisode) continue;
 
-      const titleAudioLang = parseSeasonInfo(vodName).audioLang;
-      const detectedLang =
-        titleAudioLang || extractAudioLangFromText(vodName, vodLang, vodRemarks);
+      const vodName = String(item.vod_name || "").trim();
+      const vodSub = String(item.vod_sub || "").trim();
+      const vodRemarks = String(item.vod_remarks || "").trim();
+      const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
+      const vodYear = vodYearMatch ? vodYearMatch[0] : "";
 
-      let titleScore = 0;
-      let seasonNumber: number | null = 1;
-      let partNumber: number | null = null;
-      let isFinalSeason = false;
-      let arcKey = "";
-      let tmdbMatchedSeason: number | null = null;
-      let hasExplicitTitleSeason = false;
+      if (mediaType === "tv" && tmdbSeasons && tmdbSeasons.length > 0) {
+        if (doubanSeason.has(dbId)) continue;
+        const pubDays = getEffectivePubDays(item, doubanDates);
+        if (pubDays.length === 0) continue;
 
-      if (mediaType === "tv") {
         const tvRes = resolveTvCandidateMatch({
           vodName,
           vodSub,
@@ -2111,75 +2470,259 @@ async function searchSingleVodSite(
           tmdbSeasons,
           isAnimation,
           targetYear,
+          pubDays,
         });
-        if (!tvRes.matched || tvRes.titleScore < 140) {
-          continue;
+        if (tvRes.matched && tvRes.tmdbMatchedSeason !== null && tvRes.seasonNumber !== null) {
+          doubanSeason.set(dbId, tvRes.seasonNumber);
         }
-        titleScore = tvRes.titleScore;
-        seasonNumber = tvRes.seasonNumber;
-        partNumber = tvRes.partNumber;
-        isFinalSeason = tvRes.isFinalSeason;
-        arcKey = tvRes.arcKey;
-        tmdbMatchedSeason = tvRes.tmdbMatchedSeason;
-        hasExplicitTitleSeason = tvRes.hasExplicitTitleSeason;
-      } else {
-        titleScore = computeTitleMatchScore(
-          vodName,
-          vodSub,
+      } else if (mediaType !== "tv") {
+        if (matchedMovieDoubanIds.has(dbId)) continue;
+        const mEval = evaluateMovieCandidate({
+          item,
           preparedTargets,
-          mediaType,
-          targetYear
-        );
-        if (titleScore < 140) {
-          continue;
+          targetYear,
+          targetDateDay,
+          doubanDates,
+        });
+        if (mEval.matched && (mEval.matchedByExactDate || mEval.score >= 300)) {
+          matchedMovieDoubanIds.add(dbId);
         }
-        const parsed = parseSeasonInfo(vodName);
-        seasonNumber = parsed.seasonNumber || 1;
       }
+    }
+  }
 
-      let score = titleScore;
+  return { doubanDates, doubanSeason, matchedMovieDoubanIds };
+}
 
-      // Shared release year verification (pass 2 for unresolved S2+ structural/final arcs)
-      const evalSeasonNum = seasonNumber === null ? 2 : seasonNumber;
+function hasQuickPlayableMatch(params: {
+  list: any[];
+  preparedTargets: PreparedTargetTitle[];
+  targetYear?: string;
+  targetDateDay: number | null;
+  mediaType?: "movie" | "tv";
+  isAnimation?: boolean;
+  tmdbSeasons?: TmdbSeasonMeta[];
+}): boolean {
+  const {
+    list,
+    preparedTargets,
+    targetYear,
+    targetDateDay,
+    mediaType,
+    isAnimation,
+    tmdbSeasons,
+  } = params;
+  for (const item of list) {
+    if (!item?.vod_play_url) continue;
+    if (isExcludedVodItem(item, mediaType, isAnimation)) continue;
+    const { bestEpisodes } = parseVodPlayGroups(
+      item.vod_play_from,
+      item.vod_play_url
+    );
+    if (bestEpisodes.length === 0) continue;
+    if (!bestEpisodes.some((ep) => !ep.name.includes("预告") && !ep.name.includes("花絮"))) {
+      continue;
+    }
+
+    const vodName = String(item.vod_name || "").trim();
+    const vodSub = String(item.vod_sub || "").trim();
+    const vodRemarks = String(item.vod_remarks || "").trim();
+    const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
+    const vodYear = vodYearMatch ? vodYearMatch[0] : "";
+
+    if (mediaType === "tv") {
+      const pubDays = parseAllIsoDateDays(item.vod_pubdate);
+      const tvRes = resolveTvCandidateMatch({
+        vodName,
+        vodSub,
+        vodYear,
+        vodRemarks,
+        episodeCount: bestEpisodes.length,
+        preparedTargets,
+        tmdbSeasons,
+        isAnimation,
+        targetYear,
+        pubDays,
+      });
+      if (tvRes.matched && tvRes.titleScore >= 140) return true;
+    } else {
+      const mEval = evaluateMovieCandidate({
+        item,
+        preparedTargets,
+        targetYear,
+        targetDateDay,
+      });
+      if (mEval.matched && mEval.score >= 160) return true;
+    }
+  }
+  return false;
+}
+
+function assembleSourcesFromRawBatch(params: {
+  batch: RawSiteBatch;
+  preparedTargets: PreparedTargetTitle[];
+  targetYear?: string;
+  targetDateDay: number | null;
+  mediaType?: "movie" | "tv";
+  isAnimation?: boolean;
+  tmdbSeasons?: TmdbSeasonMeta[];
+  consensus?: CrossSiteDoubanConsensus;
+}): ResolvedStreamSource[] {
+  const {
+    batch,
+    preparedTargets,
+    targetYear,
+    targetDateDay,
+    mediaType,
+    isAnimation,
+    tmdbSeasons,
+    consensus,
+  } = params;
+  const { site, keyword, list, latencyMs } = batch;
+
+  type ScoredCandidate = {
+    item: any;
+    score: number;
+    seasonNumber: number | null;
+    partNumber: number | null;
+    isFinalSeason: boolean;
+    arcKey: string;
+    tmdbMatchedSeason: number | null;
+    hasExplicitTitleSeason: boolean;
+    vodYearNum: number;
+    audioLang?: "粤语" | "国语";
+    explicitTitleLang?: "粤语" | "国语";
+    playGroups: VodPlayGroup[];
+    episodes: VodEpisode[];
+  };
+
+  const tmdbSeasonAirYears =
+    tmdbSeasons
+      ?.map((s) => s.airYear)
+      .filter((y): y is number => typeof y === "number" && y > 0) || undefined;
+
+  const validCandidates: ScoredCandidate[] = [];
+
+  for (const item of list) {
+    if (!item.vod_play_url) continue;
+
+    const vodName = String(item.vod_name || "").trim();
+    const vodSub = String(item.vod_sub || "").trim();
+    const vodRemarks = String(item.vod_remarks || "").trim();
+    const vodLang = String(item.vod_lang || "").trim();
+    const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
+    const vodYear = vodYearMatch ? vodYearMatch[0] : "";
+    const vodYearNum = vodYear ? Number(vodYear) : 0;
+
+    // Reject recaps ("解说"), trailers ("预告"/"花絮"/"先导"), micro-dramas ("短剧"), spin-offs/live-action adaptations, and wrong movie/tv categories
+    if (isExcludedVodItem(item, mediaType, isAnimation)) {
+      continue;
+    }
+
+    const { playGroups, bestEpisodes } = parseVodPlayGroups(
+      item.vod_play_from,
+      item.vod_play_url
+    );
+    if (bestEpisodes.length === 0) continue;
+
+    const hasNonTrailerEpisode = bestEpisodes.some(
+      (ep) => !ep.name.includes("预告") && !ep.name.includes("花絮")
+    );
+    if (!hasNonTrailerEpisode) {
+      continue;
+    }
+
+    const titleAudioLang = parseSeasonInfo(vodName).audioLang;
+    const detectedLang =
+      titleAudioLang || extractAudioLangFromText(vodName, vodLang, vodRemarks);
+
+    const dbId = extractDoubanId(item.vod_douban_id);
+    const pubDays = getEffectivePubDays(item, consensus?.doubanDates);
+    const doubanMatchedSeason = dbId
+      ? consensus?.doubanSeason.get(dbId) ?? null
+      : null;
+
+    let score = 0;
+    let seasonNumber: number | null = 1;
+    let partNumber: number | null = null;
+    let isFinalSeason = false;
+    let arcKey = "";
+    let tmdbMatchedSeason: number | null = null;
+    let hasExplicitTitleSeason = false;
+
+    if (mediaType === "tv") {
+      const tvRes = resolveTvCandidateMatch({
+        vodName,
+        vodSub,
+        vodYear,
+        vodRemarks,
+        episodeCount: bestEpisodes.length,
+        preparedTargets,
+        tmdbSeasons,
+        isAnimation,
+        targetYear,
+        pubDays,
+        doubanMatchedSeason,
+      });
+      if (!tvRes.matched || tvRes.titleScore < 140) {
+        continue;
+      }
+      const evalSeasonNum = tvRes.seasonNumber === null ? 2 : tvRes.seasonNumber;
       const yearCheck = evaluateYearMatch(
-        mediaType,
+        "tv",
         targetYear,
         vodYear,
-        titleScore,
+        tvRes.titleScore,
         evalSeasonNum,
         tmdbSeasonAirYears
       );
-      if (!yearCheck.matched) {
+      if (!yearCheck.matched && tvRes.tmdbMatchedSeason === null) {
         continue;
       }
-      score += yearCheck.bonus;
-
-      if (mediaType === "tv" && bestEpisodes.length > 1) {
-        score += 20;
-      } else if (mediaType === "movie" && bestEpisodes.length <= 4) {
-        score += 15;
+      score = tvRes.titleScore + (yearCheck.matched ? yearCheck.bonus : 105);
+      seasonNumber = tvRes.seasonNumber;
+      partNumber = tvRes.partNumber;
+      isFinalSeason = tvRes.isFinalSeason;
+      arcKey = tvRes.arcKey;
+      tmdbMatchedSeason = tvRes.tmdbMatchedSeason;
+      hasExplicitTitleSeason = tvRes.hasExplicitTitleSeason;
+      if (bestEpisodes.length > 1) score += 20;
+    } else {
+      const mEval = evaluateMovieCandidate({
+        item,
+        preparedTargets,
+        targetYear,
+        targetDateDay,
+        doubanDates: consensus?.doubanDates,
+        matchedMovieDoubanIds: consensus?.matchedMovieDoubanIds,
+      });
+      if (!mEval.matched) {
+        continue;
       }
-
-      if (score >= 160) {
-        validCandidates.push({
-          item,
-          score,
-          seasonNumber,
-          partNumber,
-          isFinalSeason,
-          arcKey,
-          tmdbMatchedSeason,
-          hasExplicitTitleSeason,
-          vodYearNum,
-          audioLang: detectedLang,
-          explicitTitleLang: titleAudioLang,
-          playGroups,
-          episodes: bestEpisodes,
-        });
-      }
+      score = mEval.score;
+      if (bestEpisodes.length <= 4) score += 15;
     }
 
-    if (validCandidates.length === 0) return [];
+    if (score >= 160) {
+      validCandidates.push({
+        item,
+        score,
+        seasonNumber,
+        partNumber,
+        isFinalSeason,
+        arcKey,
+        tmdbMatchedSeason,
+        hasExplicitTitleSeason,
+        vodYearNum,
+        audioLang: detectedLang,
+        explicitTitleLang: titleAudioLang,
+        playGroups,
+        episodes: bestEpisodes,
+      });
+    }
+  }
+
+  if (validCandidates.length === 0) return [];
 
     // Check if this provider has explicit 粤语 / 国语 variants (or any Cantonese stream)
     const hasExplicitLangVariants = validCandidates.some(
@@ -2616,26 +3159,41 @@ async function searchSingleVodSite(
 
     const singleSource = buildSourceFromCandidates(validCandidates, undefined);
     return singleSource ? [singleSource] : [];
-  } catch {
-    if (!externalSignal?.aborted) {
-      if (timedOut) {
-        onOutcome?.("timeout");
-        // Skip tripping circuit cooldown on short timeouts (slow PHP search != broken video CDN)
-        if (timeoutMs >= 5000) {
-          recordSiteFailure(site.id);
-        }
-      } else {
-        onOutcome?.("error");
-        recordSiteFailure(site.id);
-      }
-    }
-    return [];
-  } finally {
-    clearTimeout(timer);
-    if (externalSignal) {
-      externalSignal.removeEventListener("abort", onExternalAbort);
-    }
-  }
+}
+
+async function searchSingleVodSite(
+  site: VodSite,
+  keyword: string,
+  targetTitles: string[] | PreparedTargetTitle[],
+  targetYear?: string,
+  mediaType?: "movie" | "tv",
+  timeoutMs = 2400,
+  externalSignal?: AbortSignal,
+  onOutcome?: (outcome: "ok" | "error" | "timeout") => void,
+  isAnimation?: boolean,
+  tmdbSeasons?: TmdbSeasonMeta[]
+): Promise<ResolvedStreamSource[]> {
+  const batch = await fetchRawVodSiteBatch(
+    site,
+    keyword,
+    timeoutMs,
+    externalSignal,
+    onOutcome
+  );
+  if (!batch) return [];
+  const preparedTargets: PreparedTargetTitle[] =
+    targetTitles.length > 0 && typeof targetTitles[0] === "string"
+      ? prepareTargetTitles(targetTitles as string[], mediaType)
+      : (targetTitles as PreparedTargetTitle[]);
+  return assembleSourcesFromRawBatch({
+    batch,
+    preparedTargets,
+    targetYear,
+    targetDateDay: null,
+    mediaType,
+    isAnimation,
+    tmdbSeasons,
+  });
 }
 
 export async function pingVodSite(siteId: string): Promise<{
@@ -2665,6 +3223,7 @@ interface TmdbCandidateMetadata {
   candidateTitles: string[];
   primaryTitles?: string[];
   releaseYear?: string;
+  releaseDate?: string;
   isUnreleased: boolean;
   primaryZhTitle?: string;
   isAnimation?: boolean;
@@ -2754,7 +3313,7 @@ async function getTmdbCandidateMetadata(
     typeof caches !== "undefined" ? (caches as any).default : null;
   const edgeCacheReq =
     tmdbId && edgeCache
-      ? new Request(`https://tmdb-meta.101movies.internal/v5/${type}/${tmdbId}`, {
+      ? new Request(`https://tmdb-meta.101movies.internal/v6/${type}/${tmdbId}`, {
           method: "GET",
         })
       : null;
@@ -2780,6 +3339,7 @@ async function getTmdbCandidateMetadata(
   const primaryTitles: string[] = [];
   const primaryNorms = new Set<string>();
   let releaseYear: string | undefined;
+  let releaseDate: string | undefined;
   let isUnreleased = false;
   let primaryZhTitle: string | undefined;
   let isAnimation: boolean | undefined;
@@ -2811,6 +3371,9 @@ async function getTmdbCandidateMetadata(
     const hintDate = hintItem.release_date || hintItem.first_air_date;
     if (hintDate && typeof hintDate === "string") {
       releaseYear = hintDate.slice(0, 4);
+      if (/^\d{4}-\d{2}-\d{2}/.test(hintDate)) {
+        releaseDate = hintDate.slice(0, 10);
+      }
       const todayIso = new Date().toISOString().slice(0, 10);
       if (hintDate > todayIso) {
         isUnreleased = true;
@@ -2840,6 +3403,9 @@ async function getTmdbCandidateMetadata(
         const dateStr = d.release_date || d.first_air_date;
         if (dateStr && typeof dateStr === "string") {
           releaseYear = dateStr.slice(0, 4);
+          if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+            releaseDate = dateStr.slice(0, 10);
+          }
         }
         isUnreleased = isMediaUnreleased(type, d);
         if (
@@ -2854,7 +3420,11 @@ async function getTmdbCandidateMetadata(
           const extractedSeasons: TmdbSeasonMeta[] = [];
           for (const s of d.seasons) {
             if (typeof s?.season_number === "number" && s.season_number > 0) {
-              const airMatch = String(s?.air_date || "").match(/(19|20)\d{2}/);
+              const rawAir = String(s?.air_date || "").trim();
+              const airDate = /^\d{4}-\d{2}-\d{2}/.test(rawAir)
+                ? rawAir.slice(0, 10)
+                : undefined;
+              const airMatch = rawAir.match(/(19|20)\d{2}/);
               const airYear = airMatch ? Number(airMatch[0]) : undefined;
               const epCount =
                 typeof s?.episode_count === "number" && s.episode_count > 0
@@ -2863,6 +3433,7 @@ async function getTmdbCandidateMetadata(
               extractedSeasons.push({
                 seasonNumber: Number(s.season_number),
                 name: toSimplifiedChinese(String(s?.name || "").trim()),
+                airDate,
                 airYear,
                 episodeCount: epCount,
               });
@@ -2980,6 +3551,7 @@ async function getTmdbCandidateMetadata(
     candidateTitles,
     primaryTitles,
     releaseYear,
+    releaseDate,
     isUnreleased,
     primaryZhTitle,
     isAnimation,
@@ -3006,15 +3578,493 @@ async function getTmdbCandidateMetadata(
   return meta;
 }
 
+async function fetchKeywordRoundBatches(params: {
+  sites: VodSite[];
+  keyword: string;
+  roundTimeoutMs: number;
+  maxSites: number;
+  hasMatchFn: (batch: RawSiteBatch) => boolean;
+  onOutcome: (outcome: "ok" | "error" | "timeout") => void;
+}): Promise<RawSiteBatch[]> {
+  const { sites, keyword, roundTimeoutMs, maxSites, hasMatchFn, onOutcome } = params;
+  const targets = sites.slice(0, maxSites);
+  if (targets.length === 0) return [];
+
+  const roundAc = new AbortController();
+  const roundStart = Date.now();
+  let softDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
+  let softDeadlineAt = Infinity;
+  let quickMatchCount = 0;
+  let tier3QuickMatchCount = 0;
+  const collected: RawSiteBatch[] = [];
+
+  const tightenSoftDeadline = (delayMs: number) => {
+    const clampedDelay = Math.max(0, delayMs);
+    const targetAt = Date.now() + clampedDelay;
+    if (targetAt >= softDeadlineAt) return;
+    softDeadlineAt = targetAt;
+    if (softDeadlineTimer) {
+      clearTimeout(softDeadlineTimer);
+      softDeadlineTimer = null;
+    }
+    if (clampedDelay === 0) {
+      roundAc.abort();
+    } else {
+      softDeadlineTimer = setTimeout(() => roundAc.abort(), clampedDelay);
+    }
+  };
+
+  try {
+    await Promise.allSettled(
+      targets.map(async (site) => {
+        const batch = await fetchRawVodSiteBatch(
+          site,
+          keyword,
+          roundTimeoutMs,
+          roundAc.signal,
+          onOutcome
+        );
+        if (!batch) return;
+        collected.push(batch);
+        if (hasMatchFn(batch)) {
+          quickMatchCount++;
+          if (getSourceQualityTier(site.id) >= 3) {
+            tier3QuickMatchCount++;
+          }
+          const elapsed = Date.now() - roundStart;
+          if (quickMatchCount >= 6 && tier3QuickMatchCount >= 3) {
+            tightenSoftDeadline(0);
+          } else if (quickMatchCount >= 4 && tier3QuickMatchCount >= 2) {
+            tightenSoftDeadline(Math.max(250, 900 - elapsed));
+          } else if (quickMatchCount >= 2) {
+            tightenSoftDeadline(Math.max(550, 2100 - elapsed));
+          } else if (quickMatchCount >= 1) {
+            tightenSoftDeadline(Math.max(700, 2800 - elapsed));
+          }
+        }
+      })
+    );
+  } finally {
+    if (softDeadlineTimer) {
+      clearTimeout(softDeadlineTimer);
+      softDeadlineTimer = null;
+    }
+  }
+
+  return collected;
+}
+
+function buildDistinctSeasonKeyword(
+  season: TmdbSeasonMeta | undefined,
+  primaryQuery: string
+): { distinctName: string | null; keywords: string[] } {
+  const rawName = toSimplifiedChinese(String(season?.name || "")).trim();
+  const isGeneric =
+    !rawName ||
+    /^第\s*[一二两三四五六七八九十\d]+\s*[季部期]$/i.test(rawName) ||
+    /^(?:Season|Series)\s*\d+$/i.test(rawName);
+
+  let distinctName: string | null = null;
+  if (!isGeneric) {
+    let cleaned = rawName;
+    if (primaryQuery) {
+      const escaped = primaryQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      cleaned = cleaned.replace(new RegExp(`^${escaped}[\\s:：·\\-—_]*`, "i"), "").trim();
+    }
+    const cjk = countCjkChars(cleaned);
+    const latin = (cleaned.match(/[a-z]/gi) || []).length;
+    if (cjk >= 2 || latin >= 4) {
+      distinctName = cleaned;
+    }
+  }
+
+  const keywords: string[] = [];
+  const pushKw = (k?: string | null) => {
+    const t = k?.trim();
+    if (t && !keywords.includes(t)) keywords.push(t);
+  };
+
+  if (distinctName) {
+    pushKw(distinctName);
+    if (primaryQuery && normalizeTitleForComparison(distinctName) !== normalizeTitleForComparison(primaryQuery)) {
+      pushKw(`${primaryQuery} ${distinctName}`);
+    }
+  } else if (primaryQuery && season) {
+    pushKw(`${primaryQuery} 第${season.seasonNumber}季`);
+    pushKw(`${primaryQuery}${season.seasonNumber}`);
+    pushKw(primaryQuery);
+  }
+
+  return { distinctName, keywords };
+}
+
+function assembleSeasonSourcesFromBatches(params: {
+  batches: RawSiteBatch[];
+  seasonNumber: number;
+  targetSeason?: TmdbSeasonMeta;
+  allSeasons?: TmdbSeasonMeta[];
+  primaryQuery: string;
+  fallbackTitles: PreparedTargetTitle[];
+  isAnimation?: boolean;
+}): ResolvedStreamSource[] {
+  const {
+    batches,
+    seasonNumber,
+    targetSeason,
+    allSeasons,
+    primaryQuery,
+    fallbackTitles,
+    isAnimation,
+  } = params;
+
+  const doubanDates = buildDoubanDatesMap(batches);
+  const { distinctName } = buildDistinctSeasonKeyword(targetSeason, primaryQuery);
+  const seasonTargets = distinctName
+    ? prepareTargetTitles(
+        [
+          distinctName,
+          `${primaryQuery} ${distinctName}`,
+          `${targetSeason?.name || ""}`,
+        ].filter(Boolean),
+        "tv"
+      )
+    : fallbackTitles;
+
+  const targetAirDay = parseSingleIsoDateDay(targetSeason?.airDate);
+  const targetYearStr = targetSeason?.airYear ? String(targetSeason.airYear) : undefined;
+  const nextSeasonAirDay = (() => {
+    if (!allSeasons || targetAirDay === null) return null;
+    const later = allSeasons
+      .filter((s) => s.seasonNumber > seasonNumber)
+      .map((s) => parseSingleIsoDateDay(s.airDate))
+      .filter((d): d is number => d !== null)
+      .sort((a, b) => a - b);
+    return later.length > 0 ? later[0] : null;
+  })();
+
+  const distinctTokens = distinctName
+    ? [normalizeTitleForComparison(distinctName)]
+    : [];
+  const matchedSeasonDoubanIds = new Set<string>();
+
+  const evalSeasonItem = (item: any, epCount: number) => {
+    const vodName = String(item.vod_name || "").trim();
+    const vodSub = String(item.vod_sub || "").trim();
+    const vodRemarks = String(item.vod_remarks || "").trim();
+    const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
+    const vodYear = vodYearMatch ? vodYearMatch[0] : "";
+    const parsed = parseSeasonInfo(vodName);
+    const pubDays = getEffectivePubDays(item, doubanDates);
+    const dbId = extractDoubanId(item.vod_douban_id);
+    const isOngoingNow = isOngoingCurrentYear(vodYear, vodRemarks);
+
+    const scoreAgainstSeason = computeTitleMatchScore(
+      vodName,
+      vodSub,
+      seasonTargets,
+      "tv",
+      targetYearStr
+    );
+    const scoreAgainstSeries = computeTitleMatchScore(
+      vodName,
+      vodSub,
+      fallbackTitles,
+      "tv",
+      targetYearStr
+    );
+    const normTitleSub = normalizeTitleForComparison(`${vodName} ${vodSub}`);
+    const hasToken = distinctTokens.some(
+      (tok) => tok.length >= 2 && normTitleSub.includes(tok)
+    );
+    const bestTitleScore = Math.max(scoreAgainstSeason, scoreAgainstSeries);
+
+    const dayDiff = getMinDayDiff(pubDays, targetAirDay);
+    const exactDateHit = dayDiff !== null && dayDiff <= 4;
+    const intervalHit =
+      targetAirDay !== null &&
+      epCount > 2 &&
+      pubDays.some(
+        (d) =>
+          d > targetAirDay + 4 &&
+          d < (nextSeasonAirDay !== null ? nextSeasonAirDay - 4 : targetAirDay + 730)
+      );
+
+    if (exactDateHit && (bestTitleScore >= 110 || hasToken || matchedSeasonDoubanIds.has(dbId || ""))) {
+      return { matched: true, score: Math.max(bestTitleScore, 240) + 140, partNumber: parsed.partNumber ?? null };
+    }
+    if (intervalHit && (bestTitleScore >= 140 || hasToken || matchedSeasonDoubanIds.has(dbId || ""))) {
+      return { matched: true, score: Math.max(bestTitleScore, 220) + 100, partNumber: parsed.partNumber ?? null };
+    }
+    if (dbId && matchedSeasonDoubanIds.has(dbId) && (epCount > 2 || isOngoingNow || bestTitleScore >= 180)) {
+      return { matched: true, score: Math.max(bestTitleScore, 240) + 110, partNumber: parsed.partNumber ?? null };
+    }
+
+    const strongTitleHit = distinctName
+      ? scoreAgainstSeason >= 185
+      : parsed.seasonNumber === seasonNumber && scoreAgainstSeries >= 185;
+    if (strongTitleHit) {
+      const targetY = targetSeason?.airYear;
+      const vodY = vodYear ? Number(vodYear) : NaN;
+      if (targetY && Number.isFinite(vodY) && Math.abs(vodY - targetY) > 1) {
+        return { matched: false, score: 0, partNumber: null };
+      }
+      return { matched: true, score: bestTitleScore + (targetY && Number.isFinite(vodY) ? 100 : 20), partNumber: parsed.partNumber ?? null };
+    }
+    return { matched: false, score: 0, partNumber: null };
+  };
+
+  // Pass 1: Pool matching Douban IDs across batches
+  for (const batch of batches) {
+    for (const item of batch.list) {
+      if (!item?.vod_play_url || isExcludedVodItem(item, "tv", isAnimation)) continue;
+      const dbId = extractDoubanId(item.vod_douban_id);
+      if (!dbId || matchedSeasonDoubanIds.has(dbId)) continue;
+      const { bestEpisodes } = parseVodPlayGroups(item.vod_play_from, item.vod_play_url);
+      if (bestEpisodes.length === 0) continue;
+      if (!bestEpisodes.some((ep) => !ep.name.includes("预告") && !ep.name.includes("花絮"))) continue;
+      const res = evalSeasonItem(item, bestEpisodes.length);
+      if (res.matched) matchedSeasonDoubanIds.add(dbId);
+    }
+  }
+
+  // Pass 2: Assemble per-site sources for this season
+  const results: ResolvedStreamSource[] = [];
+  for (const batch of batches) {
+    const siteItems: {
+      item: any;
+      score: number;
+      partNumber: number | null;
+      vodYearNum: number;
+      audioLang?: "粤语" | "国语";
+      explicitTitleLang?: "粤语" | "国语";
+      playGroups: VodPlayGroup[];
+      episodes: VodEpisode[];
+    }[] = [];
+
+    for (const item of batch.list) {
+      if (!item?.vod_play_url || isExcludedVodItem(item, "tv", isAnimation)) continue;
+      const { playGroups, bestEpisodes } = parseVodPlayGroups(item.vod_play_from, item.vod_play_url);
+      if (bestEpisodes.length === 0) continue;
+      if (!bestEpisodes.some((ep) => !ep.name.includes("预告") && !ep.name.includes("花絮"))) continue;
+
+      const ev = evalSeasonItem(item, bestEpisodes.length);
+      if (!ev.matched) continue;
+
+      const vodName = String(item.vod_name || "").trim();
+      const vodLang = String(item.vod_lang || "").trim();
+      const vodRemarks = String(item.vod_remarks || "").trim();
+      const vodYearMatch = String(item.vod_year || "").match(/(19|20)\d{2}/);
+      const vodYearNum = vodYearMatch ? Number(vodYearMatch[0]) : 0;
+      const titleAudioLang = parseSeasonInfo(vodName).audioLang;
+      const detectedLang =
+        titleAudioLang || extractAudioLangFromText(vodName, vodLang, vodRemarks);
+
+      siteItems.push({
+        item,
+        score: ev.score + (bestEpisodes.length > 1 ? 20 : 0),
+        partNumber: ev.partNumber,
+        vodYearNum,
+        audioLang: detectedLang,
+        explicitTitleLang: titleAudioLang,
+        playGroups,
+        episodes: bestEpisodes,
+      });
+    }
+
+    if (siteItems.length === 0) continue;
+
+    const buildSingleLang = (
+      cands: typeof siteItems,
+      langTag?: "粤语" | "国语"
+    ): ResolvedStreamSource | null => {
+      if (cands.length === 0) return null;
+      const suffix = langTag === "粤语" ? "_yue" : langTag === "国语" ? "_guo" : "";
+      const byPart = new Map<string, (typeof siteItems)[0]>();
+      for (const c of cands) {
+        const key = c.partNumber !== null && c.partNumber >= 2 ? `p:${c.partNumber}` : "p:1";
+        const ex = byPart.get(key);
+        if (!ex || c.score > ex.score || (c.score === ex.score && c.episodes.length > ex.episodes.length)) {
+          byPart.set(key, c);
+        }
+      }
+      const cours = Array.from(byPart.values()).sort(
+        (a, b) => (a.vodYearNum || 9999) - (b.vodYearNum || 9999) || (a.partNumber ?? 1) - (b.partNumber ?? 1)
+      );
+      const primary = cours[0];
+      const mergedEps = sequentializeCourEpisodes(cours);
+      const cleanName = toSimplifiedChinese(String(primary.item.vod_name || primaryQuery).trim());
+      return {
+        sourceId: `${batch.site.id}${suffix}`,
+        sourceName: batch.site.name,
+        audioLang: langTag,
+        fromConfig: batch.site.fromConfig,
+        vodId: primary.item.vod_id,
+        vodName: cleanName,
+        vodYear: primary.item.vod_year ? String(primary.item.vod_year) : undefined,
+        vodRemarks: primary.item.vod_remarks ? String(primary.item.vod_remarks) : undefined,
+        vodPic: primary.item.vod_pic ? String(primary.item.vod_pic) : undefined,
+        latencyMs: batch.latencyMs,
+        quality: detectSourceQuality(
+          primary.item.vod_remarks,
+          primary.item.vod_name,
+          mergedEps[0]?.name,
+          primary.playGroups[0]?.groupName
+        ),
+        playGroups: primary.playGroups,
+        episodes: mergedEps,
+        seasons: [
+          {
+            seasonNumber,
+            name: `Season ${seasonNumber}`,
+            vodId: primary.item.vod_id,
+            vodName: cleanName,
+            episodes: mergedEps,
+          },
+        ],
+      };
+    };
+
+    const yue = siteItems.filter((c) => (c.explicitTitleLang || c.audioLang) === "粤语");
+    const guo = siteItems.filter((c) => (c.explicitTitleLang || c.audioLang) === "国语");
+    const neutral = siteItems.filter((c) => !c.explicitTitleLang && !c.audioLang);
+
+    if (neutral.length > 0 && (yue.length > 0 || guo.length > 0)) {
+      const s0 = buildSingleLang(neutral);
+      if (s0) results.push(s0);
+      const sy = buildSingleLang(yue, "粤语");
+      if (sy) results.push(sy);
+      const sg = buildSingleLang(guo, "国语");
+      if (sg) results.push(sg);
+    } else {
+      const s0 = buildSingleLang(siteItems, yue.length === siteItems.length ? "粤语" : guo.length === siteItems.length ? "国语" : undefined);
+      if (s0) results.push(s0);
+    }
+  }
+
+  return results;
+}
+
+function assembleRawPickerSources(params: {
+  batches: RawSiteBatch[];
+  query: string;
+  mediaType: "movie" | "tv";
+  respectCategory: boolean;
+}): ResolvedStreamSource[] {
+  const { batches, query, mediaType, respectCategory } = params;
+  const normQ = normalizeTitleForComparison(toSimplifiedChinese(query));
+  const seenKey = new Set<string>();
+  const scored: { src: ResolvedStreamSource; relScore: number }[] = [];
+
+  for (const batch of batches) {
+    for (const item of batch.list) {
+      if (!item?.vod_play_url) continue;
+      const vodName = String(item.vod_name || "").trim();
+      const vodRemarks = String(item.vod_remarks || "").trim();
+      if (
+        vodName.includes("解说") ||
+        vodName.includes("预告") ||
+        vodName.includes("短剧") ||
+        vodRemarks.includes("预告") ||
+        vodRemarks.includes("花絮") ||
+        vodRemarks.includes("电影解说") ||
+        (respectCategory && isIncompatibleVodCategory(item.type_name, mediaType))
+      ) {
+        continue;
+      }
+
+      const key = `${batch.site.id}:${item.vod_id}`;
+      if (seenKey.has(key)) continue;
+
+      const { playGroups, bestEpisodes } = parseVodPlayGroups(
+        item.vod_play_from,
+        item.vod_play_url
+      );
+      if (bestEpisodes.length === 0) continue;
+      if (!bestEpisodes.some((ep) => !ep.name.includes("预告") && !ep.name.includes("花絮"))) {
+        continue;
+      }
+      seenKey.add(key);
+
+      const cleanName = toSimplifiedChinese(vodName);
+      const normName = normalizeTitleForComparison(cleanName);
+      const exactHit = normQ && normName === normQ ? 200 : 0;
+      const prefixHit = normQ && normName.startsWith(normQ) ? 100 : 0;
+      const containsHit = normQ && normName.includes(normQ) ? 50 : 0;
+      const epBonus = mediaType === "tv" ? Math.min(bestEpisodes.length, 50) : bestEpisodes.length <= 4 ? 30 : 0;
+      const tierBonus = getSourceQualityTier(batch.site.id) * 20;
+      const relScore = exactHit + prefixHit + containsHit + epBonus + tierBonus - Math.min(batch.latencyMs / 200, 15);
+
+      const audioLang =
+        parseSeasonInfo(vodName).audioLang ||
+        extractAudioLangFromText(vodName, String(item.vod_lang || ""), vodRemarks);
+
+      const src: ResolvedStreamSource = {
+        sourceId: `${batch.site.id}_raw_${item.vod_id}`,
+        sourceName: batch.site.name,
+        audioLang,
+        fromConfig: batch.site.fromConfig,
+        vodId: item.vod_id,
+        vodName: cleanName,
+        vodYear: item.vod_year ? String(item.vod_year) : undefined,
+        vodRemarks: vodRemarks || undefined,
+        vodPic: item.vod_pic ? String(item.vod_pic) : undefined,
+        latencyMs: batch.latencyMs,
+        quality: detectSourceQuality(
+          vodRemarks,
+          vodName,
+          bestEpisodes[0]?.name,
+          playGroups[0]?.groupName
+        ),
+        playGroups,
+        episodes: bestEpisodes,
+        ...(mediaType === "tv"
+          ? {
+              seasons: [
+                {
+                  seasonNumber: 1,
+                  name: cleanName,
+                  vodId: item.vod_id,
+                  vodName: cleanName,
+                  episodes: bestEpisodes,
+                },
+              ],
+            }
+          : {}),
+      };
+      scored.push({ src, relScore });
+    }
+  }
+
+  scored.sort((a, b) => b.relScore - a.relScore || a.src.latencyMs - b.src.latencyMs);
+  return scored.slice(0, 24).map((x) => x.src);
+}
+
 export async function resolveStreamsForMedia(params: {
   tmdbId: string;
   type: "movie" | "tv";
   customKeyword?: string;
   disabledSiteIds?: string[];
   tmdbApiKey?: string;
+  seasonNumber?: number;
+  rawMode?: boolean;
 }): Promise<VodResolveResponse> {
-  const { tmdbId, type, customKeyword, disabledSiteIds = [], tmdbApiKey } = params;
-  const cacheKey = `${type}:${tmdbId}:${customKeyword || ""}:${disabledSiteIds.join(",")}`;
+  const {
+    tmdbId,
+    type,
+    customKeyword,
+    disabledSiteIds = [],
+    tmdbApiKey,
+    seasonNumber,
+    rawMode = false,
+  } = params;
+  const normalizedSeasonNum =
+    type === "tv" &&
+    typeof seasonNumber === "number" &&
+    Number.isFinite(seasonNumber) &&
+    seasonNumber > 0
+      ? Math.floor(seasonNumber)
+      : undefined;
+  const cacheKey = `${type}:${tmdbId}:s${normalizedSeasonNum || 0}:r${rawMode ? 1 : 0}:${customKeyword || ""}:${disabledSiteIds.join(",")}`;
   const cachedResolved = resolvedStreamsCache.get(cacheKey);
   if (cachedResolved && cachedResolved.expiresAt > Date.now()) {
     return cachedResolved.data;
@@ -3027,6 +4077,7 @@ export async function resolveStreamsForMedia(params: {
       ? [...meta.primaryTitles]
       : [...meta.candidateTitles];
   const releaseYear = meta.releaseYear;
+  const targetDateDay = parseSingleIsoDateDay(meta.releaseDate);
   const isUnreleased = meta.isUnreleased;
 
   const trimmedCustomKeyword = customKeyword?.trim() || "";
@@ -3053,7 +4104,7 @@ export async function resolveStreamsForMedia(params: {
   const primaryQuery = searchKeywords[0] || "";
 
   // Do not resolve streams for unreleased movies/shows
-  if (isUnreleased && !customKeyword) {
+  if (isUnreleased && !trimmedCustomKeyword && !rawMode) {
     const emptyRes: VodResolveResponse = {
       tmdbId,
       mediaType: type,
@@ -3099,15 +4150,124 @@ export async function resolveStreamsForMedia(params: {
 
   const preparedTargets = prepareTargetTitles(candidateTitles, type);
   let matchedSources: ResolvedStreamSource[] = [];
-  const matchedBaseSiteIds = new Set<string>();
-  const maxKeywordsToTry = Math.min(searchKeywords.length, 3);
+  let hadUpstreamErrors = false;
+  const resolveStart = Date.now();
+  const trackOutcome = (outcome: "ok" | "error" | "timeout") => {
+    if (outcome === "error" || outcome === "timeout") {
+      hadUpstreamErrors = true;
+    }
+  };
+
+  // Mode 1: Raw Cinetry-style manual picker mode
+  if (rawMode) {
+    const rawQuery = trimmedCustomKeyword ? toSimplifiedChinese(trimmedCustomKeyword) : primaryQuery;
+    const rawBatches = await fetchKeywordRoundBatches({
+      sites: activeSites,
+      keyword: rawQuery,
+      roundTimeoutMs: 4200,
+      maxSites: Math.min(activeSites.length, 10),
+      hasMatchFn: (b) => b.list.some((it) => Boolean(it?.vod_play_url)),
+      onOutcome: trackOutcome,
+    });
+    matchedSources = assembleRawPickerSources({
+      batches: rawBatches,
+      query: rawQuery,
+      mediaType: type,
+      respectCategory: !trimmedCustomKeyword,
+    });
+    const response: VodResolveResponse = {
+      tmdbId,
+      mediaType: type,
+      searchQuery: rawQuery,
+      candidateTitles,
+      releaseYear,
+      sources: matchedSources,
+      ...(matchedSources.length === 0 && hadUpstreamErrors ? { hadTransientErrors: true } : {}),
+    };
+    if (!(matchedSources.length === 0 && hadUpstreamErrors)) {
+      setBoundedCache(resolvedStreamsCache, cacheKey, { data: response, expiresAt: Date.now() + 5 * 60 * 1000 }, 300);
+    }
+    return response;
+  }
+
+  // Mode 2: On-demand missing TMDB season lookup (handles renamed sequels like 化物语 -> 伪物语)
+  if (normalizedSeasonNum !== undefined) {
+    const targetSeason = meta.seasons?.find((s) => s.seasonNumber === normalizedSeasonNum);
+    const { keywords: seasonKeywords } = buildDistinctSeasonKeyword(targetSeason, primaryQuery);
+    const seasonBatchesBySite = new Map<string, RawSiteBatch>();
+    let used = 0;
+
+    for (const skw of seasonKeywords.slice(0, 2)) {
+      if (used >= 18) break;
+      const remSites = activeSites.filter((s) => !seasonBatchesBySite.has(s.id));
+      if (remSites.length === 0) break;
+      const cap = Math.min(remSites.length, 18 - used);
+      used += cap;
+      const batches = await fetchKeywordRoundBatches({
+        sites: remSites,
+        keyword: skw,
+        roundTimeoutMs: 4200,
+        maxSites: cap,
+        hasMatchFn: (b) => b.list.some((it) => Boolean(it?.vod_play_url)),
+        onOutcome: trackOutcome,
+      });
+      for (const b of batches) {
+        if (!seasonBatchesBySite.has(b.site.id)) {
+          seasonBatchesBySite.set(b.site.id, b);
+        }
+      }
+      if (seasonBatchesBySite.size >= 6) break;
+    }
+
+    matchedSources = assembleSeasonSourcesFromBatches({
+      batches: Array.from(seasonBatchesBySite.values()),
+      seasonNumber: normalizedSeasonNum,
+      targetSeason,
+      allSeasons: meta.seasons,
+      primaryQuery,
+      fallbackTitles: preparedTargets,
+      isAnimation: meta.isAnimation,
+    });
+
+    matchedSources.sort((a, b) => {
+      const aTier = getSourceQualityTier(a.sourceId);
+      const bTier = getSourceQualityTier(b.sourceId);
+      if (aTier !== bTier) return bTier - aTier;
+      const diffEps = (b.episodes?.length || 0) - (a.episodes?.length || 0);
+      if (Math.abs(diffEps) >= 3) return diffEps;
+      return a.latencyMs - b.latencyMs;
+    });
+
+    const hasTransientEmpty = matchedSources.length === 0 && hadUpstreamErrors;
+    const response: VodResolveResponse = {
+      tmdbId,
+      mediaType: type,
+      searchQuery: seasonKeywords[0] || primaryQuery,
+      candidateTitles,
+      releaseYear: targetSeason?.airYear ? String(targetSeason.airYear) : releaseYear,
+      sources: matchedSources,
+      ...(hasTransientEmpty ? { hadTransientErrors: true } : {}),
+    };
+    if (!hasTransientEmpty) {
+      setBoundedCache(
+        resolvedStreamsCache,
+        cacheKey,
+        { data: response, expiresAt: Date.now() + (matchedSources.length > 0 ? 30 : 2) * 60 * 1000 },
+        300
+      );
+    }
+    return response;
+  }
+
+  // Mode 3: Standard Movie & Multi-Season TV Resolution with Cross-Site Date + Douban ID Consensus
   // NOTE: Stay under Cloudflare Pages Functions' 50-subrequest ceiling across TMDB + up to 3 keyword rounds.
   const MAX_VOD_SUBREQUESTS = 26;
   const OVERALL_WITH_SOURCES_DEADLINE_MS = 3800;
   const OVERALL_EMPTY_DEADLINE_MS = 8500;
-  const resolveStart = Date.now();
+  const maxKeywordsToTry = Math.min(searchKeywords.length, 3);
+  const batchesBySite = new Map<string, RawSiteBatch>();
+  const quickMatchedSites = new Set<string>();
   let vodSubrequestsUsed = 0;
-  let hadUpstreamErrors = false;
 
   const primaryNorm = normalizeTitleForComparison(searchKeywords[0] || "");
   for (let kIdx = 0; kIdx < maxKeywordsToTry; kIdx++) {
@@ -3121,106 +4281,70 @@ export async function resolveStreamsForMedia(params: {
       Boolean(kwNorm) &&
       !primaryNorm.includes(kwNorm) &&
       !kwNorm.includes(primaryNorm);
-    if (kIdx > 0 && matchedBaseSiteIds.size >= (isDistinctCjkAlias ? 6 : 2)) {
+    if (kIdx > 0 && quickMatchedSites.size >= (isDistinctCjkAlias ? 6 : 2)) {
       break;
     }
-    if (kIdx > 1 && matchedBaseSiteIds.size > 0 && !isDistinctCjkAlias) {
+    if (kIdx > 1 && quickMatchedSites.size > 0 && !isDistinctCjkAlias) {
       break;
     }
 
     const overallBudgetMs =
-      matchedBaseSiteIds.size > 0
+      quickMatchedSites.size > 0
         ? isDistinctCjkAlias
           ? 4600
           : OVERALL_WITH_SOURCES_DEADLINE_MS
         : OVERALL_EMPTY_DEADLINE_MS;
     const remainingWallMs = overallBudgetMs - (Date.now() - resolveStart);
     if (kIdx > 0 && remainingWallMs < 800) break;
-    const maxRoundCapMs = matchedBaseSiteIds.size > 0 ? 2600 : 6000;
+    const maxRoundCapMs = quickMatchedSites.size > 0 ? 2600 : 6000;
     const roundTimeoutMs = Math.max(800, Math.min(maxRoundCapMs, remainingWallMs));
     const remainingBudget = MAX_VOD_SUBREQUESTS - vodSubrequestsUsed;
     const remainingSites = activeSites
-      .filter((s) => !matchedBaseSiteIds.has(s.id))
+      .filter((s) => !quickMatchedSites.has(s.id))
       .slice(0, remainingBudget);
     if (remainingSites.length === 0) break;
 
     vodSubrequestsUsed += remainingSites.length;
 
-    const roundAc = new AbortController();
-    const roundStart = Date.now();
-    let softDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
-    let softDeadlineAt = Infinity;
+    const roundBatches = await fetchKeywordRoundBatches({
+      sites: remainingSites,
+      keyword: kw,
+      roundTimeoutMs,
+      maxSites: remainingBudget,
+      hasMatchFn: (b) => {
+        const prev = batchesBySite.get(b.site.id);
+        if (!prev) {
+          batchesBySite.set(b.site.id, b);
+        } else {
+          const seenIds = new Set(prev.list.map((it) => String(it?.vod_id)));
+          const extras = b.list.filter((it) => !seenIds.has(String(it?.vod_id)));
+          prev.list = [...prev.list, ...extras];
+        }
+        const ok = hasQuickPlayableMatch({
+          list: b.list,
+          preparedTargets,
+          targetYear: releaseYear,
+          targetDateDay,
+          mediaType: type,
+          isAnimation: meta.isAnimation,
+          tmdbSeasons: meta.seasons,
+        });
+        if (ok) quickMatchedSites.add(b.site.id);
+        return ok;
+      },
+      onOutcome: trackOutcome,
+    });
 
-    const tightenSoftDeadline = (delayMs: number) => {
-      const clampedDelay = Math.max(0, delayMs);
-      const targetAt = Date.now() + clampedDelay;
-      if (targetAt >= softDeadlineAt) return;
-      softDeadlineAt = targetAt;
-      if (softDeadlineTimer) {
-        clearTimeout(softDeadlineTimer);
-        softDeadlineTimer = null;
-      }
-      if (clampedDelay === 0) {
-        roundAc.abort();
-      } else {
-        softDeadlineTimer = setTimeout(() => roundAc.abort(), clampedDelay);
-      }
-    };
-
-    try {
-      await Promise.allSettled(
-        remainingSites.map(async (site) => {
-          const siteSources = await searchSingleVodSite(
-            site,
-            kw,
-            preparedTargets,
-            releaseYear,
-            type,
-            roundTimeoutMs,
-            roundAc.signal,
-            (outcome) => {
-              if (outcome === "error" || outcome === "timeout") {
-                hadUpstreamErrors = true;
-              }
-            },
-            meta.isAnimation,
-            meta.seasons
-          );
-          if (siteSources.length > 0 && !matchedBaseSiteIds.has(site.id)) {
-            matchedBaseSiteIds.add(site.id);
-            matchedSources.push(...siteSources);
-
-            const tier3MatchedCount = Array.from(matchedBaseSiteIds).filter(
-              (baseId) => getSourceQualityTier(baseId) >= 3
-            ).length;
-            const elapsed = Date.now() - roundStart;
-
-            if (matchedBaseSiteIds.size >= 6 && tier3MatchedCount >= 3) {
-              tightenSoftDeadline(0);
-            } else if (
-              matchedBaseSiteIds.size >= 4 &&
-              tier3MatchedCount >= 2
-            ) {
-              tightenSoftDeadline(Math.max(250, 900 - elapsed));
-            } else if (matchedBaseSiteIds.size >= 2) {
-              tightenSoftDeadline(Math.max(550, 2100 - elapsed));
-            } else if (matchedBaseSiteIds.size >= 1) {
-              tightenSoftDeadline(Math.max(700, 2800 - elapsed));
-            }
-          }
-        })
-      );
-    } finally {
-      if (softDeadlineTimer) {
-        clearTimeout(softDeadlineTimer);
-        softDeadlineTimer = null;
+    for (const b of roundBatches) {
+      if (!batchesBySite.has(b.site.id)) {
+        batchesBySite.set(b.site.id, b);
       }
     }
   }
 
-  // Cooldown rescue pass: if all healthy sites yielded 0 matches, try skipped cooldown sites within budget
+  // Cooldown rescue pass: if quick matching found nothing across healthy sites, try skipped cooldown sites within budget
   if (
-    matchedSources.length === 0 &&
+    quickMatchedSites.size === 0 &&
     skippedCooldownSites.length > 0 &&
     vodSubrequestsUsed < MAX_VOD_SUBREQUESTS
   ) {
@@ -3233,43 +4357,55 @@ export async function resolveStreamsForMedia(params: {
       );
       vodSubrequestsUsed += rescueSites.length;
       const rescueTimeoutMs = Math.min(4500, rescueRemainingMs);
-      const rescueAc = new AbortController();
-      let rescueTimer: ReturnType<typeof setTimeout> | null = null;
-
-      try {
-        await Promise.allSettled(
-          rescueSites.map(async (site) => {
-            const siteSources = await searchSingleVodSite(
-              site,
-              primaryQuery,
-              preparedTargets,
-              releaseYear,
-              type,
-              rescueTimeoutMs,
-              rescueAc.signal,
-              (outcome) => {
-                if (outcome === "error" || outcome === "timeout") {
-                  hadUpstreamErrors = true;
-                }
-              },
-              meta.isAnimation,
-              meta.seasons
-            );
-            if (siteSources.length > 0 && !matchedBaseSiteIds.has(site.id)) {
-              matchedBaseSiteIds.add(site.id);
-              matchedSources.push(...siteSources);
-              if (!rescueTimer) {
-                rescueTimer = setTimeout(() => rescueAc.abort(), 600);
-              }
-            }
-          })
-        );
-      } finally {
-        if (rescueTimer) {
-          clearTimeout(rescueTimer);
-          rescueTimer = null;
+      const rescueBatches = await fetchKeywordRoundBatches({
+        sites: rescueSites,
+        keyword: primaryQuery,
+        roundTimeoutMs: rescueTimeoutMs,
+        maxSites: rescueSites.length,
+        hasMatchFn: (b) =>
+          hasQuickPlayableMatch({
+            list: b.list,
+            preparedTargets,
+            targetYear: releaseYear,
+            targetDateDay,
+            mediaType: type,
+            isAnimation: meta.isAnimation,
+            tmdbSeasons: meta.seasons,
+          }),
+        onOutcome: trackOutcome,
+      });
+      for (const b of rescueBatches) {
+        if (!batchesBySite.has(b.site.id)) {
+          batchesBySite.set(b.site.id, b);
         }
       }
+    }
+  }
+
+  const allBatches = Array.from(batchesBySite.values());
+  const consensus = buildCrossSiteDoubanConsensus({
+    batches: allBatches,
+    preparedTargets,
+    mediaType: type,
+    targetYear: releaseYear,
+    targetDateDay,
+    isAnimation: meta.isAnimation,
+    tmdbSeasons: meta.seasons,
+  });
+
+  for (const batch of allBatches) {
+    const siteSources = assembleSourcesFromRawBatch({
+      batch,
+      preparedTargets,
+      targetYear: releaseYear,
+      targetDateDay,
+      mediaType: type,
+      isAnimation: meta.isAnimation,
+      tmdbSeasons: meta.seasons,
+      consensus,
+    });
+    if (siteSources.length > 0) {
+      matchedSources.push(...siteSources);
     }
   }
 
@@ -3319,6 +4455,19 @@ export async function resolveStreamsForMedia(params: {
     return a.latencyMs - b.latencyMs;
   });
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const tmdbSeasonsSummary: TmdbSeasonSummary[] | undefined =
+    type === "tv" && meta.seasons && meta.seasons.length > 0
+      ? meta.seasons
+          .filter((s) => s.seasonNumber > 0 && (!s.airDate || s.airDate <= todayIso))
+          .map(({ seasonNumber: sNum, name, airDate, episodeCount }) => ({
+            seasonNumber: sNum,
+            name,
+            airDate,
+            episodeCount,
+          }))
+      : undefined;
+
   const hasTransientEmpty = matchedSources.length === 0 && hadUpstreamErrors;
   const response: VodResolveResponse = {
     tmdbId,
@@ -3327,6 +4476,9 @@ export async function resolveStreamsForMedia(params: {
     candidateTitles,
     releaseYear,
     sources: matchedSources,
+    ...(tmdbSeasonsSummary && tmdbSeasonsSummary.length > 0
+      ? { tmdbSeasons: tmdbSeasonsSummary }
+      : {}),
     ...(hasTransientEmpty ? { hadTransientErrors: true } : {}),
   };
 

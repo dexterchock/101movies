@@ -572,6 +572,11 @@ async function fetchAndScoreTmdbCandidates(
     const type = req.query.type === "tv" ? "tv" : "movie";
     const tmdbId = String(req.query.id || "");
     const customKeyword = req.query.wd ? String(req.query.wd) : undefined;
+    const seasonParam = req.query.season ? String(req.query.season) : "";
+    const parsedSeason = seasonParam ? parseInt(seasonParam, 10) : NaN;
+    const seasonNumber =
+      Number.isFinite(parsedSeason) && parsedSeason > 0 ? parsedSeason : undefined;
+    const rawMode = String(req.query.raw || "") === "1";
     const disabledStr = req.query.disabled ? String(req.query.disabled) : "";
     const disabledSiteIds = disabledStr
       ? disabledStr
@@ -587,6 +592,8 @@ async function fetchAndScoreTmdbCandidates(
         customKeyword,
         disabledSiteIds,
         tmdbApiKey: TMDB_API_KEY,
+        seasonNumber,
+        rawMode,
       });
       res.json(resolved);
     } catch (err) {

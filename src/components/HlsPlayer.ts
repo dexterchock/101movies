@@ -22,6 +22,19 @@ declare global {
 const HLS_SCRIPT_URL = "/vendor/hls.light-1.7.4.min.js";
 let hlsLoadPromise: Promise<typeof HlsType | null> | null = null;
 
+export function normalizeStreamUrl(rawUrl: string): string {
+  const trimmed = String(rawUrl || "").trim();
+  if (!trimmed) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      return new URL(trimmed).toString();
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed;
+}
+
 function hasStandardMSE(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -228,24 +241,33 @@ export function createHlsPlayer(
   let playbackGen = 0;
   let pendingSeek = options.initialTime ?? 0;
 
+  const normalizedSrc = normalizeStreamUrl(options.src);
   const allowProxyFallback = options.allowProxyFallback !== false;
   const isHttpOnHttps =
     typeof window !== "undefined" &&
     window.location.protocol === "https:" &&
-    options.src.startsWith("http://");
+    normalizedSrc.startsWith("http://");
+  const isMp4 =
+    normalizedSrc.toLowerCase().includes(".mp4") &&
+    !normalizedSrc.toLowerCase().includes(".m3u8");
+  const alreadyProxied = normalizedSrc.startsWith("/api/vod/proxy");
 
   let useProxy =
     Boolean(options.forceProxy) || (allowProxyFallback && isHttpOnHttps);
   let useBackupManifest = false;
+  let useDirectNativeHls = false;
+  let triedFullProxy = useProxy;
+  let triedBackupManifest = false;
+  let triedDirectNative = false;
 
   const getEffectiveSrc = () => {
     if (useProxy) {
-      return buildVodProxyUrl(options.src, "full");
+      return buildVodProxyUrl(normalizedSrc, "full");
     }
     if (isHttpOnHttps) {
-      return options.src.replace(/^http:\/\//i, "https://");
+      return normalizedSrc.replace(/^http:\/\//i, "https://");
     }
-    return options.src;
+    return normalizedSrc;
   };
 
   const exitCurrentFullscreen = () => {
@@ -357,6 +379,7 @@ export function createHlsPlayer(
         if (destroyed || useProxy) return;
         pendingSeek = video.currentTime || pendingSeek;
         useProxy = true;
+        triedFullProxy = true;
         video.crossOrigin = "anonymous";
         void startPlayback();
       },
@@ -404,21 +427,42 @@ export function createHlsPlayer(
     "error",
     () => {
       if (destroyed || hls !== null) return;
-      if (!useProxy && allowProxyFallback && !isBackupApiActive()) {
+      const currentPlayingSrc = video.currentSrc || video.src || "";
+      if (
+        !triedDirectNative &&
+        !useDirectNativeHls &&
+        !isMp4 &&
+        !alreadyProxied &&
+        !isHttpOnHttps &&
+        video.canPlayType("application/vnd.apple.mpegurl") &&
+        currentPlayingSrc.includes("/api/vod/proxy")
+      ) {
+        triedDirectNative = true;
         pendingSeek = video.currentTime || pendingSeek;
-        useProxy = true;
+        useDirectNativeHls = true;
+        useProxy = false;
+        useBackupManifest = false;
         void startPlayback();
       } else if (
-        !useBackupManifest &&
+        !triedBackupManifest &&
         !isBackupApiActive() &&
-        !options.src.toLowerCase().includes(".mp4") &&
+        !isMp4 &&
+        !alreadyProxied &&
         video.canPlayType("application/vnd.apple.mpegurl") &&
-        (video.currentSrc || video.src || "").includes("/api/vod/proxy") &&
-        getBackupVodProxyUrl(options.src)
+        getBackupVodProxyUrl(normalizedSrc)
       ) {
+        triedBackupManifest = true;
         pendingSeek = video.currentTime || pendingSeek;
         useBackupManifest = true;
+        useDirectNativeHls = false;
         useProxy = false;
+        void startPlayback();
+      } else if (!triedFullProxy && allowProxyFallback && !isBackupApiActive()) {
+        triedFullProxy = true;
+        pendingSeek = video.currentTime || pendingSeek;
+        useProxy = true;
+        useDirectNativeHls = false;
+        useBackupManifest = false;
         void startPlayback();
       } else {
         options.onError?.();
@@ -443,16 +487,16 @@ export function createHlsPlayer(
   };
 
   const startPlayback = async () => {
-    if (destroyed || !options.src) return;
+    if (destroyed || !normalizedSrc) return;
     const gen = ++playbackGen;
     destroyHlsInstance();
     const effectiveSrc = getEffectiveSrc();
-    const isMp4 =
-      options.src.toLowerCase().includes(".mp4") &&
-      !options.src.toLowerCase().includes(".m3u8");
 
     if (isMp4) {
       video.src = effectiveSrc;
+      if (typeof video.load === "function") {
+        video.load();
+      }
       video.addEventListener(
         "loadedmetadata",
         () => {
@@ -562,15 +606,22 @@ export function createHlsPlayer(
         }
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      const alreadyProxied = options.src.startsWith("/api/vod/proxy");
       const backupManifestUrl = useBackupManifest
-        ? getBackupVodProxyUrl(options.src)
+        ? getBackupVodProxyUrl(normalizedSrc)
         : null;
-      video.src = backupManifestUrl
+      if (useDirectNativeHls) {
+        triedDirectNative = true;
+      }
+      video.src = useDirectNativeHls
+        ? normalizedSrc
+        : backupManifestUrl
         ? backupManifestUrl
         : useProxy || alreadyProxied
         ? effectiveSrc
-        : buildVodProxyUrl(options.src, "manifest");
+        : buildVodProxyUrl(normalizedSrc, "manifest");
+      if (typeof video.load === "function") {
+        video.load();
+      }
       video.addEventListener(
         "loadedmetadata",
         () => {

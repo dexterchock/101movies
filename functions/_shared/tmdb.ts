@@ -193,17 +193,19 @@ export async function fetchTmdb(
   return { page: 1, results: verifiedResults };
 }
 
-export async function fetchTrendingHk(
+export async function fetchTrendingRegion(
   type: "movie" | "tv",
-  apiKey: string
+  apiKey: string,
+  region: "hk" | "cn" = "hk"
 ): Promise<any[]> {
   if (!apiKey) return [];
-  const hkCacheKey = `trending_${type}_hk`;
-  const cachedHk = tmdbListCache.get(hkCacheKey);
-  if (cachedHk && cachedHk.expiresAt > Date.now()) {
-    return cachedHk.results;
+  const cacheKey = `trending_${type}_${region}`;
+  const cached = tmdbListCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.results;
   }
 
+  const originCountry = region === "cn" ? "CN%7CHK%7CTW" : "HK";
   const recentYear = new Date().getFullYear() - 3;
   const recentDate = `${recentYear}-01-01`;
   const dateFilter =
@@ -211,8 +213,8 @@ export async function fetchTrendingHk(
       ? `primary_release_date.gte=${recentDate}`
       : `first_air_date.gte=${recentDate}`;
   const popMinVotes = type === "movie" ? 5 : 2;
-  const recentUrl = `${TMDB_BASE_URL}/discover/${type}?sort_by=popularity.desc&with_origin_country=HK&${dateFilter}&vote_count.gte=1`;
-  const popUrl = `${TMDB_BASE_URL}/discover/${type}?sort_by=popularity.desc&with_origin_country=HK&vote_count.gte=${popMinVotes}`;
+  const recentUrl = `${TMDB_BASE_URL}/discover/${type}?sort_by=popularity.desc&with_origin_country=${originCountry}&${dateFilter}&vote_count.gte=1`;
+  const popUrl = `${TMDB_BASE_URL}/discover/${type}?sort_by=popularity.desc&with_origin_country=${originCountry}&vote_count.gte=${popMinVotes}`;
 
   const [recentRes, popRes, recentZhRes, popZhRes] = await Promise.allSettled<any>([
     fetch(`${recentUrl}&api_key=${apiKey}`, { signal: AbortSignal.timeout(4500) }).then((r) => r.json()),
@@ -263,7 +265,7 @@ export async function fetchTrendingHk(
   if (results.length > 0) {
     setBoundedCache(
       tmdbListCache,
-      hkCacheKey,
+      cacheKey,
       {
         results,
         expiresAt: Date.now() + 15 * 60 * 1000,
@@ -273,6 +275,13 @@ export async function fetchTrendingHk(
   }
 
   return results;
+}
+
+export async function fetchTrendingHk(
+  type: "movie" | "tv",
+  apiKey: string
+): Promise<any[]> {
+  return fetchTrendingRegion(type, apiKey, "hk");
 }
 
 const personZhNameCache = new Map<number, string>();

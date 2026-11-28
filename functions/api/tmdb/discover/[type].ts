@@ -13,17 +13,22 @@ export const onRequestGet: PagesFunction = async (context) => {
       ? `first_air_date_year=${encodeURIComponent(year)}`
       : `primary_release_year=${encodeURIComponent(year)}`;
 
-  const isHk = genre.toLowerCase() === "hk";
+  const genreLower = genre.toLowerCase();
+  const isHk = genreLower === "hk";
+  const isCn = genreLower === "cn";
+  const isRegional = isHk || isCn;
   let genreParam = "";
   if (isHk) {
     genreParam = "&with_origin_country=HK";
+  } else if (isCn) {
+    genreParam = "&with_origin_country=CN%7CHK%7CTW";
   } else if (genre && genre !== "all") {
     const resolvedGenre = resolveTmdbGenre(type, genre);
     genreParam = `&with_genres=${encodeURIComponent(resolvedGenre)}`;
   }
 
-  const minVotes = isHk ? 1 : 3;
-  const discoverMinVotes = isHk ? 1 : 10;
+  const minVotes = isRegional ? 1 : 3;
+  const discoverMinVotes = isRegional ? 1 : 10;
 
   try {
     const data = await fetchTmdb(

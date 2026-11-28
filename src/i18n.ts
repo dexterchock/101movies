@@ -89,7 +89,7 @@ export function onLangChange(
 
 const CATEGORY_ZH_MAP: Record<string, string> = {
   all: "全部",
-  hk: "港片",
+  hk: "国产",
   action: "动作",
   scifi: "科幻",
   comedy: "喜剧",

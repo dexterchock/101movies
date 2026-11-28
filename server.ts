@@ -11,7 +11,7 @@ import {
   fetchMediaDetails as fetchTmdbMediaDetails,
   fetchOgMediaMetadata,
   fetchTmdb as fetchSharedTmdb,
-  fetchTrendingHk,
+  fetchTrendingRegion,
   filterReleasedMedia,
   resolveTmdbGenre,
 } from "./functions/_shared/tmdb";
@@ -68,10 +68,11 @@ async function startServer() {
 
   app.get("/api/tmdb/trending/movie", async (req, res) => {
     const genre = req.query.genre ? String(req.query.genre).trim() : "";
-    if (genre.toLowerCase() === "hk") {
+    const genreLower = genre.toLowerCase();
+    if (genreLower === "hk" || genreLower === "cn") {
       if (!TMDB_API_KEY) return res.json({ results: [] });
       try {
-        const results = await fetchTrendingHk("movie", TMDB_API_KEY);
+        const results = await fetchTrendingRegion("movie", TMDB_API_KEY, genreLower);
         return res.json({
           page: 1,
           results,
@@ -82,7 +83,7 @@ async function startServer() {
         console.error(err);
         return res
           .status(500)
-          .json({ error: "Failed to fetch HK movies from TMDB" });
+          .json({ error: "Failed to fetch regional movies from TMDB" });
       }
     }
     if (genre && genre !== "all") {
@@ -98,10 +99,11 @@ async function startServer() {
   });
   app.get("/api/tmdb/trending/tv", async (req, res) => {
     const genre = req.query.genre ? String(req.query.genre).trim() : "";
-    if (genre.toLowerCase() === "hk") {
+    const genreLower = genre.toLowerCase();
+    if (genreLower === "hk" || genreLower === "cn") {
       if (!TMDB_API_KEY) return res.json({ results: [] });
       try {
-        const results = await fetchTrendingHk("tv", TMDB_API_KEY);
+        const results = await fetchTrendingRegion("tv", TMDB_API_KEY, genreLower);
         return res.json({
           page: 1,
           results,
@@ -112,7 +114,7 @@ async function startServer() {
         console.error(err);
         return res
           .status(500)
-          .json({ error: "Failed to fetch HK dramas from TMDB" });
+          .json({ error: "Failed to fetch regional dramas from TMDB" });
       }
     }
     if (genre && genre !== "all") {
@@ -413,16 +415,21 @@ async function fetchAndScoreTmdbCandidates(
       type === "tv"
         ? `first_air_date_year=${encodeURIComponent(year)}`
         : `primary_release_year=${encodeURIComponent(year)}`;
-    const isHk = genre.toLowerCase() === "hk";
+    const genreLower = genre.toLowerCase();
+    const isHk = genreLower === "hk";
+    const isCn = genreLower === "cn";
+    const isRegional = isHk || isCn;
     let genreParam = "";
     if (isHk) {
       genreParam = "&with_origin_country=HK";
+    } else if (isCn) {
+      genreParam = "&with_origin_country=CN%7CHK%7CTW";
     } else if (genre && genre !== "all") {
       const resolvedGenre = resolveTmdbGenre(type, genre);
       genreParam = `&with_genres=${encodeURIComponent(resolvedGenre)}`;
     }
-    const minVotes = isHk ? 1 : 3;
-    const discoverMinVotes = isHk ? 1 : 10;
+    const minVotes = isRegional ? 1 : 3;
+    const discoverMinVotes = isRegional ? 1 : 10;
     fetchTmdb(
       `/discover/${type}?sort_by=popularity.desc&vote_count.gte=${discoverMinVotes}&${yearParam}${genreParam}`,
       res,

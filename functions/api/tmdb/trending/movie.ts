@@ -1,6 +1,6 @@
 import {
   fetchTmdb,
-  fetchTrendingHk,
+  fetchTrendingRegion,
   getTmdbKey,
   resolveTmdbGenre,
 } from "../../../_shared/tmdb";
@@ -8,9 +8,10 @@ import {
 export const onRequestGet: PagesFunction = async (context) => {
   const url = new URL(context.request.url);
   const genre = url.searchParams.get("genre")?.trim() || "";
+  const genreLower = genre.toLowerCase();
   const apiKey = getTmdbKey(context.env);
 
-  if (genre.toLowerCase() === "hk") {
+  if (genreLower === "hk" || genreLower === "cn") {
     if (!apiKey) {
       return Response.json(
         { results: [] },
@@ -18,7 +19,7 @@ export const onRequestGet: PagesFunction = async (context) => {
       );
     }
     try {
-      const results = await fetchTrendingHk("movie", apiKey);
+      const results = await fetchTrendingRegion("movie", apiKey, genreLower);
       return Response.json(
         {
           page: 1,

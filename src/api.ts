@@ -1,3 +1,4 @@
+import { isZh } from "./i18n";
 import {
   MediaItem,
   MediaDetails,
@@ -638,8 +639,20 @@ export function prewarmStreamManifests(
     });
 }
 
-function buildTrendingPath(type: "movie" | "tv", genre?: string): string {
+function resolveEffectiveGenre(type: "movie" | "tv", genre?: string): string {
   const resolved = resolveGenreId(type, genre);
+  if (resolved === "hk" && isZh()) return "cn";
+  return resolved;
+}
+
+function getEffectiveCacheKey(genre?: string): string {
+  const raw = genre || "all";
+  if (raw.toLowerCase() === "hk" && isZh()) return "cn";
+  return raw;
+}
+
+function buildTrendingPath(type: "movie" | "tv", genre?: string): string {
+  const resolved = resolveEffectiveGenre(type, genre);
   const query =
     resolved && resolved !== "all"
       ? `?genre=${encodeURIComponent(resolved)}&v=6`
@@ -652,7 +665,7 @@ function buildRankingsPath(
   year: number,
   genre?: string
 ): string {
-  const resolved = resolveGenreId(type, genre);
+  const resolved = resolveEffectiveGenre(type, genre);
   const genreQuery =
     resolved && resolved !== "all"
       ? `&genre=${encodeURIComponent(resolved)}`
@@ -670,7 +683,7 @@ function buildDetailsPath(type: "movie" | "tv", id: string): string {
 
 export const api = {
   getCachedTrendingMovies(genre?: string): MediaItem[] | undefined {
-    const cacheKey = genre || "all";
+    const cacheKey = getEffectiveCacheKey(genre);
     const ram = trendingMoviesCache.get(cacheKey);
     if (ram) return ram;
     const disk = readPersistentCache<MediaItem[]>(
@@ -684,7 +697,7 @@ export const api = {
     return undefined;
   },
   getCachedTrendingTV(genre?: string): MediaItem[] | undefined {
-    const cacheKey = genre || "all";
+    const cacheKey = getEffectiveCacheKey(genre);
     const ram = trendingTVCache.get(cacheKey);
     if (ram) return ram;
     const disk = readPersistentCache<MediaItem[]>(
@@ -702,7 +715,7 @@ export const api = {
     year: number,
     genre?: string
   ): MediaItem[] | undefined {
-    const cacheKey = `${type}_${year}_${genre || "all"}`;
+    const cacheKey = `${type}_${year}_${getEffectiveCacheKey(genre)}`;
     const ram = rankingsCache.get(cacheKey);
     if (ram) return ram;
     const disk = readPersistentCache<MediaItem[]>(
@@ -795,7 +808,7 @@ export const api = {
     genre?: string,
     signal?: AbortSignal
   ): Promise<MediaItem[]> {
-    const cacheKey = genre || "all";
+    const cacheKey = getEffectiveCacheKey(genre);
     const apiPath = buildTrendingPath("movie", genre);
     const cached = this.getCachedTrendingMovies(genre);
     if (cached) return cached;
@@ -820,7 +833,7 @@ export const api = {
     genre?: string,
     signal?: AbortSignal
   ): Promise<MediaItem[]> {
-    const cacheKey = genre || "all";
+    const cacheKey = getEffectiveCacheKey(genre);
     const apiPath = buildTrendingPath("tv", genre);
     const cached = this.getCachedTrendingTV(genre);
     if (cached) return cached;
@@ -906,7 +919,7 @@ export const api = {
     genre?: string,
     signal?: AbortSignal
   ): Promise<MediaItem[]> {
-    const cacheKey = `${type}_${year}_${genre || "all"}`;
+    const cacheKey = `${type}_${year}_${getEffectiveCacheKey(genre)}`;
     const apiPath = buildRankingsPath(type, year, genre);
     const cached = this.getCachedRankings(type, year, genre);
     if (cached) return cached;

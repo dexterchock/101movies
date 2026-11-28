@@ -83,9 +83,20 @@
           };
           return m[g] || c;
         }
+        var isZhLang = false;
+        try {
+          var storedLang = window.localStorage ? window.localStorage.getItem("ui_lang") : null;
+          if (storedLang === "zh") {
+            isZhLang = true;
+          } else if (storedLang !== "en" && typeof navigator !== "undefined") {
+            var navLang = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+            isZhLang = /^zh\b/i.test(String(navLang).trim());
+          }
+        } catch (e) {}
         function resolveGenre(t, c) {
           if (!c || c === "all") return "";
           var g = String(c).toLowerCase().trim();
+          if (g === "hk") return isZhLang ? "cn" : "hk";
           var isTv = t === "tv";
           var m = {
             action: isTv ? "10759" : "28",

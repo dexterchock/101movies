@@ -363,7 +363,13 @@ export function mount(container: HTMLElement): ViewCleanup {
         t("search.noResultsTitle", { query: trimmed })
       )}</p><p class="empty-state-desc">${escapeHtml(t("search.noResultsDesc"))}</p>`;
     } else {
-      emptyWrap.innerHTML = `<p class="empty-state-hint">${escapeHtml(t("search.emptyHint"))}</p>`;
+      emptyWrap.innerHTML = `<p class="empty-state-hint">${escapeHtml(
+        t("search.emptyHint")
+      )}</p><p class="empty-state-credit">${escapeHtml(
+        t("search.creatorPrefix")
+      )}<a class="empty-state-credit-link" href="https://www.instagram.com/dexterchock/" target="_blank" rel="noopener noreferrer">@dexterchock</a>${escapeHtml(
+        t("search.creatorSuffix")
+      )}</p>`;
     }
     stage.replaceChildren(emptyWrap);
   }

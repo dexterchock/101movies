@@ -1977,6 +1977,28 @@ svg {
   margin: 0;
 }
 
+.empty-state-credit {
+  margin: 10px 0 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.24);
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
+.empty-state-credit-link {
+  color: rgba(255, 255, 255, 0.38);
+  text-decoration: none;
+  outline: none;
+  transition: color 200ms ease;
+}
+
+.empty-state-credit-link:hover,
+.empty-state-credit-link:focus-visible {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 @media (min-width: 640px) {
   .empty-state-title {
     font-size: 20px;
@@ -1985,6 +2007,10 @@ svg {
   .empty-state-desc,
   .empty-state-hint {
     font-size: 14px;
+  }
+
+  .empty-state-credit {
+    font-size: 12px;
   }
 }
 

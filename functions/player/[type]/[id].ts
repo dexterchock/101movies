@@ -157,9 +157,13 @@ export const onRequestGet: PagesFunction = async (context) => {
   }
 
   const mediaType = rawType as "movie" | "tv";
-  const apiKey = getTmdbKey(context.env);
   const ua = context.request.headers.get("user-agent") || "";
   const isCrawler = CRAWLER_UA_RE.test(ua);
+  if (!isCrawler) {
+    return fetchBaseSpaHtml(context, reqUrl.origin);
+  }
+
+  const apiKey = getTmdbKey(context.env);
 
   const [baseRes, cachedOg] = await Promise.all([
     fetchBaseSpaHtml(context, reqUrl.origin),
@@ -168,16 +172,7 @@ export const onRequestGet: PagesFunction = async (context) => {
 
   let og = cachedOg;
   if (!og && apiKey) {
-    if (isCrawler) {
-      og = await fetchAndCacheOgMetadata(mediaType, id, reqUrl.origin, apiKey);
-    } else if (context.waitUntil) {
-      // Never block human browser navigation TTFB waiting on TMDB metadata; warm edge cache in background
-      try {
-        context.waitUntil(
-          fetchAndCacheOgMetadata(mediaType, id, reqUrl.origin, apiKey)
-        );
-      } catch {}
-    }
+    og = await fetchAndCacheOgMetadata(mediaType, id, reqUrl.origin, apiKey);
   }
 
   const contentType = baseRes.headers.get("content-type") || "";

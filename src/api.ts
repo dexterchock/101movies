@@ -12,6 +12,12 @@ const BACKUP_ORIGIN_OVERRIDE_KEY = "backup_api_origin";
 const BACKUP_FAILOVER_TTL_MS = 30 * 60 * 1000;
 const PRIMARY_FAILOVER_TIMEOUT_MS = 18_000;
 
+declare const __VOD_API_VERSION__: string | undefined;
+const VOD_API_VERSION =
+  typeof __VOD_API_VERSION__ === "string" && __VOD_API_VERSION__
+    ? __VOD_API_VERSION__
+    : "12";
+
 const API_LS_PREFIX = "api_cache_v6:";
 const API_SS_PREFIX = "api_search_v6:";
 const API_LS_MAX_ENTRIES = 45;
@@ -769,7 +775,7 @@ export const api = {
     const ram = vodResolveCache.get(key);
     if (ram) return ram;
     if (!customKeyword?.trim() && disabledIds.length === 0) {
-      const apiPath = `/api/vod/resolve?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&v=12`;
+      const apiPath = `/api/vod/resolve?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}&v=${VOD_API_VERSION}`;
       const disk = readPersistentCache<VodResolveResponse>("local", apiPath);
       if (disk && Array.isArray(disk.sources) && disk.sources.length > 0) {
         setBoundedCache(vodResolveCache, key, disk, 80);
@@ -949,7 +955,7 @@ export const api = {
     const queryParts = [
       `type=${encodeURIComponent(type)}`,
       `id=${encodeURIComponent(id)}`,
-      "v=12",
+      `v=${VOD_API_VERSION}`,
     ];
     if (customKeyword && customKeyword.trim()) {
       queryParts.push(`wd=${encodeURIComponent(customKeyword.trim())}`);
@@ -1008,7 +1014,7 @@ export const api = {
 
     const apiPath = `/api/vod/resolve?type=tv&id=${encodeURIComponent(
       id
-    )}&season=${encodeURIComponent(String(seasonNumber))}&v=12`;
+    )}&season=${encodeURIComponent(String(seasonNumber))}&v=${VOD_API_VERSION}`;
     const data = await fetchJsonWithLocalFallback<VodResolveResponse>(
       apiPath,
       (d) => Array.isArray(d?.sources) && d.sources.length > 0,
@@ -1030,13 +1036,20 @@ export const api = {
     const trimmed = keyword.trim();
     const apiPath = `/api/vod/resolve?type=${encodeURIComponent(
       type
-    )}&id=${encodeURIComponent(id)}&wd=${encodeURIComponent(trimmed)}&raw=1&v=12`;
+    )}&id=${encodeURIComponent(id)}&wd=${encodeURIComponent(trimmed)}&raw=1&v=${VOD_API_VERSION}`;
     return fetchJsonWithLocalFallback<VodResolveResponse>(
       apiPath,
       (d) => Array.isArray(d?.sources) && d.sources.length > 0,
       signal,
       false
     );
+  },
+
+  /**
+   * Silently prefetches lightweight TMDB movie/TV details into memory cache.
+   */
+  prefetchMediaDetails(type: "movie" | "tv", id: string): void {
+    this.getDetails(type, id).catch(() => {});
   },
 
   /**

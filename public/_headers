@@ -1,5 +1,5 @@
 /*
-  Cache-Control: no-cache, must-revalidate
+  Cache-Control: public, max-age=60, stale-while-revalidate=3600
   Link: <https://image.tmdb.org>; rel=preconnect
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

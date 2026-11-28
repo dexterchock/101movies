@@ -3,6 +3,17 @@ import * as esbuild from "esbuild";
 import ts from "typescript";
 import { defineConfig, Plugin } from "vite";
 
+const VOD_API_VERSION = "12";
+
+function vodApiVersionHtmlPlugin(): Plugin {
+  return {
+    name: "vod-api-version-html",
+    transformIndexHtml(html) {
+      return html.replace(/__VOD_API_VERSION__/g, VOD_API_VERSION);
+    },
+  };
+}
+
 // NOTE: DO NOT remove or switch to native <script type="module">. Samsung Tizen 4.0
 // (Chromium 56) rejects modern module scripts/crossorigin attributes and requires a classic deferred IIFE.
 function tizenClassicBundlePlugin(): Plugin {
@@ -54,7 +65,10 @@ function tizenEs5DownlevelPlugin(): Plugin {
 
 export default defineConfig(() => {
   return {
-    plugins: [tizenEs5DownlevelPlugin(), tizenClassicBundlePlugin()],
+    define: {
+      __VOD_API_VERSION__: JSON.stringify(VOD_API_VERSION),
+    },
+    plugins: [vodApiVersionHtmlPlugin(), tizenEs5DownlevelPlugin(), tizenClassicBundlePlugin()],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "."),

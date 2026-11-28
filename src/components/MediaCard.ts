@@ -136,7 +136,7 @@ export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
 
   card.append(posterBox, meta);
 
-  // 150ms debounced hover & focus intent prefetching
+  // 280ms debounced hover/focus preloads lightweight details; pointerdown kicks off heavy VOD resolution
   let intentTimer: ReturnType<typeof setTimeout> | null = null;
 
   const schedulePrefetch = () => {
@@ -145,8 +145,8 @@ export function createMediaCard(options: MediaCardOptions): HTMLAnchorElement {
     intentTimer = setTimeout(() => {
       intentTimer = null;
       if (signal?.aborted || !card.isConnected) return;
-      api.prefetchMediaIntent(type, String(item.id));
-    }, 150);
+      api.prefetchMediaDetails(type, String(item.id));
+    }, 280);
   };
 
   const cancelPrefetch = () => {

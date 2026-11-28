@@ -4,7 +4,7 @@ A keyboard and remote friendly streaming discovery and HLS playback web app buil
 
 Live site: [101movies.pages.dev](https://101movies.pages.dev)
 
-![101Movies Interface Preview](public/preview.png)
+![101Movies Interface Preview](docs/preview.png)
 
 ## Features
 
@@ -59,13 +59,15 @@ Live site: [101movies.pages.dev](https://101movies.pages.dev)
 │   │   ├── tvbox/                  # TVBox config listing & parser routes
 │   │   └── vod/                    # Stream resolution, ping & proxy routes
 │   └── player/[type]/[id].ts       # HTMLRewriter OG & Twitter meta injection
+├── docs/
+│   └── preview.png                 # Application screenshot
 ├── public/
 │   ├── _headers                    # Cloudflare Pages cache control headers
+│   ├── _routes.json                # Cloudflare Pages Functions route filters
 │   ├── fonts/                      # Bundled Poppins TTF fonts for OG rendering
 │   ├── upscaler/                   # Lazy loaded WebSR runtimes & Anime4K weights
 │   ├── vendor/                     # Lazy loaded hls.js ES5 bundle
 │   ├── og-image.png                # Site Open Graph preview (1200x630)
-│   ├── preview.png                 # Application screenshot
 │   ├── llms.txt
 │   ├── robots.txt
 │   ├── site.webmanifest
